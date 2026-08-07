@@ -1179,7 +1179,7 @@ export default function SkillsSection() {
 
   return (
     <section
-      id="skills"
+      id="experience"
       ref={sectionRef}
       data-performance-mode={
         performanceMode

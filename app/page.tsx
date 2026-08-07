@@ -1,7 +1,8 @@
 import About from "@/components/home/about";
 import Hero from "@/components/home/hero";
 import ProjectsSection from "@/components/home/projects";
-import SkillsSection from "@/components/home/skills";
+import SkillsFlowSection from "@/components/home/skills";
+import SkillsStackSection from "@/components/home/skills-stack";
 
 import Navbar from "@/components/layout/navbar";
 
@@ -17,12 +18,11 @@ export default function HomePage() {
 
         <ProjectsSection />
 
-        <SkillsSection />
+        {/* NEW REAL SKILLS SECTION */}
+        <SkillsStackSection />
 
-        <section
-          id="experience"
-          className="min-h-[300px] scroll-mt-24 bg-white"
-        />
+        {/* OLD LIQUID FLOW — NOW EXPERIENCE */}
+        <SkillsFlowSection />
 
         <section
           id="contact"
