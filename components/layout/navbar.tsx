@@ -1,9 +1,16 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
+  useRef,
   useState,
 } from "react";
+
+import {
+  usePathname,
+  useRouter,
+} from "next/navigation";
 
 import ExperienceModeToggle from "@/components/layout/experience-mode-toggle";
 import LanguageToggle from "@/components/layout/language-toggle";
@@ -17,6 +24,18 @@ const sectionIds = [
   "experience",
   "contact",
 ] as const;
+
+type SectionId =
+  (typeof sectionIds)[number];
+
+const PENDING_SCROLL_KEY =
+  "baki-portfolio-pending-scroll";
+
+/*
+ * Extra room between the sticky navbar
+ * and the section we're scrolling to.
+ */
+const SCROLL_OFFSET = 88;
 
 function MenuIcon({
   open,
@@ -53,6 +72,12 @@ function MenuIcon({
 }
 
 export default function Navbar() {
+  const router =
+    useRouter();
+
+  const pathname =
+    usePathname();
+
   const { copy } =
     useLanguage();
 
@@ -64,52 +89,187 @@ export default function Navbar() {
   const [
     activeSection,
     setActiveSection,
-  ] = useState("home");
+  ] =
+    useState<SectionId>("home");
 
   const [
     isScrolled,
     setIsScrolled,
   ] = useState(false);
 
-  const navigationLinks = [
+  const scrollFrameRef =
+    useRef<number | null>(
+      null,
+    );
+
+  const isHomePage =
+    pathname === "/";
+
+  const navigationLinks: {
+    label: string;
+    id: SectionId;
+  }[] = [
     {
       label:
         copy.nav.home,
-      href: "#home",
       id: "home",
     },
     {
       label:
         copy.nav.about,
-      href: "#about",
       id: "about",
     },
     {
       label:
         copy.nav.projects,
-      href: "#projects",
       id: "projects",
     },
     {
       label:
         copy.nav.skills,
-      href: "#skills",
       id: "skills",
     },
     {
       label:
         copy.nav.experience,
-      href: "#experience",
       id: "experience",
     },
     {
       label:
         copy.nav.contact,
-      href: "#contact",
       id: "contact",
     },
   ];
 
+  /*
+   * Scroll to any homepage section without
+   * adding #section to the URL.
+   */
+  const scrollToSection =
+    useCallback(
+      (
+        sectionId: SectionId,
+        behavior:
+          | ScrollBehavior
+          | undefined = "smooth",
+      ) => {
+        const section =
+          document.getElementById(
+            sectionId,
+          );
+
+        if (!section) {
+          return false;
+        }
+
+        /*
+         * Home should always go to the true
+         * top of the page.
+         */
+        if (
+          sectionId === "home"
+        ) {
+          window.scrollTo({
+            top: 0,
+            behavior,
+          });
+
+          return true;
+        }
+
+        const sectionTop =
+          section.getBoundingClientRect()
+            .top +
+          window.scrollY;
+
+        /*
+         * Keep the heading comfortably below
+         * the sticky navbar.
+         */
+        const finalPosition =
+          Math.max(
+            0,
+            sectionTop -
+              SCROLL_OFFSET,
+          );
+
+        window.scrollTo({
+          top: finalPosition,
+          behavior,
+        });
+
+        return true;
+      },
+      [],
+    );
+
+  /*
+   * Main navbar action.
+   *
+   * If already on homepage:
+   * → scroll directly.
+   *
+   * If on another route:
+   * → remember destination
+   * → navigate to /
+   * → scroll after homepage mounts.
+   */
+  const handleNavigation =
+    useCallback(
+      (
+        sectionId: SectionId,
+      ) => {
+        setMenuOpen(false);
+
+        if (isHomePage) {
+          setActiveSection(
+            sectionId,
+          );
+
+          /*
+           * Give the mobile menu one frame
+           * to begin closing before scrolling.
+           */
+          window.requestAnimationFrame(
+            () => {
+              scrollToSection(
+                sectionId,
+              );
+            },
+          );
+
+          return;
+        }
+
+        /*
+         * Store this temporarily so the homepage
+         * knows where to scroll after navigation.
+         *
+         * This keeps the URL clean:
+         *
+         * /
+         *
+         * instead of:
+         *
+         * /#projects
+         */
+        window.sessionStorage.setItem(
+          PENDING_SCROLL_KEY,
+          sectionId,
+        );
+
+        router.push("/");
+      },
+      [
+        isHomePage,
+        router,
+        scrollToSection,
+      ],
+    );
+
+  /*
+   * Detect navbar scroll state.
+   */
   useEffect(() => {
     function handleScroll() {
       setIsScrolled(
@@ -135,7 +295,116 @@ export default function Navbar() {
     };
   }, []);
 
+  /*
+   * When arriving back on the homepage from:
+   *
+   * /projects
+   * /projects/gym-house-website
+   * /projects/maya-burger-website
+   *
+   * check whether a navbar destination was saved.
+   */
   useEffect(() => {
+    if (!isHomePage) {
+      return;
+    }
+
+    const pendingSection =
+      window.sessionStorage.getItem(
+        PENDING_SCROLL_KEY,
+      );
+
+    if (
+      !pendingSection ||
+      !sectionIds.includes(
+        pendingSection as SectionId,
+      )
+    ) {
+      return;
+    }
+
+    const sectionId =
+      pendingSection as SectionId;
+
+    window.sessionStorage.removeItem(
+      PENDING_SCROLL_KEY,
+    );
+
+    /*
+     * The homepage content may take a few frames
+     * to mount after route navigation.
+     *
+     * Retry briefly until the destination exists.
+     */
+    let attempts = 0;
+
+    const maxAttempts = 60;
+
+    function tryScroll() {
+      attempts += 1;
+
+      const section =
+        document.getElementById(
+          sectionId,
+        );
+
+      if (section) {
+        setActiveSection(
+          sectionId,
+        );
+
+        scrollToSection(
+          sectionId,
+          "smooth",
+        );
+
+        return;
+      }
+
+      if (
+        attempts >= maxAttempts
+      ) {
+        return;
+      }
+
+      scrollFrameRef.current =
+        window.requestAnimationFrame(
+          tryScroll,
+        );
+    }
+
+    scrollFrameRef.current =
+      window.requestAnimationFrame(
+        tryScroll,
+      );
+
+    return () => {
+      if (
+        scrollFrameRef.current !==
+        null
+      ) {
+        window.cancelAnimationFrame(
+          scrollFrameRef.current,
+        );
+      }
+    };
+  }, [
+    isHomePage,
+    scrollToSection,
+  ]);
+
+  /*
+   * Detect which homepage section
+   * is currently visible.
+   *
+   * This keeps the active navbar underline
+   * synchronized with the user's scroll.
+   */
+  useEffect(() => {
+    if (!isHomePage) {
+      return;
+    }
+
     const sections =
       sectionIds
         .map((sectionId) =>
@@ -159,7 +428,7 @@ export default function Navbar() {
     const observer =
       new IntersectionObserver(
         (entries) => {
-          const visible =
+          const visibleSections =
             entries
               .filter(
                 (entry) =>
@@ -174,18 +443,35 @@ export default function Navbar() {
                   first.intersectionRatio,
               );
 
-          const section =
-            visible[0];
+          const mostVisible =
+            visibleSections[0];
 
-          if (section) {
+          if (!mostVisible) {
+            return;
+          }
+
+          const sectionId =
+            mostVisible.target
+              .id as SectionId;
+
+          if (
+            sectionIds.includes(
+              sectionId,
+            )
+          ) {
             setActiveSection(
-              section.target.id,
+              sectionId,
             );
           }
         },
         {
+          /*
+           * Makes the active state feel natural
+           * instead of switching the instant a
+           * section touches the viewport.
+           */
           rootMargin:
-            "-25% 0px -60% 0px",
+            "-22% 0px -58% 0px",
 
           threshold: [
             0.01,
@@ -207,17 +493,38 @@ export default function Navbar() {
     return () => {
       observer.disconnect();
     };
-  }, []);
+  }, [isHomePage]);
 
-  function handleNavigation(
-    sectionId: string,
-  ) {
-    setActiveSection(
-      sectionId,
+  /*
+   * ESC closes mobile menu.
+   */
+  useEffect(() => {
+    if (!menuOpen) {
+      return;
+    }
+
+    function handleKeyDown(
+      event: KeyboardEvent,
+    ) {
+      if (
+        event.key === "Escape"
+      ) {
+        setMenuOpen(false);
+      }
+    }
+
+    window.addEventListener(
+      "keydown",
+      handleKeyDown,
     );
 
-    setMenuOpen(false);
-  }
+    return () => {
+      window.removeEventListener(
+        "keydown",
+        handleKeyDown,
+      );
+    };
+  }, [menuOpen]);
 
   return (
     <header
@@ -228,85 +535,214 @@ export default function Navbar() {
       }`}
     >
       <nav
-  className={`mx-auto flex w-full max-w-[1500px] items-center justify-between overflow-hidden px-2 transition-all duration-500 sm:px-6 lg:px-8 xl:overflow-visible xl:px-12 ${
+        className={`mx-auto flex w-full max-w-[1500px] items-center justify-between overflow-hidden px-2 transition-all duration-500 sm:px-6 lg:px-8 xl:overflow-visible xl:px-12 ${
           isScrolled
             ? "h-[68px]"
             : "h-[82px]"
         }`}
       >
-        {/* LOGO */}
-        <a
-          href="#home"
-          onClick={() =>
+        {/* ==========================================
+            LOGO / HOME BUTTON
+           ========================================== */}
+
+        <button
+          type="button"
+          onClick={() => {
             handleNavigation(
               "home",
-            )
+            );
+          }}
+          aria-label={
+            copy.nav.home
           }
-          className="group flex shrink-0 items-center gap-2"
+          className="group flex shrink-0 cursor-pointer items-center gap-2"
         >
-          <span className="text-lg font-extrabold tracking-[-0.055em] text-[#11130f] transition-colors duration-300 group-hover:text-[#3f6728] sm:text-xl">
+          <span
+            className={`
+              text-lg
+              font-extrabold
+
+              tracking-[-0.055em]
+
+              text-[#11130f]
+
+              transition-colors
+              duration-300
+
+              group-hover:text-[#3f6728]
+
+              sm:text-xl
+            `}
+          >
             BAKI
           </span>
 
-          <span className="hidden font-mono text-sm font-bold text-[#4b702f] sm:inline">
+          <span
+            className={`
+              hidden
+
+              font-mono
+              text-sm
+              font-bold
+
+              text-[#4b702f]
+
+              sm:inline
+            `}
+          >
             &lt;/&gt;
           </span>
-        </a>
+        </button>
 
-        {/* DESKTOP NAV */}
+        {/* ==========================================
+            DESKTOP NAVIGATION
+           ========================================== */}
+
         <div className="hidden items-center gap-6 xl:flex">
           {navigationLinks.map(
             (link) => {
               const active =
+                isHomePage &&
                 activeSection ===
-                link.id;
+                  link.id;
 
               return (
-                <a
+                <button
                   key={link.id}
-                  href={
-                    link.href
-                  }
-                  onClick={() =>
+                  type="button"
+                  onClick={() => {
                     handleNavigation(
                       link.id,
-                    )
-                  }
-                  className={`group relative flex h-[68px] items-center px-1 text-sm font-semibold transition-colors duration-300 ${
-                    active
-                      ? "text-[#3e6727]"
-                      : "text-black/55 hover:text-[#3e6727]"
-                  }`}
+                    );
+                  }}
+                  className={`
+                    group
+                    relative
+
+                    flex
+                    h-[68px]
+
+                    cursor-pointer
+
+                    items-center
+
+                    px-1
+
+                    text-sm
+                    font-semibold
+
+                    transition-colors
+                    duration-300
+
+                    ${
+                      active
+                        ? "text-[#3e6727]"
+                        : "text-black/55 hover:text-[#3e6727]"
+                    }
+                  `}
                 >
                   {link.label}
 
                   <span
-                    className={`absolute bottom-[13px] left-0 h-[2px] w-full origin-center rounded-full bg-[#4b702f] transition-transform duration-300 ${
-                      active
-                        ? "scale-x-100"
-                        : "scale-x-0 group-hover:scale-x-100"
-                    }`}
+                    className={`
+                      absolute
+                      bottom-[13px]
+                      left-0
+
+                      h-[2px]
+                      w-full
+
+                      origin-center
+                      rounded-full
+
+                      bg-[#4b702f]
+
+                      transition-transform
+                      duration-300
+
+                      ${
+                        active
+                          ? "scale-x-100"
+                          : "scale-x-0 group-hover:scale-x-100"
+                      }
+                    `}
                   />
-                </a>
+                </button>
               );
             },
           )}
         </div>
 
-        {/* RIGHT CONTROLS */}
-        <div className="ml-auto flex min-w-0 max-w-[calc(100%-58px)] shrink items-center justify-end gap-1 sm:max-w-none sm:gap-2 xl:ml-0 xl:shrink-0 xl:gap-3">
+        {/* ==========================================
+            RIGHT CONTROLS
+           ========================================== */}
+
+        <div
+          className={`
+            ml-auto
+
+            flex
+            min-w-0
+            max-w-[calc(100%-58px)]
+            shrink
+
+            items-center
+            justify-end
+
+            gap-1
+
+            sm:max-w-none
+            sm:gap-2
+
+            xl:ml-0
+            xl:shrink-0
+            xl:gap-3
+          `}
+        >
           <ExperienceModeToggle />
 
           <LanguageToggle />
 
-          <a
-            href="#contact"
-            onClick={() =>
+          {/* DESKTOP CONTACT BUTTON */}
+
+          <button
+            type="button"
+            onClick={() => {
               handleNavigation(
                 "contact",
-              )
-            }
-            className="group hidden h-12 items-center gap-3 rounded-2xl bg-[#315d20] px-5 text-sm font-semibold text-white shadow-[0_14px_35px_rgba(49,93,32,0.22)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#284e1a] xl:inline-flex"
+              );
+            }}
+            className={`
+              group
+
+              hidden
+              h-12
+
+              cursor-pointer
+
+              items-center
+              gap-3
+
+              rounded-2xl
+
+              bg-[#315d20]
+
+              px-5
+
+              text-sm
+              font-semibold
+              text-white
+
+              shadow-[0_14px_35px_rgba(49,93,32,0.22)]
+
+              transition-all
+              duration-300
+
+              hover:-translate-y-0.5
+              hover:bg-[#284e1a]
+
+              xl:inline-flex
+            `}
           >
             <span>
               {
@@ -315,10 +751,30 @@ export default function Navbar() {
               }
             </span>
 
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/15 transition-transform duration-300 group-hover:translate-x-1">
+            <span
+              className={`
+                flex
+                h-7
+                w-7
+
+                items-center
+                justify-center
+
+                rounded-full
+
+                bg-white/15
+
+                transition-transform
+                duration-300
+
+                group-hover:translate-x-1
+              `}
+            >
               →
             </span>
-          </a>
+          </button>
+
+          {/* MOBILE MENU BUTTON */}
 
           <button
             type="button"
@@ -332,13 +788,13 @@ export default function Navbar() {
             aria-expanded={
               menuOpen
             }
-            onClick={() =>
+            onClick={() => {
               setMenuOpen(
                 (current) =>
                   !current,
-              )
-            }
-            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border text-[#171914] shadow-sm transition-all duration-300 sm:h-11 sm:w-11 xl:hidden ${
+              );
+            }}
+            className={`flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl border text-[#171914] shadow-sm transition-all duration-300 sm:h-11 sm:w-11 xl:hidden ${
               menuOpen
                 ? "border-[#4b702f]/30 bg-[#edf4e8] text-[#3e6727]"
                 : "border-black/10 bg-white hover:border-[#4b702f]/25"
@@ -353,7 +809,10 @@ export default function Navbar() {
         </div>
       </nav>
 
-      {/* MOBILE MENU */}
+      {/* ==========================================
+          MOBILE NAVIGATION
+         ========================================== */}
+
       <div
         className={`absolute inset-x-0 top-full overflow-hidden border-b border-black/[0.07] bg-[#f8f8f4]/98 shadow-[0_25px_50px_rgba(24,35,18,0.12)] backdrop-blur-2xl transition-all duration-500 xl:hidden ${
           menuOpen
@@ -365,21 +824,20 @@ export default function Navbar() {
           {navigationLinks.map(
             (link) => {
               const active =
+                isHomePage &&
                 activeSection ===
-                link.id;
+                  link.id;
 
               return (
-                <a
+                <button
                   key={link.id}
-                  href={
-                    link.href
-                  }
-                  onClick={() =>
+                  type="button"
+                  onClick={() => {
                     handleNavigation(
                       link.id,
-                    )
-                  }
-                  className={`flex items-center justify-between rounded-xl px-4 py-3.5 text-base font-semibold transition-all duration-300 ${
+                    );
+                  }}
+                  className={`group flex w-full cursor-pointer items-center justify-between rounded-xl px-4 py-3.5 text-left text-base font-semibold transition-all duration-300 ${
                     active
                       ? "bg-[#edf4e8] text-[#3e6727]"
                       : "text-black/65 hover:bg-black/[0.035] hover:text-[#3e6727]"
@@ -391,30 +849,78 @@ export default function Navbar() {
                     }
                   </span>
 
-                  <span>
+                  <span
+                    className={`
+                      transition-transform
+                      duration-300
+
+                      group-hover:translate-x-1
+                    `}
+                  >
                     →
                   </span>
-                </a>
+                </button>
               );
             },
           )}
 
-          <a
-            href="#contact"
-            onClick={() =>
+          {/* MOBILE CONTACT */}
+
+          <button
+            type="button"
+            onClick={() => {
               handleNavigation(
                 "contact",
-              )
-            }
-            className="mt-4 flex h-12 items-center justify-center gap-3 rounded-xl bg-[#315d20] font-semibold text-white"
-          >
-            {
-              copy.nav
-                .letsTalk
-            }
+              );
+            }}
+            className={`
+              group
 
-            <span>→</span>
-          </a>
+              mt-4
+
+              flex
+              h-12
+              w-full
+
+              cursor-pointer
+
+              items-center
+              justify-center
+              gap-3
+
+              rounded-xl
+
+              bg-[#315d20]
+
+              font-semibold
+              text-white
+
+              shadow-[0_12px_30px_rgba(49,93,32,0.16)]
+
+              transition-all
+              duration-300
+
+              active:scale-[0.98]
+            `}
+          >
+            <span>
+              {
+                copy.nav
+                  .letsTalk
+              }
+            </span>
+
+            <span
+              className={`
+                transition-transform
+                duration-300
+
+                group-hover:translate-x-1
+              `}
+            >
+              →
+            </span>
+          </button>
         </div>
       </div>
     </header>
