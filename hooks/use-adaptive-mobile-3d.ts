@@ -3,8 +3,11 @@
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
 } from "react";
+
+import { useExperienceMode } from "@/components/providers/experience-mode-provider";
 
 export type RobotRenderMode =
   | "checking"
@@ -13,7 +16,6 @@ export type RobotRenderMode =
 
 export type RobotFallbackReason =
   | "none"
-  | "remembered"
   | "reduced-motion"
   | "low-memory"
   | "low-cpu"
@@ -23,70 +25,56 @@ export type RobotFallbackReason =
   | "manual";
 
 type AdaptiveMobile3DOptions = {
-  /**
-   * Start measuring only after:
-   * - Spline has loaded
-   * - the main website has been revealed
-   */
   monitorEnabled: boolean;
 };
 
-type NavigatorWithPerformanceHints = Navigator & {
-  deviceMemory?: number;
+type NavigatorWithPerformanceHints =
+  Navigator & {
+    deviceMemory?: number;
 
-  userAgentData?: {
-    mobile?: boolean;
+    userAgentData?: {
+      mobile?: boolean;
+    };
   };
-};
 
-const SESSION_STORAGE_KEY =
-  "baki-portfolio-robot-render-mode";
+const PERFORMANCE_WARMUP_MS =
+  4_500;
 
-/**
- * Give WebGL time to compile shaders, initialize textures,
- * and finish the loader/page transition.
- */
-const PERFORMANCE_WARMUP_MS = 4_500;
+const SAMPLE_WINDOW_MS =
+  2_500;
 
-/**
- * Each measurement window lasts 2.5 seconds.
- *
- * Four windows means the system observes roughly ten seconds
- * before making a normal performance fallback decision.
- */
-const SAMPLE_WINDOW_MS = 2_500;
 const HISTORY_SIZE = 4;
-const REQUIRED_BAD_WINDOWS = 3;
-const REQUIRED_CONSECUTIVE_BAD_WINDOWS = 2;
 
-/**
- * Two extremely bad windows can trigger an earlier fallback.
- * This still requires about five seconds of severely bad rendering.
- */
-const REQUIRED_CATASTROPHIC_WINDOWS = 2;
+const REQUIRED_BAD_WINDOWS = 3;
+
+const REQUIRED_CONSECUTIVE_BAD_WINDOWS =
+  2;
+
+const REQUIRED_CATASTROPHIC_WINDOWS =
+  2;
 
 function isPhoneDevice() {
   const extendedNavigator =
     navigator as NavigatorWithPerformanceHints;
 
-  const phoneViewport = window.matchMedia(
-    "(max-width: 767px)",
-  ).matches;
+  const phoneViewport =
+    window.matchMedia(
+      "(max-width: 767px)",
+    ).matches;
 
-  const coarsePointer = window.matchMedia(
-    "(pointer: coarse)",
-  ).matches;
+  const coarsePointer =
+    window.matchMedia(
+      "(pointer: coarse)",
+    ).matches;
 
   const userAgentSaysMobile =
-    extendedNavigator.userAgentData?.mobile === true;
+    extendedNavigator
+      .userAgentData
+      ?.mobile === true;
 
   const hasTouch =
     navigator.maxTouchPoints > 0;
 
-  /*
-   * Requiring a phone-sized viewport prevents small desktop
-   * browser windows from being classified as phones.
-   */
   return (
     phoneViewport &&
     (
@@ -103,28 +91,17 @@ function getInitialFallbackReason():
   const extendedNavigator =
     navigator as NavigatorWithPerformanceHints;
 
-  const rememberedMode = window.sessionStorage.getItem(
-    SESSION_STORAGE_KEY,
-  );
-
-  if (rememberedMode === "image") {
-    return "remembered";
-  }
-
-  const prefersReducedMotion = window.matchMedia(
-    "(prefers-reduced-motion: reduce)",
-  ).matches;
+  const prefersReducedMotion =
+    window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
 
   if (prefersReducedMotion) {
     return "reduced-motion";
   }
 
-  /*
-   * These thresholds are intentionally conservative.
-   * Borderline phones still get a chance to run the real scene,
-   * after which actual frame performance decides.
-   */
-  const memory = extendedNavigator.deviceMemory;
+  const memory =
+    extendedNavigator.deviceMemory;
 
   if (
     typeof memory === "number" &&
@@ -137,7 +114,8 @@ function getInitialFallbackReason():
     navigator.hardwareConcurrency;
 
   if (
-    typeof logicalProcessors === "number" &&
+    typeof logicalProcessors ===
+      "number" &&
     logicalProcessors <= 2
   ) {
     return "low-cpu";
@@ -149,269 +127,465 @@ function getInitialFallbackReason():
 export function useAdaptiveMobile3D({
   monitorEnabled,
 }: AdaptiveMobile3DOptions) {
-  const [mode, setMode] =
-    useState<RobotRenderMode>("checking");
+  const {
+    mode: experienceMode,
+    userSelected,
+    setExperienceMode,
+  } = useExperienceMode();
 
-  const [reason, setReason] =
-    useState<RobotFallbackReason>("none");
-
-  const [isMobile, setIsMobile] =
-    useState(false);
-
-  const [sceneAttempt, setSceneAttempt] =
-    useState(0);
-
-  const activateImage = useCallback(
-    (
-      nextReason: RobotFallbackReason,
-      remember = true,
-    ) => {
-      if (remember) {
-        window.sessionStorage.setItem(
-          SESSION_STORAGE_KEY,
-          "image",
-        );
-      }
-
-      setReason(nextReason);
-      setMode("image");
-    },
-    [],
-  );
-
-  const tryInteractive3D = useCallback(() => {
-    window.sessionStorage.removeItem(
-      SESSION_STORAGE_KEY,
+  const [
+    mode,
+    setMode,
+  ] =
+    useState<RobotRenderMode>(
+      "checking",
     );
 
-    setReason("none");
-    setSceneAttempt((current) => current + 1);
-    setMode("3d");
-  }, []);
+  const [
+    reason,
+    setReason,
+  ] =
+    useState<RobotFallbackReason>(
+      "none",
+    );
 
-  const useLightweightMode = useCallback(() => {
-    activateImage("manual");
-  }, [activateImage]);
+  const [
+    isMobile,
+    setIsMobile,
+  ] =
+    useState(false);
+
+  const [
+    sceneAttempt,
+    setSceneAttempt,
+  ] =
+    useState(0);
+
+  const initialResolvedRef =
+    useRef(false);
+
+  const activateImage =
+    useCallback(
+      (
+        nextReason:
+          RobotFallbackReason,
+        persist = false,
+      ) => {
+        setReason(nextReason);
+
+        setMode("image");
+
+        setExperienceMode(
+          "performance",
+          {
+            persist,
+          },
+        );
+      },
+      [setExperienceMode],
+    );
+
+  const tryInteractive3D =
+    useCallback(() => {
+      setReason("none");
+
+      setSceneAttempt(
+        (current) =>
+          current + 1,
+      );
+
+      setMode("3d");
+
+      setExperienceMode(
+        "quality",
+        {
+          persist: true,
+        },
+      );
+    }, [
+      setExperienceMode,
+    ]);
+
+  const useLightweightMode =
+    useCallback(() => {
+      setReason("manual");
+
+      setMode("image");
+
+      setExperienceMode(
+        "performance",
+        {
+          persist: true,
+        },
+      );
+    }, [
+      setExperienceMode,
+    ]);
 
   /*
-   * Resolve browser-only device information after hydration.
-   * requestAnimationFrame keeps the state update outside the
-   * synchronous effect body.
+   * Resolve the global mode + device capability.
    */
   useEffect(() => {
-    const frame = window.requestAnimationFrame(() => {
-      const phone = isPhoneDevice();
+    const frame =
+      window.requestAnimationFrame(
+        () => {
+          const phone =
+            isPhoneDevice();
 
-      setIsMobile(phone);
+          setIsMobile(phone);
 
-      if (!phone) {
-        setReason("none");
-        setMode("3d");
-        return;
-      }
+          /*
+           * Performance mode ALWAYS wins,
+           * including on desktop.
+           */
+          if (
+            experienceMode ===
+            "performance"
+          ) {
+            setReason(
+              userSelected
+                ? "manual"
+                : reason,
+            );
 
-      const initialFallback =
-        getInitialFallbackReason();
+            setMode("image");
 
-      if (initialFallback) {
-        activateImage(initialFallback);
-        return;
-      }
+            initialResolvedRef.current =
+              true;
 
-      setReason("none");
-      setMode("3d");
-    });
+            return;
+          }
+
+          /*
+           * Explicit Quality selection:
+           * give the visitor real 3D.
+           */
+          if (
+            userSelected &&
+            experienceMode ===
+              "quality"
+          ) {
+            setReason("none");
+
+            setSceneAttempt(
+              (current) =>
+                initialResolvedRef.current
+                  ? current + 1
+                  : current,
+            );
+
+            setMode("3d");
+
+            initialResolvedRef.current =
+              true;
+
+            return;
+          }
+
+          /*
+           * Desktop defaults to quality.
+           */
+          if (!phone) {
+            setReason("none");
+
+            setMode("3d");
+
+            initialResolvedRef.current =
+              true;
+
+            return;
+          }
+
+          /*
+           * Automatic mobile preflight.
+           */
+          const fallbackReason =
+            getInitialFallbackReason();
+
+          if (fallbackReason) {
+            setReason(
+              fallbackReason,
+            );
+
+            setMode("image");
+
+            setExperienceMode(
+              "performance",
+              {
+                persist: false,
+              },
+            );
+
+            initialResolvedRef.current =
+              true;
+
+            return;
+          }
+
+          setReason("none");
+
+          setMode("3d");
+
+          initialResolvedRef.current =
+            true;
+        },
+      );
 
     return () => {
-      window.cancelAnimationFrame(frame);
+      window.cancelAnimationFrame(
+        frame,
+      );
     };
-  }, [activateImage]);
+  }, [
+    experienceMode,
+    setExperienceMode,
+    userSelected,
+  ]);
 
   /*
-   * Actual sustained-performance monitor.
+   * Real sustained performance monitor.
    *
-   * This only runs on phone-sized devices while the live 3D scene
-   * is mounted, loaded, and visible to the visitor.
+   * It only runs when:
+   * - phone
+   * - live 3D
+   * - scene is active
+   * - visitor has NOT explicitly forced Quality
    */
   useEffect(() => {
     if (
       !isMobile ||
       mode !== "3d" ||
-      !monitorEnabled
+      !monitorEnabled ||
+      experienceMode !==
+        "quality" ||
+      userSelected
     ) {
       return;
     }
 
     let animationFrame = 0;
+
     let longTaskObserver:
       | PerformanceObserver
       | null = null;
 
     let previousTimestamp = 0;
+
     let windowStartedAt = 0;
 
     let frameCount = 0;
+
     let slowFrameCount = 0;
+
     let severeFrameCount = 0;
+
     let longTaskDuration = 0;
 
     let consecutiveBadWindows = 0;
-    let consecutiveCatastrophicWindows = 0;
 
-    const badWindowHistory: boolean[] = [];
+    let consecutiveCatastrophicWindows =
+      0;
+
+    const badWindowHistory:
+      boolean[] = [];
 
     const warmupEndsAt =
-      performance.now() + PERFORMANCE_WARMUP_MS;
+      performance.now() +
+      PERFORMANCE_WARMUP_MS;
 
-    function resetMeasurementWindow(
+    function resetWindow(
       timestamp: number,
     ) {
-      windowStartedAt = timestamp;
+      windowStartedAt =
+        timestamp;
 
       frameCount = 0;
+
       slowFrameCount = 0;
+
       severeFrameCount = 0;
+
       longTaskDuration = 0;
     }
 
-    /*
-     * Long Tasks are supplementary.
-     * Safari or another browser may not expose "longtask",
-     * so the feature is detected before observing it.
-     */
     if (
-      typeof PerformanceObserver !== "undefined" &&
-      PerformanceObserver.supportedEntryTypes?.includes(
-        "longtask",
-      )
+      typeof PerformanceObserver !==
+        "undefined" &&
+      PerformanceObserver
+        .supportedEntryTypes
+        ?.includes("longtask")
     ) {
-      longTaskObserver = new PerformanceObserver(
-        (entryList) => {
-          if (
-            document.visibilityState !== "visible" ||
-            performance.now() < warmupEndsAt
-          ) {
-            return;
-          }
+      longTaskObserver =
+        new PerformanceObserver(
+          (entryList) => {
+            if (
+              document
+                .visibilityState !==
+                "visible" ||
+              performance.now() <
+                warmupEndsAt
+            ) {
+              return;
+            }
 
-          for (const entry of entryList.getEntries()) {
-            longTaskDuration += entry.duration;
-          }
-        },
-      );
+            for (
+              const entry of
+              entryList.getEntries()
+            ) {
+              longTaskDuration +=
+                entry.duration;
+            }
+          },
+        );
 
       try {
         longTaskObserver.observe({
-          entryTypes: ["longtask"],
+          entryTypes: [
+            "longtask",
+          ],
         });
       } catch {
         longTaskObserver.disconnect();
-        longTaskObserver = null;
+
+        longTaskObserver =
+          null;
       }
     }
 
-    function measureFrame(timestamp: number) {
-      /*
-       * requestAnimationFrame is heavily throttled in background
-       * tabs. Those samples must never classify the device as slow.
-       */
+    function measureFrame(
+      timestamp: number,
+    ) {
       if (
-        document.visibilityState !== "visible"
+        document.visibilityState !==
+        "visible"
       ) {
-        previousTimestamp = timestamp;
-        resetMeasurementWindow(timestamp);
+        previousTimestamp =
+          timestamp;
+
+        resetWindow(
+          timestamp,
+        );
 
         animationFrame =
-          window.requestAnimationFrame(measureFrame);
+          window.requestAnimationFrame(
+            measureFrame,
+          );
 
         return;
       }
 
-      if (previousTimestamp === 0) {
-        previousTimestamp = timestamp;
-        resetMeasurementWindow(timestamp);
+      if (
+        previousTimestamp === 0
+      ) {
+        previousTimestamp =
+          timestamp;
+
+        resetWindow(
+          timestamp,
+        );
 
         animationFrame =
-          window.requestAnimationFrame(measureFrame);
+          window.requestAnimationFrame(
+            measureFrame,
+          );
 
         return;
       }
 
       const frameDuration =
-        timestamp - previousTimestamp;
+        timestamp -
+        previousTimestamp;
 
-      previousTimestamp = timestamp;
+      previousTimestamp =
+        timestamp;
 
-      /*
-       * Ignore initialization and loader-exit activity.
-       */
-      if (timestamp < warmupEndsAt) {
-        resetMeasurementWindow(timestamp);
+      if (
+        timestamp <
+        warmupEndsAt
+      ) {
+        resetWindow(
+          timestamp,
+        );
 
         animationFrame =
-          window.requestAnimationFrame(measureFrame);
+          window.requestAnimationFrame(
+            measureFrame,
+          );
 
         return;
       }
 
-      /*
-       * Ignore a giant interval caused by tab switching,
-       * browser UI interruption, or device sleep.
-       */
-      if (frameDuration > 1_000) {
-        resetMeasurementWindow(timestamp);
+      if (
+        frameDuration >
+        1_000
+      ) {
+        resetWindow(
+          timestamp,
+        );
 
         animationFrame =
-          window.requestAnimationFrame(measureFrame);
+          window.requestAnimationFrame(
+            measureFrame,
+          );
 
         return;
       }
 
       frameCount += 1;
 
-      /*
-       * Above 34 ms means the browser missed roughly two
-       * frames on a 60 Hz display.
-       */
-      if (frameDuration > 34) {
+      if (
+        frameDuration > 34
+      ) {
         slowFrameCount += 1;
       }
 
-      /*
-       * Above 80 ms is clearly visible as a stutter.
-       */
-      if (frameDuration > 80) {
+      if (
+        frameDuration > 80
+      ) {
         severeFrameCount += 1;
       }
 
       const windowDuration =
-        timestamp - windowStartedAt;
+        timestamp -
+        windowStartedAt;
 
-      if (windowDuration >= SAMPLE_WINDOW_MS) {
-        const framesPerSecond =
-          (frameCount * 1_000) / windowDuration;
+      if (
+        windowDuration >=
+        SAMPLE_WINDOW_MS
+      ) {
+        const fps =
+          (
+            frameCount *
+            1_000
+          ) /
+          windowDuration;
 
-        const slowFrameRatio =
+        const slowRatio =
           frameCount > 0
-            ? slowFrameCount / frameCount
+            ? slowFrameCount /
+              frameCount
             : 1;
 
         const badWindow =
-          framesPerSecond < 28 ||
+          fps < 28 ||
           (
-            framesPerSecond < 40 &&
-            slowFrameRatio > 0.2
+            fps < 40 &&
+            slowRatio > 0.2
           ) ||
-          slowFrameRatio > 0.38 ||
+          slowRatio > 0.38 ||
           severeFrameCount >= 3 ||
-          longTaskDuration >= 320;
+          longTaskDuration >=
+            320;
 
-        const catastrophicWindow =
-          framesPerSecond < 18 ||
+        const catastrophic =
+          fps < 18 ||
           severeFrameCount >= 8 ||
-          longTaskDuration >= 900;
+          longTaskDuration >=
+            900;
 
-        badWindowHistory.push(badWindow);
+        badWindowHistory.push(
+          badWindow,
+        );
 
         if (
           badWindowHistory.length >
@@ -420,59 +594,78 @@ export function useAdaptiveMobile3D({
           badWindowHistory.shift();
         }
 
-        consecutiveBadWindows = badWindow
-          ? consecutiveBadWindows + 1
-          : 0;
-
-        consecutiveCatastrophicWindows =
-          catastrophicWindow
-            ? consecutiveCatastrophicWindows + 1
+        consecutiveBadWindows =
+          badWindow
+            ? consecutiveBadWindows +
+              1
             : 0;
 
-        const badWindowsInHistory =
-          badWindowHistory.filter(Boolean).length;
+        consecutiveCatastrophicWindows =
+          catastrophic
+            ? consecutiveCatastrophicWindows +
+              1
+            : 0;
 
-        const sustainedPoorPerformance =
+        const badWindows =
+          badWindowHistory.filter(
+            Boolean,
+          ).length;
+
+        const sustained =
           badWindowHistory.length ===
             HISTORY_SIZE &&
-          badWindowsInHistory >=
+          badWindows >=
             REQUIRED_BAD_WINDOWS &&
           consecutiveBadWindows >=
             REQUIRED_CONSECUTIVE_BAD_WINDOWS;
 
-        const catastrophicPerformance =
+        const catastrophicFailure =
           consecutiveCatastrophicWindows >=
           REQUIRED_CATASTROPHIC_WINDOWS;
 
         if (
-          sustainedPoorPerformance ||
-          catastrophicPerformance
+          sustained ||
+          catastrophicFailure
         ) {
-          activateImage("sustained-lag");
+          activateImage(
+            "sustained-lag",
+            false,
+          );
 
           return;
         }
 
-        resetMeasurementWindow(timestamp);
+        resetWindow(
+          timestamp,
+        );
       }
 
       animationFrame =
-        window.requestAnimationFrame(measureFrame);
+        window.requestAnimationFrame(
+          measureFrame,
+        );
     }
 
     animationFrame =
-      window.requestAnimationFrame(measureFrame);
+      window.requestAnimationFrame(
+        measureFrame,
+      );
 
     return () => {
-      window.cancelAnimationFrame(animationFrame);
+      window.cancelAnimationFrame(
+        animationFrame,
+      );
+
       longTaskObserver?.disconnect();
     };
   }, [
     activateImage,
+    experienceMode,
     isMobile,
     mode,
     monitorEnabled,
     sceneAttempt,
+    userSelected,
   ]);
 
   return {

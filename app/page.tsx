@@ -1,3 +1,4 @@
+import About from "@/components/home/about";
 import Hero from "@/components/home/hero";
 import Navbar from "@/components/layout/navbar";
 
@@ -6,8 +7,10 @@ export default function HomePage() {
     <>
       <Navbar />
 
-      <main>
+      <main className="w-full overflow-x-hidden">
         <Hero />
+
+        <About />
 
         <section
           id="projects"
