@@ -4,9 +4,9 @@ import {
   useEffect,
   useRef,
   useState,
-  type ReactNode,
 } from "react";
 
+import { useExperienceMode } from "@/components/providers/experience-mode-provider";
 import { useLanguage } from "@/components/providers/language-provider";
 
 type LocalizedText = {
@@ -36,7 +36,6 @@ type SkillGroup = {
 const skillGroups: SkillGroup[] = [
   {
     number: "01",
-
     icon: "frontend",
 
     title: {
@@ -68,7 +67,6 @@ const skillGroups: SkillGroup[] = [
 
   {
     number: "02",
-
     icon: "backend",
 
     title: {
@@ -100,7 +98,6 @@ const skillGroups: SkillGroup[] = [
 
   {
     number: "03",
-
     icon: "security",
 
     title: {
@@ -132,7 +129,6 @@ const skillGroups: SkillGroup[] = [
 
   {
     number: "04",
-
     icon: "database",
 
     title: {
@@ -164,7 +160,6 @@ const skillGroups: SkillGroup[] = [
 
   {
     number: "05",
-
     icon: "cloud",
 
     title: {
@@ -196,7 +191,6 @@ const skillGroups: SkillGroup[] = [
 
   {
     number: "06",
-
     icon: "design",
 
     title: {
@@ -228,7 +222,6 @@ const skillGroups: SkillGroup[] = [
 
   {
     number: "07",
-
     icon: "python",
 
     title: {
@@ -260,7 +253,6 @@ const skillGroups: SkillGroup[] = [
 
   {
     number: "08",
-
     icon: "product",
 
     title: {
@@ -568,9 +560,11 @@ function SkillIconGraphic({
 function SkillCard({
   group,
   index,
+  performanceMode,
 }: {
   group: SkillGroup;
   index: number;
+  performanceMode: boolean;
 }) {
   const { language } =
     useLanguage();
@@ -610,10 +604,13 @@ function SkillCard({
           observer.disconnect();
         },
         {
-          threshold: 0.2,
+          threshold:
+            performanceMode
+              ? 0.08
+              : 0.2,
 
           rootMargin:
-            "0px 0px -8% 0px",
+            "0px 0px -6% 0px",
         },
       );
 
@@ -622,7 +619,7 @@ function SkillCard({
     return () => {
       observer.disconnect();
     };
-  }, []);
+  }, [performanceMode]);
 
   const isRight =
     index % 2 !== 0;
@@ -637,6 +634,12 @@ function SkillCard({
       }
       className={`
         skill-flow-card
+
+        ${
+          performanceMode
+            ? "skill-flow-card--performance"
+            : "skill-flow-card--quality"
+        }
 
         ${
           isRight
@@ -656,13 +659,9 @@ function SkillCard({
         border
         border-black/[0.07]
 
-        bg-white/[0.92]
+        bg-white/[0.94]
 
         p-5
-
-        shadow-[0_20px_65px_rgba(35,49,27,0.08)]
-
-        backdrop-blur-xl
 
         sm:w-[82%]
         sm:p-6
@@ -673,8 +672,6 @@ function SkillCard({
         lg:p-7
       `}
     >
-      {/* TOP HIGHLIGHT */}
-
       <span
         aria-hidden="true"
         className={`
@@ -695,10 +692,10 @@ function SkillCard({
       />
 
       <div className="flex items-start gap-4">
-        {/* ICON */}
-
         <div
           className={`
+            skill-flow-icon
+
             flex
             h-12
             w-12
@@ -716,8 +713,6 @@ function SkillCard({
 
             text-[#72ae35]
 
-            shadow-[0_10px_28px_rgba(118,176,55,0.17),inset_0_1px_0_rgba(255,255,255,0.9)]
-
             sm:h-14
             sm:w-14
             sm:rounded-[17px]
@@ -727,8 +722,6 @@ function SkillCard({
             type={group.icon}
           />
         </div>
-
-        {/* TEXT */}
 
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
@@ -744,9 +737,7 @@ function SkillCard({
                   text-[#76aa49]
                 `}
               >
-                {
-                  group.number
-                }
+                {group.number}
               </span>
 
               <h3
@@ -824,8 +815,6 @@ function SkillCard({
         </div>
       </div>
 
-      {/* SKILLS */}
-
       <div
         className={`
           mt-5
@@ -845,6 +834,8 @@ function SkillCard({
             <span
               key={skill}
               className={`
+                skill-flow-chip
+
                 rounded-[9px]
 
                 border
@@ -860,13 +851,6 @@ function SkillCard({
 
                 text-black/52
 
-                transition-all
-                duration-300
-
-                hover:border-[#8fc85b]/25
-                hover:bg-[#f0f8e8]
-                hover:text-[#4c782f]
-
                 sm:text-[10px]
               `}
             >
@@ -876,27 +860,27 @@ function SkillCard({
         )}
       </div>
 
-      {/* DECORATIVE CORNER */}
+      {!performanceMode && (
+        <div
+          aria-hidden="true"
+          className={`
+            pointer-events-none
 
-      <div
-        aria-hidden="true"
-        className={`
-          pointer-events-none
+            absolute
+            -bottom-8
+            -right-8
 
-          absolute
-          -bottom-8
-          -right-8
+            h-24
+            w-24
 
-          h-24
-          w-24
+            rounded-full
 
-          rounded-full
+            bg-[#b9ed78]/10
 
-          bg-[#b9ed78]/10
-
-          blur-2xl
-        `}
-      />
+            blur-2xl
+          `}
+        />
+      )}
     </article>
   );
 }
@@ -933,20 +917,28 @@ export default function SkillsSection() {
   const { language } =
     useLanguage();
 
-const sectionRef =
-  useRef<HTMLElement | null>(
-    null,
-  );
+  const {
+    mode: experienceMode,
+  } = useExperienceMode();
 
-const flowRef =
-  useRef<HTMLDivElement | null>(
-    null,
-  );
+  const performanceMode =
+    experienceMode ===
+    "performance";
 
-const liquidPathRef =
-  useRef<SVGPathElement | null>(
-    null,
-  );
+  const sectionRef =
+    useRef<HTMLElement | null>(
+      null,
+    );
+
+  const flowRef =
+    useRef<HTMLDivElement | null>(
+      null,
+    );
+
+  const liquidPathRef =
+    useRef<SVGPathElement | null>(
+      null,
+    );
 
   const copy =
     language === "am"
@@ -996,70 +988,75 @@ const liquidPathRef =
         };
 
   /*
-   * Scroll-linked tube fill.
+   * Scroll-linked liquid.
    *
-   * We update the SVG directly instead of calling
-   * setState every frame. That keeps this animation
-   * extremely lightweight.
+   * Important:
+   * we update the actual SVG path rather than React state.
+   * That avoids a component render for every scroll frame.
    */
   useEffect(() => {
-const flow =
-  flowRef.current;
+    const flow =
+      flowRef.current;
 
-const liquidPath =
-  liquidPathRef.current;
+    const liquidPath =
+      liquidPathRef.current;
 
-if (
-  !flow ||
-  !liquidPath
-) {
-  return;
-}
+    if (
+      !flow ||
+      !liquidPath
+    ) {
+      return;
+    }
 
     let animationFrame = 0;
 
+    /*
+     * In Performance mode we avoid processing extremely
+     * tiny scroll differences.
+     *
+     * That cuts unnecessary style writes on phones.
+     */
+    let previousProgress = -1;
+
     function updateProgress() {
       const currentFlow =
-  flowRef.current;
+        flowRef.current;
 
-const currentPath =
-  liquidPathRef.current;
+      const currentPath =
+        liquidPathRef.current;
 
-if (
-  !currentFlow ||
-  !currentPath
-) {
-  return;
-}
+      if (
+        !currentFlow ||
+        !currentPath
+      ) {
+        return;
+      }
 
-const rect =
-  currentFlow.getBoundingClientRect();
+      const rect =
+        currentFlow.getBoundingClientRect();
 
-const flowTop =
-  window.scrollY +
-  rect.top;
+      const flowTop =
+        window.scrollY +
+        rect.top;
 
-const flowHeight =
-  currentFlow.offsetHeight;
+      const flowHeight =
+        currentFlow.offsetHeight;
 
-const viewportHeight =
-  window.innerHeight;
+      const viewportHeight =
+        window.innerHeight;
 
-/*
- * Start only when the actual skill/tube area
- * reaches around the lower-middle of the screen.
- */
-const start =
-  flowTop -
-  viewportHeight * 0.58;
+      /*
+       * This is the tuned later starting point
+       * from our previous adjustment.
+       */
+      const start =
+        flowTop -
+        viewportHeight * 0.52;
 
-/*
- * Finish while the final skill is still visible.
- */
-const end =
-  flowTop +
-  flowHeight -
-  viewportHeight * 0.48;
+      const end =
+        flowTop +
+        flowHeight -
+        viewportHeight * 0.48;
 
       const denominator =
         Math.max(
@@ -1074,7 +1071,7 @@ const end =
         ) /
         denominator;
 
-      const progress =
+      let progress =
         Math.min(
           1,
           Math.max(
@@ -1082,6 +1079,37 @@ const end =
             rawProgress,
           ),
         );
+
+      /*
+       * PERFORMANCE MODE
+       *
+       * Quantize the value slightly.
+       *
+       * Quality:
+       * thousands of tiny possible progress changes.
+       *
+       * Performance:
+       * 400 steps are more than enough visually but reduce
+       * needless SVG paint updates during fast scrolling.
+       */
+      if (
+        performanceMode
+      ) {
+        progress =
+          Math.round(
+            progress * 400,
+          ) / 400;
+
+        if (
+          progress ===
+          previousProgress
+        ) {
+          return;
+        }
+      }
+
+      previousProgress =
+        progress;
 
       currentPath.style.strokeDashoffset =
         String(
@@ -1095,13 +1123,20 @@ const end =
     }
 
     function requestUpdate() {
-      window.cancelAnimationFrame(
-        animationFrame,
-      );
+      /*
+       * Never allow multiple queued animation frames.
+       */
+      if (animationFrame) {
+        return;
+      }
 
       animationFrame =
         window.requestAnimationFrame(
-          updateProgress,
+          () => {
+            animationFrame = 0;
+
+            updateProgress();
+          },
         );
     }
 
@@ -1124,9 +1159,11 @@ const end =
     );
 
     return () => {
-      window.cancelAnimationFrame(
-        animationFrame,
-      );
+      if (animationFrame) {
+        window.cancelAnimationFrame(
+          animationFrame,
+        );
+      }
 
       window.removeEventListener(
         "scroll",
@@ -1138,13 +1175,26 @@ const end =
         requestUpdate,
       );
     };
-  }, []);
+  }, [performanceMode]);
 
   return (
     <section
       id="skills"
       ref={sectionRef}
+      data-performance-mode={
+        performanceMode
+          ? "true"
+          : "false"
+      }
       className={`
+        skills-flow-section
+
+        ${
+          performanceMode
+            ? "skills-flow-section--performance"
+            : "skills-flow-section--quality"
+        }
+
         relative
 
         scroll-mt-24
@@ -1163,11 +1213,15 @@ const end =
         lg:py-28
       `}
     >
-      {/* BACKGROUND */}
+      {/* ==========================================
+          BACKGROUND DOTS
+         ========================================== */}
 
       <div
         aria-hidden="true"
         className={`
+          skills-flow-dot-background
+
           pointer-events-none
 
           absolute
@@ -1182,27 +1236,35 @@ const end =
         `}
       />
 
-      <div
-        aria-hidden="true"
-        className={`
-          pointer-events-none
+      {/* ==========================================
+          LARGE QUALITY-MODE GLOW
 
-          absolute
-          left-1/2
-          top-[18%]
+          Completely removed from the DOM in Performance.
+         ========================================== */}
 
-          h-[520px]
-          w-[520px]
+      {!performanceMode && (
+        <div
+          aria-hidden="true"
+          className={`
+            pointer-events-none
 
-          -translate-x-1/2
+            absolute
+            left-1/2
+            top-[18%]
 
-          rounded-full
+            h-[520px]
+            w-[520px]
 
-          bg-[#dff2cf]/35
+            -translate-x-1/2
 
-          blur-[150px]
-        `}
-      />
+            rounded-full
+
+            bg-[#dff2cf]/35
+
+            blur-[150px]
+          `}
+        />
+      )}
 
       <div className="relative mx-auto max-w-[1450px]">
         {/* ==========================================
@@ -1212,6 +1274,8 @@ const end =
         <header className="mx-auto max-w-[780px] text-center">
           <div
             className={`
+              skills-flow-header-pill
+
               mx-auto
 
               inline-flex
@@ -1227,13 +1291,20 @@ const end =
 
               px-3
               py-1.5
-
-              shadow-[0_6px_20px_rgba(42,61,31,0.05)]
-
-              backdrop-blur-xl
             `}
           >
-            <span className="h-1.5 w-1.5 rounded-full bg-[#9ce23f] shadow-[0_0_12px_rgba(156,226,63,0.8)]" />
+            <span
+              className={`
+                skills-flow-status-dot
+
+                h-1.5
+                w-1.5
+
+                rounded-full
+
+                bg-[#9ce23f]
+              `}
+            />
 
             <span
               className={`
@@ -1340,11 +1411,11 @@ const end =
         </header>
 
         {/* ==========================================
-            FLOW AREA
+            FLOW
            ========================================== */}
 
         <div
-        ref={flowRef}
+          ref={flowRef}
           className={`
             relative
 
@@ -1358,13 +1429,15 @@ const end =
           `}
         >
           {/* ==========================================
-              SVG PIPE / LIQUID
+              TUBE
              ========================================== */}
 
           <svg
             viewBox="0 0 1000 2800"
             preserveAspectRatio="none"
             className={`
+              skills-flow-svg
+
               pointer-events-none
 
               absolute
@@ -1380,54 +1453,59 @@ const end =
             aria-hidden="true"
           >
             <defs>
-              <linearGradient
-                id="skillsLiquidGradient"
-                x1="0"
-                y1="0"
-                x2="1"
-                y2="1"
-              >
-                <stop
-                  offset="0%"
-                  stopColor="#d8ff55"
-                />
+              {!performanceMode && (
+                <>
+                  <linearGradient
+                    id="skillsLiquidGradient"
+                    x1="0"
+                    y1="0"
+                    x2="1"
+                    y2="1"
+                  >
+                    <stop
+                      offset="0%"
+                      stopColor="#d8ff55"
+                    />
 
-                <stop
-                  offset="45%"
-                  stopColor="#a8eb39"
-                />
+                    <stop
+                      offset="45%"
+                      stopColor="#a8eb39"
+                    />
 
-                <stop
-                  offset="100%"
-                  stopColor="#7fc52d"
-                />
-              </linearGradient>
+                    <stop
+                      offset="100%"
+                      stopColor="#7fc52d"
+                    />
+                  </linearGradient>
 
-              <filter
-                id="skillsLiquidGlow"
-                x="-100%"
-                y="-100%"
-                width="300%"
-                height="300%"
-              >
-                <feGaussianBlur
-                  stdDeviation="10"
-                  result="blur"
-                />
+                  <filter
+                    id="skillsLiquidGlow"
+                    x="-100%"
+                    y="-100%"
+                    width="300%"
+                    height="300%"
+                    colorInterpolationFilters="sRGB"
+                  >
+                    <feGaussianBlur
+                      stdDeviation="8"
+                      result="blur"
+                    />
 
-                <feMerge>
-                  <feMergeNode
-                    in="blur"
-                  />
+                    <feMerge>
+                      <feMergeNode
+                        in="blur"
+                      />
 
-                  <feMergeNode
-                    in="SourceGraphic"
-                  />
-                </feMerge>
-              </filter>
+                      <feMergeNode
+                        in="SourceGraphic"
+                      />
+                    </feMerge>
+                  </filter>
+                </>
+              )}
             </defs>
 
-            {/* OUTER GLASS TUBE */}
+            {/* OUTER TUBE */}
 
             <path
               pathLength="1"
@@ -1455,9 +1533,40 @@ const end =
               className="skills-flow-tube"
             />
 
-            {/* INNER GLASS HIGHLIGHT */}
+            {/* GLASS HIGHLIGHT */}
+
+            {!performanceMode && (
+              <path
+                pathLength="1"
+                d="
+                  M500 0
+                  C500 110 500 150 500 210
+
+                  C500 310 255 300 255 420
+                  C255 540 745 530 745 650
+
+                  C745 770 255 760 255 880
+                  C255 1000 745 990 745 1110
+
+                  C745 1230 255 1220 255 1340
+                  C255 1460 745 1450 745 1570
+
+                  C745 1690 255 1680 255 1800
+                  C255 1920 745 1910 745 2030
+
+                  C745 2150 255 2140 255 2260
+                  C255 2380 745 2370 745 2490
+
+                  C745 2610 500 2580 500 2800
+                "
+                className="skills-flow-tube-highlight"
+              />
+            )}
+
+            {/* LIQUID */}
 
             <path
+              ref={liquidPathRef}
               pathLength="1"
               d="
                 M500 0
@@ -1480,45 +1589,22 @@ const end =
 
                 C745 2610 500 2580 500 2800
               "
-              className="skills-flow-tube-highlight"
-            />
-
-            {/* ACTUAL SCROLL-FILLED LIQUID */}
-
-            <path
-              ref={
-                liquidPathRef
+              stroke={
+                performanceMode
+                  ? "#9eea39"
+                  : "url(#skillsLiquidGradient)"
               }
-              pathLength="1"
-              d="
-                M500 0
-                C500 110 500 150 500 210
-
-                C500 310 255 300 255 420
-                C255 540 745 530 745 650
-
-                C745 770 255 760 255 880
-                C255 1000 745 990 745 1110
-
-                C745 1230 255 1220 255 1340
-                C255 1460 745 1450 745 1570
-
-                C745 1690 255 1680 255 1800
-                C255 1920 745 1910 745 2030
-
-                C745 2150 255 2140 255 2260
-                C255 2380 745 2370 745 2490
-
-                C745 2610 500 2580 500 2800
-              "
-              stroke="url(#skillsLiquidGradient)"
-              filter="url(#skillsLiquidGlow)"
+              filter={
+                performanceMode
+                  ? undefined
+                  : "url(#skillsLiquidGlow)"
+              }
               className="skills-flow-liquid"
             />
           </svg>
 
           {/* ==========================================
-              SKILL CARDS
+              CARDS
              ========================================== */}
 
           <div
@@ -1548,15 +1634,22 @@ const end =
                   }
                   group={group}
                   index={index}
+                  performanceMode={
+                    performanceMode
+                  }
                 />
               ),
             )}
           </div>
 
-          {/* BOTTOM TERMINAL */}
+          {/* ==========================================
+              END
+             ========================================== */}
 
           <div
             className={`
+              skills-flow-end-pill
+
               relative
               z-20
 
@@ -1587,23 +1680,19 @@ const end =
 
               text-[#568335]
 
-              shadow-[0_10px_32px_rgba(74,112,47,0.08)]
-
-              backdrop-blur-xl
-
               sm:mt-24
             `}
           >
             <span
               className={`
+                skills-flow-status-dot
+
                 h-2
                 w-2
 
                 rounded-full
 
                 bg-[#a8ec3e]
-
-                shadow-[0_0_14px_rgba(168,236,62,0.85)]
               `}
             />
 

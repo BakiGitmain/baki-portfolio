@@ -992,3 +992,283 @@ main {
     transition: none;
   }
 }
+/* =========================================================
+   SKILLS — QUALITY / PERFORMANCE MODES
+   ========================================================= */
+
+/*
+ * QUALITY MODE
+ * Keep the premium effects.
+ */
+
+.skills-flow-section--quality .skill-flow-card {
+  box-shadow:
+    0 20px 65px
+    rgba(35, 49, 27, 0.08);
+
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.skills-flow-section--quality .skill-flow-icon {
+  box-shadow:
+    0 10px 28px
+      rgba(118, 176, 55, 0.17),
+    inset 0 1px 0
+      rgba(255, 255, 255, 0.9);
+}
+
+.skills-flow-section--quality
+  .skills-flow-header-pill,
+.skills-flow-section--quality
+  .skills-flow-end-pill {
+  box-shadow:
+    0 10px 32px
+    rgba(74, 112, 47, 0.08);
+
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.skills-flow-section--quality
+  .skills-flow-status-dot {
+  box-shadow:
+    0 0 14px
+    rgba(168, 236, 62, 0.8);
+}
+
+/*
+ * =========================================================
+ * PERFORMANCE MODE
+ *
+ * These overrides remove the expensive parts:
+ *
+ * - SVG shadows
+ * - glass blur
+ * - card blur
+ * - glowing dots
+ * - expensive hover effects
+ * - large layered shadows
+ * =========================================================
+ */
+
+.skills-flow-section--performance
+  .skills-flow-svg {
+  contain: layout paint;
+}
+
+.skills-flow-section--performance
+  .skills-flow-tube {
+  stroke:
+    rgba(114, 133, 98, 0.14);
+
+  filter: none !important;
+}
+
+.skills-flow-section--performance
+  .skills-flow-liquid {
+  filter: none !important;
+
+  stroke-width: 13px;
+
+  transition:
+    opacity 150ms linear;
+
+  will-change:
+    stroke-dashoffset;
+}
+
+.skills-flow-section--performance
+  .skill-flow-card {
+  background:
+    rgba(255, 255, 255, 0.97);
+
+  box-shadow:
+    0 8px 24px
+    rgba(35, 49, 27, 0.055);
+
+  backdrop-filter:
+    none !important;
+
+  -webkit-backdrop-filter:
+    none !important;
+
+  transition:
+    opacity 350ms ease,
+    transform 400ms
+      cubic-bezier(
+        0.22,
+        1,
+        0.36,
+        1
+      );
+
+  will-change:
+    auto;
+}
+
+.skills-flow-section--performance
+  .skill-flow-icon {
+  box-shadow:
+    0 5px 14px
+    rgba(118, 176, 55, 0.08);
+}
+
+.skills-flow-section--performance
+  .skill-flow-chip {
+  transition: none;
+}
+
+.skills-flow-section--performance
+  .skills-flow-header-pill,
+.skills-flow-section--performance
+  .skills-flow-end-pill {
+  box-shadow:
+    0 4px 14px
+    rgba(35, 49, 27, 0.04);
+
+  backdrop-filter:
+    none;
+
+  -webkit-backdrop-filter:
+    none;
+}
+
+.skills-flow-section--performance
+  .skills-flow-status-dot {
+  box-shadow: none;
+}
+
+/*
+ * Kill the expensive quality hover lift
+ * while Performance mode is active.
+ */
+
+.skills-flow-section--performance
+  .skill-flow-card[data-visible="true"]:hover {
+  transform:
+    translate3d(
+      0,
+      0,
+      0
+    )
+    scale(1);
+
+  border-color:
+    rgba(0, 0, 0, 0.07);
+
+  box-shadow:
+    0 8px 24px
+    rgba(35, 49, 27, 0.055);
+}
+
+/* =========================================================
+   MOBILE PERFORMANCE MODE
+   ========================================================= */
+
+@media (max-width: 767px) {
+  /*
+   * The mobile GPU gets the biggest reduction.
+   */
+
+  .skills-flow-section--performance
+    .skills-flow-dot-background {
+    opacity: 0.18;
+  }
+
+  .skills-flow-section--performance
+    .skills-flow-tube {
+    stroke-width: 23px;
+
+    filter: none !important;
+  }
+
+  .skills-flow-section--performance
+    .skills-flow-liquid {
+    stroke-width: 9px;
+
+    filter: none !important;
+  }
+
+  /*
+   * Cards only do a tiny vertical entrance.
+   * No sideways transforms.
+   */
+
+  .skills-flow-section--performance
+    .skill-flow-card {
+    --skill-enter-x: 0px;
+
+    transform:
+      translate3d(
+        0,
+        12px,
+        0
+      );
+
+    opacity: 0;
+
+    box-shadow:
+      0 5px 18px
+      rgba(35, 49, 27, 0.045);
+  }
+
+  .skills-flow-section--performance
+    .skill-flow-card[data-visible="true"] {
+    transform:
+      translate3d(
+        0,
+        0,
+        0
+      );
+
+    opacity: 1;
+  }
+
+  .skills-flow-section--performance
+    .skill-flow-card[data-visible="true"]:hover {
+    transform:
+      translate3d(
+        0,
+        0,
+        0
+      );
+  }
+
+  .skills-flow-section--performance
+    .skill-flow-icon {
+    box-shadow: none;
+  }
+}
+
+/* =========================================================
+   VERY WEAK / REDUCED MOTION DEVICES
+   ========================================================= */
+
+@media (
+  prefers-reduced-motion:
+    reduce
+) {
+  .skills-flow-section
+    .skill-flow-card,
+  .skills-flow-section
+    .skill-flow-card[data-visible="true"] {
+    transform: none;
+
+    opacity: 1;
+
+    transition: none;
+  }
+
+  .skills-flow-section
+    .skills-flow-liquid {
+    transition: none;
+
+    filter: none !important;
+  }
+
+  .skills-flow-section
+    .skill-flow-tube {
+    filter: none !important;
+  }
+}
