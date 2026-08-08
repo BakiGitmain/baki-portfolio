@@ -1,12 +1,13 @@
 import express, {
   type NextFunction,
   type Request,
+  type RequestHandler,
   type Response,
 } from "express";
 
 import cors from "cors";
 
-import helmet from "helmet";
+import helmetModule from "helmet";
 
 import cookieParser from "cookie-parser";
 
@@ -30,7 +31,10 @@ import projectsRouter from "./routes/projects.routes.js";
 
 const app =
   express();
-
+const helmet =
+  helmetModule as unknown as (
+    options?: Record<string, unknown>,
+  ) => RequestHandler;
 app.set(
   "trust proxy",
   1,
