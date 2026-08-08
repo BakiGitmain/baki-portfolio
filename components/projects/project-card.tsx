@@ -3,9 +3,13 @@
 import Image from "next/image";
 import Link from "next/link";
 
-import { useLanguage } from "@/components/providers/language-provider";
+import {
+  useLanguage,
+} from "@/components/providers/language-provider";
 
-import type { Project } from "@/lib/projects";
+import type {
+  Project,
+} from "@/lib/projects";
 
 function ArrowIcon() {
   return (
@@ -38,20 +42,40 @@ export default function ProjectCard({
 }: {
   project: Project;
 }) {
-  const { language } =
-    useLanguage();
+  const {
+    language,
+  } = useLanguage();
+
+  const title =
+    language === "am"
+      ? project.title.am
+      : project.title.en;
+
+  const category =
+    language === "am"
+      ? project.category.am
+      : project.category.en;
+
+  const shortDescription =
+    language === "am"
+      ? project.shortDescription.am
+      : project.shortDescription.en;
 
   const labels =
     language === "am"
       ? {
           caseStudy:
             "ፕሮጀክቱን በዝርዝር ይመልከቱ",
-          imageAlt: `${project.title} ፕሮጀክት`,
+
+          imageAlt:
+            `${title} ፕሮጀክት`,
         }
       : {
           caseStudy:
             "View Case Study",
-          imageAlt: `${project.title} project`,
+
+          imageAlt:
+            `${title} project`,
         };
 
   return (
@@ -78,17 +102,22 @@ export default function ProjectCard({
         ease-[cubic-bezier(0.22,1,0.36,1)]
 
         hover:-translate-y-2
+
         hover:border-[#5f8b43]/20
 
         hover:shadow-[0_24px_65px_rgba(42,67,29,0.12)]
       `}
     >
-      {/* THUMBNAIL */}
+      {/* =================================================
+          IMAGE
+         ================================================= */}
 
       <div
         className={`
           relative
+
           aspect-[16/10]
+
           overflow-hidden
 
           border-b
@@ -99,8 +128,12 @@ export default function ProjectCard({
       >
         <Image
           fill
-          src={project.thumbnail}
-          alt={labels.imageAlt}
+          src={
+            project.thumbnail
+          }
+          alt={
+            labels.imageAlt
+          }
           sizes="(max-width: 768px) 100vw, 50vw"
           className={`
             object-cover
@@ -122,6 +155,7 @@ export default function ProjectCard({
             inset-0
 
             bg-gradient-to-t
+
             from-black/[0.08]
             via-transparent
             to-transparent
@@ -135,8 +169,6 @@ export default function ProjectCard({
           `}
         />
 
-        {/* FLOATING OPEN BUTTON */}
-
         <div
           className={`
             absolute
@@ -146,6 +178,7 @@ export default function ProjectCard({
             flex
             h-10
             w-10
+
             items-center
             justify-center
 
@@ -173,7 +206,9 @@ export default function ProjectCard({
         </div>
       </div>
 
-      {/* CONTENT */}
+      {/* =================================================
+          CONTENT
+         ================================================= */}
 
       <div className="p-5 sm:p-6">
         <div className="mb-3 flex items-center gap-2">
@@ -182,17 +217,18 @@ export default function ProjectCard({
           <p
             className={`
               text-[10px]
+
               font-bold
+
               uppercase
+
               tracking-[0.15em]
 
               text-[#548236]
             `}
           >
             {
-              project.category[
-                language
-              ]
+              category
             }
           </p>
         </div>
@@ -200,7 +236,9 @@ export default function ProjectCard({
         <h3
           className={`
             text-[23px]
+
             font-bold
+
             tracking-[-0.045em]
 
             text-[#161914]
@@ -213,33 +251,41 @@ export default function ProjectCard({
             sm:text-[26px]
           `}
         >
-          {project.title}
+          {
+            title
+          }
         </h3>
 
         <p
           className={`
             mt-2
+
             max-w-[600px]
 
             text-[13px]
+
             leading-6
+
             text-black/48
 
             sm:text-[14px]
           `}
         >
           {
-            project.shortDescription[
-              language
-            ]
+            shortDescription
           }
         </p>
 
-        {/* TECHNOLOGIES */}
+        {/* =================================================
+            TECHNOLOGIES
+           ================================================= */}
 
         <div className="mt-5 flex flex-wrap gap-2">
           {project.technologies
-            .slice(0, 4)
+            .slice(
+              0,
+              4,
+            )
             .map(
               (
                 technology,
@@ -260,7 +306,9 @@ export default function ProjectCard({
                     py-1.5
 
                     text-[10px]
+
                     font-semibold
+
                     text-black/48
 
                     sm:text-[11px]
@@ -274,7 +322,9 @@ export default function ProjectCard({
             )}
         </div>
 
-        {/* CASE STUDY */}
+        {/* =================================================
+            CASE STUDY
+           ================================================= */}
 
         <div
           className={`
@@ -285,7 +335,9 @@ export default function ProjectCard({
             gap-2
 
             text-[12px]
+
             font-bold
+
             text-[#4b792f]
 
             sm:text-[13px]

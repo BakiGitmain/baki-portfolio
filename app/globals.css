@@ -8446,3 +8446,21 @@ a.contact-method-card:hover {
     transition: none;
   }
 }
+/* =========================================================
+   PROJECT GALLERY
+   ========================================================= */
+
+@keyframes project-gallery-dot-progress {
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.project-gallery-dot-progress {
+  transform-origin: left center;
+  animation: project-gallery-dot-progress 5s linear forwards;
+}

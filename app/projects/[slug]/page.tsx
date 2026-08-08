@@ -1,6 +1,10 @@
-import type { Metadata } from "next";
+import type {
+  Metadata,
+} from "next";
 
-import { notFound } from "next/navigation";
+import {
+  notFound,
+} from "next/navigation";
 
 import Navbar from "@/components/layout/navbar";
 
@@ -8,7 +12,6 @@ import ProjectDetail from "@/components/projects/project-detail";
 
 import {
   getProjectBySlug,
-  projects,
 } from "@/lib/projects";
 
 type ProjectPageProps = {
@@ -17,46 +20,103 @@ type ProjectPageProps = {
   }>;
 };
 
-export function generateStaticParams() {
-  return projects.map(
-    (project) => ({
-      slug: project.slug,
-    }),
-  );
-}
+export const dynamic =
+  "force-dynamic";
+
+/* =========================================================
+   METADATA
+   ========================================================= */
 
 export async function generateMetadata({
   params,
 }: ProjectPageProps): Promise<Metadata> {
-  const { slug } =
+  const {
+    slug,
+  } =
     await params;
 
-  const project =
-    getProjectBySlug(slug);
+  try {
+    const project =
+      await getProjectBySlug(
+        slug,
+      );
 
-  if (!project) {
+    if (!project) {
+      return {
+        title:
+          "Project Not Found | Baki",
+      };
+    }
+
     return {
       title:
-        "Project Not Found | Baki",
+        `${project.title.en} | Baki Projects`,
+
+      description:
+        project.shortDescription.en,
+
+      openGraph: {
+        title:
+          `${project.title.en} | Baki Projects`,
+
+        description:
+          project.shortDescription.en,
+
+        images: [
+          {
+            url:
+              project.thumbnail,
+
+            alt:
+              project.title.en,
+          },
+        ],
+      },
+    };
+  } catch (
+    error
+  ) {
+    console.error(
+      "Failed to generate project metadata:",
+      error,
+    );
+
+    return {
+      title:
+        "Project | Baki",
     };
   }
-
-  return {
-    title: `${project.title} | Baki Projects`,
-
-    description:
-      project.shortDescription.en,
-  };
 }
+
+/* =========================================================
+   PAGE
+   ========================================================= */
 
 export default async function ProjectPage({
   params,
 }: ProjectPageProps) {
-  const { slug } =
+  const {
+    slug,
+  } =
     await params;
 
-  const project =
-    getProjectBySlug(slug);
+  let project;
+
+  try {
+    project =
+      await getProjectBySlug(
+        slug,
+      );
+  } catch (
+    error
+  ) {
+    console.error(
+      "Failed to load project:",
+      error,
+    );
+
+    notFound();
+  }
 
   if (!project) {
     notFound();
@@ -67,7 +127,9 @@ export default async function ProjectPage({
       <Navbar />
 
       <ProjectDetail
-        project={project}
+        project={
+          project
+        }
       />
     </>
   );

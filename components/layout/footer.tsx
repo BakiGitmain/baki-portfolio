@@ -219,6 +219,7 @@ export default function Footer() {
 
     {
       id: "projects",
+      
       label: copy.projects,
     },
 

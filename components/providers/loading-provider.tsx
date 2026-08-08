@@ -11,193 +11,583 @@ import {
   type ReactNode,
 } from "react";
 
+import {
+  usePathname,
+} from "next/navigation";
+
 export type LoadingTaskId =
   | "interface"
   | "fonts"
-  | "images"
   | "scene3d"
+  | "images"
   | "page";
 
-type LoadingTaskState = "pending" | "complete" | "failed";
+type LoadingTaskState =
+  | "pending"
+  | "complete"
+  | "failed";
 
-type LoadingState = Record<LoadingTaskId, LoadingTaskState>;
+type LoadingState =
+  Record<
+    LoadingTaskId,
+    LoadingTaskState
+  >;
 
 type LoadingContextValue = {
-  tasks: LoadingState;
-  actualProgress: number;
-  currentTask: LoadingTaskId | null;
-  allTasksResolved: boolean;
-  failedTasks: LoadingTaskId[];
-  hasRevealed: boolean;
-  completeTask: (task: LoadingTaskId) => void;
-  failTask: (task: LoadingTaskId) => void;
-  revealExperience: () => void;
+  tasks:
+    LoadingState;
+
+  actualProgress:
+    number;
+
+  currentTask:
+    LoadingTaskId | null;
+
+  allTasksResolved:
+    boolean;
+
+  failedTasks:
+    LoadingTaskId[];
+
+  hasRevealed:
+    boolean;
+
+  completeTask: (
+    task:
+      LoadingTaskId,
+  ) => void;
+
+  failTask: (
+    task:
+      LoadingTaskId,
+  ) => void;
+
+  revealExperience:
+    () => void;
 };
 
+const MAXIMUM_LOADING_TIME =
+  15_000;
+
 const taskDefinitions: {
-  id: LoadingTaskId;
-  weight: number;
+  id:
+    LoadingTaskId;
+
+  weight:
+    number;
 }[] = [
   {
-    id: "interface",
-    weight: 12,
+    id:
+      "interface",
+
+    weight:
+      10,
   },
+
   {
-    id: "fonts",
-    weight: 8,
+    id:
+      "fonts",
+
+    weight:
+      10,
   },
+
   {
-    id: "images",
-    weight: 20,
+    id:
+      "scene3d",
+
+    weight:
+      45,
   },
+
   {
-    id: "scene3d",
-    weight: 50,
+    id:
+      "images",
+
+    weight:
+      25,
   },
+
   {
-    id: "page",
-    weight: 10,
+    id:
+      "page",
+
+    weight:
+      10,
   },
 ];
 
-const initialState: LoadingState = {
-  interface: "pending",
-  fonts: "pending",
-  images: "pending",
-  scene3d: "pending",
-  page: "pending",
-};
+const initialState:
+  LoadingState = {
+    interface:
+      "pending",
+
+    fonts:
+      "pending",
+
+    scene3d:
+      "pending",
+
+    images:
+      "pending",
+
+    page:
+      "pending",
+  };
 
 type LoadingAction = {
-  task: LoadingTaskId;
-  result: Exclude<LoadingTaskState, "pending">;
+  task:
+    LoadingTaskId;
+
+  result:
+    Exclude<
+      LoadingTaskState,
+      "pending"
+    >;
 };
 
 function loadingReducer(
-  state: LoadingState,
-  action: LoadingAction,
+  state:
+    LoadingState,
+
+  action:
+    LoadingAction,
 ): LoadingState {
-  if (state[action.task] !== "pending") {
+  if (
+    state[
+      action.task
+    ] !==
+    "pending"
+  ) {
     return state;
   }
 
   return {
     ...state,
-    [action.task]: action.result,
+
+    [action.task]:
+      action.result,
   };
 }
 
-async function waitForImage(image: HTMLImageElement) {
-  if (!image.complete) {
-    await new Promise<void>((resolve, reject) => {
-      function handleLoad() {
-        cleanup();
-        resolve();
-      }
+/* =========================================================
+   PRELOAD
+   ========================================================= */
 
-      function handleError() {
-        cleanup();
-        reject(new Error(`Failed to load image: ${image.currentSrc}`));
-      }
+async function preloadImageUrl(
+  url:
+    string,
+) {
+  await new Promise<void>(
+    (
+      resolve,
+      reject,
+    ) => {
+      const image =
+        new window.Image();
 
-      function cleanup() {
-        image.removeEventListener("load", handleLoad);
-        image.removeEventListener("error", handleError);
-      }
+      image.decoding =
+        "async";
 
-      image.addEventListener("load", handleLoad, {
-        once: true,
-      });
+      image.onload =
+        () =>
+          resolve();
 
-      image.addEventListener("error", handleError, {
-        once: true,
-      });
-    });
-  }
+      image.onerror =
+        () =>
+          reject(
+            new Error(
+              `Failed to preload ${url}`,
+            ),
+          );
 
-  if (image.naturalWidth === 0) {
-    throw new Error(`Invalid image: ${image.currentSrc}`);
-  }
-
-  if (typeof image.decode === "function") {
-    try {
-      await image.decode();
-    } catch {
-      // The image may already be visually available even when decode rejects.
-    }
-  }
+      image.src =
+        url;
+    },
+  );
 }
 
-const LoadingContext = createContext<LoadingContextValue | null>(null);
+type ApiGalleryImage = {
+  url?:
+    unknown;
+};
+
+type ApiProject = {
+  thumbnail?:
+    unknown;
+
+  coverImageUrl?:
+    unknown;
+
+  gallery?:
+    unknown;
+};
+
+function getCoverUrl(
+  project:
+    ApiProject,
+) {
+  if (
+    typeof project.thumbnail ===
+      "string" &&
+    project.thumbnail
+  ) {
+    return project.thumbnail;
+  }
+
+  if (
+    typeof project.coverImageUrl ===
+      "string" &&
+    project.coverImageUrl
+  ) {
+    return project.coverImageUrl;
+  }
+
+  return null;
+}
+
+function getGalleryUrls(
+  project:
+    ApiProject,
+) {
+  if (
+    !Array.isArray(
+      project.gallery,
+    )
+  ) {
+    return [];
+  }
+
+  return project.gallery.flatMap(
+    (
+      image,
+    ) => {
+      if (
+        typeof image !==
+          "object" ||
+        image ===
+          null
+      ) {
+        return [];
+      }
+
+      const candidate =
+        image as ApiGalleryImage;
+
+      return typeof candidate.url ===
+        "string" &&
+        candidate.url
+        ? [
+            candidate.url,
+          ]
+        : [];
+    },
+  );
+}
+
+async function getProjectImageUrls(
+  pathname:
+    string,
+) {
+  const apiUrl =
+    process.env
+      .NEXT_PUBLIC_API_URL;
+
+  if (!apiUrl) {
+    return [];
+  }
+
+  const base =
+    apiUrl.replace(
+      /\/$/,
+      "",
+    );
+
+  /* HOME */
+
+  if (
+    pathname === "/"
+  ) {
+    const response =
+      await fetch(
+        `${base}/api/projects?featured=true`,
+        {
+          cache:
+            "no-store",
+        },
+      );
+
+    if (!response.ok) {
+      return [];
+    }
+
+    const data =
+      (await response.json()) as {
+        projects?:
+          ApiProject[];
+      };
+
+    return (
+      data.projects ??
+      []
+    )
+      .map(
+        getCoverUrl,
+      )
+      .filter(
+        (
+          value,
+        ): value is string =>
+          Boolean(
+            value,
+          ),
+      );
+  }
+
+  /* ALL PROJECTS */
+
+  if (
+    pathname ===
+    "/projects"
+  ) {
+    const response =
+      await fetch(
+        `${base}/api/projects`,
+        {
+          cache:
+            "no-store",
+        },
+      );
+
+    if (!response.ok) {
+      return [];
+    }
+
+    const data =
+      (await response.json()) as {
+        projects?:
+          ApiProject[];
+      };
+
+    return (
+      data.projects ??
+      []
+    )
+      .map(
+        getCoverUrl,
+      )
+      .filter(
+        (
+          value,
+        ): value is string =>
+          Boolean(
+            value,
+          ),
+      );
+  }
+
+  /* PROJECT DETAIL */
+
+  if (
+    pathname.startsWith(
+      "/projects/",
+    )
+  ) {
+    const slug =
+      pathname
+        .slice(
+          "/projects/".length,
+        )
+        .split(
+          "/",
+        )[0];
+
+    if (!slug) {
+      return [];
+    }
+
+    const response =
+      await fetch(
+        `${base}/api/projects/${encodeURIComponent(
+          slug,
+        )}`,
+        {
+          cache:
+            "no-store",
+        },
+      );
+
+    if (!response.ok) {
+      return [];
+    }
+
+    const data =
+      (await response.json()) as {
+        project?:
+          ApiProject;
+      };
+
+    if (
+      !data.project
+    ) {
+      return [];
+    }
+
+    const galleryUrls =
+      getGalleryUrls(
+        data.project,
+      );
+
+    if (
+      galleryUrls.length >
+      0
+    ) {
+      return galleryUrls.slice(
+        0,
+        5,
+      );
+    }
+
+    const cover =
+      getCoverUrl(
+        data.project,
+      );
+
+    return cover
+      ? [
+          cover,
+        ]
+      : [];
+  }
+
+  return [];
+}
+
+/* =========================================================
+   CONTEXT
+   ========================================================= */
+
+const LoadingContext =
+  createContext<
+    LoadingContextValue | null
+  >(
+    null,
+  );
 
 export default function LoadingProvider({
   children,
 }: {
-  children: ReactNode;
+  children:
+    ReactNode;
 }) {
-  const [tasks, dispatch] = useReducer(loadingReducer, initialState);
-  const [hasRevealed, setHasRevealed] = useState(false);
+  const pathname =
+    usePathname();
 
-  const completeTask = useCallback((task: LoadingTaskId) => {
-    dispatch({
-      task,
-      result: "complete",
-    });
-  }, []);
+  const [
+    tasks,
+    dispatch,
+  ] =
+    useReducer(
+      loadingReducer,
+      initialState,
+    );
 
-  const failTask = useCallback((task: LoadingTaskId) => {
-    dispatch({
-      task,
-      result: "failed",
-    });
-  }, []);
+  const [
+    hasRevealed,
+    setHasRevealed,
+  ] = useState(false);
 
-  const revealExperience = useCallback(() => {
-    setHasRevealed(true);
-  }, []);
+  const completeTask =
+    useCallback(
+      (
+        task:
+          LoadingTaskId,
+      ) => {
+        dispatch({
+          task,
 
-  /*
-   * Interface task:
-   * waits for React to commit the page and the browser to prepare two frames.
-   */
+          result:
+            "complete",
+        });
+      },
+      [],
+    );
+
+  const failTask =
+    useCallback(
+      (
+        task:
+          LoadingTaskId,
+      ) => {
+        dispatch({
+          task,
+
+          result:
+            "failed",
+        });
+      },
+      [],
+    );
+
+  const revealExperience =
+    useCallback(
+      () => {
+        setHasRevealed(
+          true,
+        );
+      },
+      [],
+    );
+
+  /* INTERFACE */
+
   useEffect(() => {
-    let firstFrame = 0;
-    let secondFrame = 0;
-
-    firstFrame = window.requestAnimationFrame(() => {
-      secondFrame = window.requestAnimationFrame(() => {
-        completeTask("interface");
-      });
-    });
+    const frame =
+      window.requestAnimationFrame(
+        () => {
+          completeTask(
+            "interface",
+          );
+        },
+      );
 
     return () => {
-      window.cancelAnimationFrame(firstFrame);
-      window.cancelAnimationFrame(secondFrame);
+      window.cancelAnimationFrame(
+        frame,
+      );
     };
-  }, [completeTask]);
+  }, [
+    completeTask,
+  ]);
 
-  /*
-   * Font task:
-   * waits until the browser reports that the active fonts are ready.
-   */
+  /* FONTS */
+
   useEffect(() => {
-    let cancelled = false;
+    let cancelled =
+      false;
 
     async function loadFonts() {
-      if (!document.fonts) {
-        completeTask("fonts");
-        return;
-      }
-
       try {
-        await document.fonts.ready;
+        if (
+          document.fonts
+        ) {
+          await document.fonts.ready;
+        }
 
-        if (!cancelled) {
-          completeTask("fonts");
+        if (
+          !cancelled
+        ) {
+          completeTask(
+            "fonts",
+          );
         }
       } catch {
-        if (!cancelled) {
-          failTask("fonts");
+        if (
+          !cancelled
+        ) {
+          failTask(
+            "fonts",
+          );
         }
       }
     }
@@ -205,169 +595,344 @@ export default function LoadingProvider({
     void loadFonts();
 
     return () => {
-      cancelled = true;
+      cancelled =
+        true;
     };
-  }, [completeTask, failTask]);
+  }, [
+    completeTask,
+    failTask,
+  ]);
 
-  /*
-   * Image task:
-   * waits only for images marked with data-loader-critical="true".
-   *
-   * This prevents below-the-fold project images from making the opening
-   * loader unnecessarily slow.
-   */
+  /* 3D */
+
   useEffect(() => {
-    let cancelled = false;
-    let firstFrame = 0;
-    let secondFrame = 0;
-
-    firstFrame = window.requestAnimationFrame(() => {
-      secondFrame = window.requestAnimationFrame(async () => {
-        const criticalImages = Array.from(
-          document.querySelectorAll<HTMLImageElement>(
-            'img[data-loader-critical="true"]',
-          ),
-        );
-
-        if (criticalImages.length === 0) {
-          if (!cancelled) {
-            completeTask("images");
-          }
-
-          return;
-        }
-
-        const results = await Promise.allSettled(
-          criticalImages.map((image) => waitForImage(image)),
-        );
-
-        if (cancelled) {
-          return;
-        }
-
-        const hasFailedImage = results.some(
-          (result) => result.status === "rejected",
-        );
-
-        if (hasFailedImage) {
-          failTask("images");
-          return;
-        }
-
-        completeTask("images");
-      });
-    });
-
-    return () => {
-      cancelled = true;
-      window.cancelAnimationFrame(firstFrame);
-      window.cancelAnimationFrame(secondFrame);
-    };
-  }, [completeTask, failTask]);
-
-  /*
-   * Browser page task:
-   * waits for the browser's load lifecycle to complete.
-   */
-  useEffect(() => {
-    if (document.readyState === "complete") {
-      completeTask("page");
+    if (
+      pathname === "/"
+    ) {
       return;
     }
 
-    function handlePageLoad() {
-      completeTask("page");
-    }
-
-    window.addEventListener("load", handlePageLoad, {
-      once: true,
-    });
+    const frame =
+      window.requestAnimationFrame(
+        () => {
+          completeTask(
+            "scene3d",
+          );
+        },
+      );
 
     return () => {
-      window.removeEventListener("load", handlePageLoad);
+      window.cancelAnimationFrame(
+        frame,
+      );
     };
-  }, [completeTask]);
+  }, [
+    completeTask,
+    pathname,
+  ]);
 
-  const actualProgress = useMemo(() => {
-    const completedWeight = taskDefinitions.reduce(
-      (total, definition) => {
-        const taskState = tasks[definition.id];
+  /* IMAGES */
 
-        if (taskState === "pending") {
-          return total;
+  useEffect(() => {
+    if (
+      tasks.scene3d ===
+      "pending"
+    ) {
+      return;
+    }
+
+    let cancelled =
+      false;
+
+    async function loadImages() {
+      try {
+        const urls =
+          await getProjectImageUrls(
+            pathname,
+          );
+
+        const results =
+          await Promise.allSettled(
+            urls.map(
+              (
+                url,
+              ) =>
+                preloadImageUrl(
+                  url,
+                ),
+            ),
+          );
+
+        if (
+          cancelled
+        ) {
+          return;
         }
 
-        return total + definition.weight;
+        const failed =
+          results.some(
+            (
+              result,
+            ) =>
+              result.status ===
+              "rejected",
+          );
+
+        if (
+          failed
+        ) {
+          failTask(
+            "images",
+          );
+        } else {
+          completeTask(
+            "images",
+          );
+        }
+      } catch {
+        if (
+          !cancelled
+        ) {
+          failTask(
+            "images",
+          );
+        }
+      }
+    }
+
+    void loadImages();
+
+    return () => {
+      cancelled =
+        true;
+    };
+  }, [
+    completeTask,
+    failTask,
+    pathname,
+    tasks.scene3d,
+  ]);
+
+  /* PAGE */
+
+  useEffect(() => {
+    if (
+      document.readyState ===
+      "complete"
+    ) {
+      const frame =
+        window.requestAnimationFrame(
+          () => {
+            completeTask(
+              "page",
+            );
+          },
+        );
+
+      return () => {
+        window.cancelAnimationFrame(
+          frame,
+        );
+      };
+    }
+
+    function handleLoad() {
+      completeTask(
+        "page",
+      );
+    }
+
+    window.addEventListener(
+      "load",
+      handleLoad,
+      {
+        once:
+          true,
       },
-      0,
     );
 
-    const totalWeight = taskDefinitions.reduce(
-      (total, definition) => total + definition.weight,
-      0,
+    return () => {
+      window.removeEventListener(
+        "load",
+        handleLoad,
+      );
+    };
+  }, [
+    completeTask,
+  ]);
+
+  /* FAILSAFE */
+
+  useEffect(() => {
+    if (
+      hasRevealed
+    ) {
+      return;
+    }
+
+    const timeout =
+      window.setTimeout(
+        () => {
+          taskDefinitions.forEach(
+            (
+              definition,
+            ) => {
+              failTask(
+                definition.id,
+              );
+            },
+          );
+        },
+        MAXIMUM_LOADING_TIME,
+      );
+
+    return () => {
+      window.clearTimeout(
+        timeout,
+      );
+    };
+  }, [
+    failTask,
+    hasRevealed,
+  ]);
+
+  const actualProgress =
+    useMemo(
+      () => {
+        const completed =
+          taskDefinitions.reduce(
+            (
+              total,
+              definition,
+            ) =>
+              tasks[
+                definition.id
+              ] ===
+              "pending"
+                ? total
+                : total +
+                  definition.weight,
+            0,
+          );
+
+        return completed;
+      },
+      [
+        tasks,
+      ],
     );
 
-    return Math.round((completedWeight / totalWeight) * 100);
-  }, [tasks]);
-
-  const currentTask = useMemo(() => {
-    const pendingTask = taskDefinitions.find(
-      (definition) => tasks[definition.id] === "pending",
+  const currentTask =
+    useMemo(
+      () =>
+        taskDefinitions.find(
+          (
+            definition,
+          ) =>
+            tasks[
+              definition.id
+            ] ===
+            "pending",
+        )?.id ??
+        null,
+      [
+        tasks,
+      ],
     );
 
-    return pendingTask?.id ?? null;
-  }, [tasks]);
+  const allTasksResolved =
+    useMemo(
+      () =>
+        taskDefinitions.every(
+          (
+            definition,
+          ) =>
+            tasks[
+              definition.id
+            ] !==
+            "pending",
+        ),
+      [
+        tasks,
+      ],
+    );
 
-  const allTasksResolved = useMemo(
-    () =>
-      taskDefinitions.every(
-        (definition) => tasks[definition.id] !== "pending",
-      ),
-    [tasks],
-  );
+  const failedTasks =
+    useMemo(
+      () =>
+        taskDefinitions
+          .filter(
+            (
+              definition,
+            ) =>
+              tasks[
+                definition.id
+              ] ===
+              "failed",
+          )
+          .map(
+            (
+              definition,
+            ) =>
+              definition.id,
+          ),
+      [
+        tasks,
+      ],
+    );
 
-  const failedTasks = useMemo(
-    () =>
-      taskDefinitions
-        .filter((definition) => tasks[definition.id] === "failed")
-        .map((definition) => definition.id),
-    [tasks],
-  );
+  const value =
+    useMemo<LoadingContextValue>(
+      () => ({
+        tasks,
 
-  const value = useMemo<LoadingContextValue>(
-    () => ({
-      tasks,
-      actualProgress,
-      currentTask,
-      allTasksResolved,
-      failedTasks,
-      hasRevealed,
-      completeTask,
-      failTask,
-      revealExperience,
-    }),
-    [
-      tasks,
-      actualProgress,
-      currentTask,
-      allTasksResolved,
-      failedTasks,
-      hasRevealed,
-      completeTask,
-      failTask,
-      revealExperience,
-    ],
-  );
+        actualProgress,
+
+        currentTask,
+
+        allTasksResolved,
+
+        failedTasks,
+
+        hasRevealed,
+
+        completeTask,
+
+        failTask,
+
+        revealExperience,
+      }),
+      [
+        tasks,
+        actualProgress,
+        currentTask,
+        allTasksResolved,
+        failedTasks,
+        hasRevealed,
+        completeTask,
+        failTask,
+        revealExperience,
+      ],
+    );
 
   return (
-    <LoadingContext.Provider value={value}>
-      {children}
+    <LoadingContext.Provider
+      value={
+        value
+      }
+    >
+      {
+        children
+      }
     </LoadingContext.Provider>
   );
 }
 
 export function useLoading() {
-  const context = useContext(LoadingContext);
+  const context =
+    useContext(
+      LoadingContext,
+    );
 
   if (!context) {
     throw new Error(

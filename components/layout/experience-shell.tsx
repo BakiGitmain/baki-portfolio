@@ -1,18 +1,51 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import {
+  useEffect,
+  type ReactNode,
+} from "react";
+
+import {
+  usePathname,
+} from "next/navigation";
 
 import SiteLoader from "@/components/layout/site-loader";
-import { useLoading } from "@/components/providers/loading-provider";
+
+import {
+  useLoading,
+} from "@/components/providers/loading-provider";
 
 export default function ExperienceShell({
   children,
 }: {
-  children: ReactNode;
+  children:
+    ReactNode;
 }) {
-  const { hasRevealed } = useLoading();
+  const pathname =
+    usePathname();
+
+  const {
+    hasRevealed,
+  } = useLoading();
+
+  const isAdminRoute =
+    pathname ===
+      "/admin" ||
+    pathname.startsWith(
+      "/admin/",
+    );
 
   useEffect(() => {
+    if (
+      isAdminRoute
+    ) {
+      document.documentElement.classList.remove(
+        "is-experience-loading",
+      );
+
+      return;
+    }
+
     document.documentElement.classList.toggle(
       "is-experience-loading",
       !hasRevealed,
@@ -23,7 +56,22 @@ export default function ExperienceShell({
         "is-experience-loading",
       );
     };
-  }, [hasRevealed]);
+  }, [
+    hasRevealed,
+    isAdminRoute,
+  ]);
+
+  if (
+    isAdminRoute
+  ) {
+    return (
+      <>
+        {
+          children
+        }
+      </>
+    );
+  }
 
   return (
     <>
@@ -31,12 +79,20 @@ export default function ExperienceShell({
 
       <div
         className={`experience-shell ${
-          hasRevealed ? "experience-shell--ready" : ""
+          hasRevealed
+            ? "experience-shell--ready"
+            : ""
         }`}
-        aria-hidden={!hasRevealed}
-        inert={!hasRevealed}
+        aria-hidden={
+          !hasRevealed
+        }
+        inert={
+          !hasRevealed
+        }
       >
-        {children}
+        {
+          children
+        }
       </div>
     </>
   );
