@@ -10,6 +10,29 @@ const nextConfig: NextConfig = {
     "192.168.1.4",
   ],
 
+  /* =========================================================
+     CLOUDINARY IMAGES
+     ========================================================= */
+
+  images: {
+    remotePatterns: [
+      {
+        protocol:
+          "https",
+
+        hostname:
+          "res.cloudinary.com",
+
+        pathname:
+          "/lgx6odag/image/upload/**",
+      },
+    ],
+  },
+
+  /* =========================================================
+     BACKEND PROXY
+     ========================================================= */
+
   async rewrites() {
     return [
       {

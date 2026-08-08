@@ -1,17 +1,20 @@
 export type LocalizedText = {
   en: string;
+
   am: string;
 };
 
 export type ProjectStep = {
-  title: LocalizedText;
+  title:
+    LocalizedText;
 
   description:
     LocalizedText;
 };
 
 export type ProjectGalleryImage = {
-  url: string;
+  url:
+    string;
 
   publicId:
     string;
@@ -21,9 +24,11 @@ export type ProjectGalleryImage = {
 };
 
 export type Project = {
-  id?: string;
+  id?:
+    string;
 
-  slug: string;
+  slug:
+    string;
 
   title:
     LocalizedText;
@@ -106,23 +111,86 @@ type ProjectResponse = {
 };
 
 /* =========================================================
+   NORMALIZE URL
+   ========================================================= */
+
+function normalizeApiUrl(
+  url: string,
+) {
+  return url.replace(
+    /\/$/,
+    "",
+  );
+}
+
+/* =========================================================
    API URL
    ========================================================= */
 
 function getApiUrl() {
-  const apiUrl =
+  const publicApiUrl =
     process.env
       .NEXT_PUBLIC_API_URL;
 
-  if (!apiUrl) {
+  /* =======================================================
+     SERVER SIDE
+     ======================================================= */
+
+  if (
+    typeof window ===
+    "undefined"
+  ) {
+    const serverApiUrl =
+      process.env
+        .BACKEND_API_URL;
+
+    if (
+      serverApiUrl
+    ) {
+      return normalizeApiUrl(
+        serverApiUrl,
+      );
+    }
+
+    /*
+     * Local development fallback.
+     *
+     * Example:
+     * NEXT_PUBLIC_API_URL=http://localhost:5000
+     */
+
+    if (
+      publicApiUrl?.startsWith(
+        "http://",
+      ) ||
+      publicApiUrl?.startsWith(
+        "https://",
+      )
+    ) {
+      return normalizeApiUrl(
+        publicApiUrl,
+      );
+    }
+
+    throw new Error(
+      "BACKEND_API_URL is not configured for server-side requests.",
+    );
+  }
+
+  /* =======================================================
+     BROWSER SIDE
+     ======================================================= */
+
+  if (
+    !publicApiUrl
+  ) {
     throw new Error(
       "NEXT_PUBLIC_API_URL is not configured.",
     );
   }
 
-  return apiUrl.replace(
-    /\/$/,
-    "",
+  return normalizeApiUrl(
+    publicApiUrl,
   );
 }
 
@@ -150,7 +218,9 @@ export async function getProjects(): Promise<
       },
     );
 
-  if (!response.ok) {
+  if (
+    !response.ok
+  ) {
     throw new Error(
       "Unable to load projects.",
     );
@@ -167,7 +237,7 @@ export async function getProjects(): Promise<
 }
 
 /* =========================================================
-   FEATURED
+   FEATURED PROJECTS
    ========================================================= */
 
 export async function getFeaturedProjects(): Promise<
@@ -190,7 +260,9 @@ export async function getFeaturedProjects(): Promise<
       },
     );
 
-  if (!response.ok) {
+  if (
+    !response.ok
+  ) {
     throw new Error(
       "Unable to load featured projects.",
     );
@@ -213,7 +285,9 @@ export async function getFeaturedProjects(): Promise<
 export async function getProjectBySlug(
   slug:
     string,
-): Promise<Project | null> {
+): Promise<
+  Project | null
+> {
   const response =
     await fetch(
       `${getApiUrl()}/api/projects/${encodeURIComponent(
@@ -240,15 +314,19 @@ export async function getProjectBySlug(
     return null;
   }
 
-  if (!response.ok) {
+  if (
+    !response.ok
+  ) {
     throw new Error(
-      "Unable to load project.",
+      `Unable to load project. Status: ${response.status}`,
     );
   }
 
   const data =
     (await response.json()) as ProjectResponse;
 
-  return data.project ??
-    null;
+  return (
+    data.project ??
+    null
+  );
 }
