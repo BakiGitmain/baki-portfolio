@@ -1,0 +1,52 @@
+name: Site Health Monitor
+
+on:
+  schedule:
+    # Every 5 minutes, offset from the start of the hour.
+    # 02, 07, 12, 17, 22, ... 57
+    - cron: "2-57/5 * * * *"
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: site-health-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    name: Run site health checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+
+    steps:
+      - name: Trigger health monitor
+        env:
+          HEALTH_MONITOR_URL: ${{ secrets.HEALTH_MONITOR_URL }}
+          HEALTH_MONITOR_SECRET: ${{ secrets.HEALTH_MONITOR_SECRET }}
+
+        run: |
+          if [ -z "$HEALTH_MONITOR_URL" ]; then
+            echo "HEALTH_MONITOR_URL secret is missing."
+            exit 1
+          fi
+
+          if [ -z "$HEALTH_MONITOR_SECRET" ]; then
+            echo "HEALTH_MONITOR_SECRET secret is missing."
+            exit 1
+          fi
+
+          curl \
+            --fail-with-body \
+            --show-error \
+            --silent \
+            --retry 2 \
+            --retry-all-errors \
+            --connect-timeout 10 \
+            --max-time 90 \
+            -X POST \
+            -H "Accept: application/json" \
+            -H "X-Health-Monitor-Secret: $HEALTH_MONITOR_SECRET" \
+            "${HEALTH_MONITOR_URL%/}/api/internal/health-checks/run"

@@ -6,7 +6,9 @@ import express, {
 } from "express";
 
 import cors from "cors";
+
 import helmetModule from "helmet";
+
 import cookieParser from "cookie-parser";
 
 import {
@@ -29,7 +31,11 @@ import adminSiteAnalyticsRouter from "./routes/admin-site-analytics.routes.js";
 
 import adminSitePerformanceRouter from "./routes/admin-site-performance.routes.js";
 
+import adminSiteHealthRouter from "./routes/admin-site-health.routes.js";
+
 import performanceRouter from "./routes/performance.routes.js";
+
+import siteHealthRunnerRouter from "./routes/site-health-runner.routes.js";
 
 import healthRouter from "./routes/health.routes.js";
 
@@ -45,9 +51,7 @@ const app =
 /* =========================================================
    HELMET TYPESCRIPT WORKAROUND
 
-   Keep this.
-
-   This is required by the current Vercel / NodeNext setup.
+   DO NOT REMOVE.
    ========================================================= */
 
 const helmet =
@@ -76,17 +80,23 @@ app.use(
 );
 
 /* =========================================================
+   INTERNAL HEALTH RUNNER
+
+   Server-to-server endpoint.
+
+   It does NOT need browser CORS.
+
+   Authentication is handled by
+   X-Health-Monitor-Secret.
+   ========================================================= */
+
+app.use(
+  "/api/internal/health-checks",
+  siteHealthRunnerRouter,
+);
+
+/* =========================================================
    PUBLIC PERFORMANCE COLLECTOR
-
-   IMPORTANT:
-
-   This route is mounted BEFORE the normal admin CORS rule.
-
-   Future monitored websites can send performance metrics
-   here even if they use a different frontend origin.
-
-   The route itself verifies that the submitted origin
-   exactly matches the frontend_url stored for that site.
    ========================================================= */
 
 app.use(
@@ -122,9 +132,7 @@ app.use(
 );
 
 /* =========================================================
-   NORMAL CORS
-
-   Admin/auth API remains restricted to the main frontend.
+   NORMAL FRONTEND CORS
    ========================================================= */
 
 app.use(
@@ -199,7 +207,7 @@ app.get(
 );
 
 /* =========================================================
-   PUBLIC ROUTES
+   PUBLIC
    ========================================================= */
 
 app.use(
@@ -232,7 +240,7 @@ app.use(
 );
 
 /* =========================================================
-   ADMIN SITE ANALYTICS
+   ADMIN ANALYTICS
    ========================================================= */
 
 app.use(
@@ -241,12 +249,21 @@ app.use(
 );
 
 /* =========================================================
-   ADMIN SITE PERFORMANCE
+   ADMIN PERFORMANCE
    ========================================================= */
 
 app.use(
   "/api/admin/sites",
   adminSitePerformanceRouter,
+);
+
+/* =========================================================
+   ADMIN HEALTH
+   ========================================================= */
+
+app.use(
+  "/api/admin/sites",
+  adminSiteHealthRouter,
 );
 
 /* =========================================================

@@ -44,6 +44,12 @@ import {
 } from "@/lib/site-performance-api";
 
 import {
+  getSiteHealth,
+  type AvailableSiteHealth,
+  type SiteHealthStatus,
+} from "@/lib/site-health-api";
+
+import {
   useLanguage,
 } from "@/components/providers/language-provider";
 
@@ -405,13 +411,6 @@ type TrafficPoint = {
   pageViews: number;
 };
 
-type PlaceholderTrendPoint =
-  TrafficPoint & {
-    performance: number;
-    responseTime: number;
-    uptime: number;
-  };
-
 type PerformanceTrendPoint = {
   date: string;
   label: string;
@@ -426,6 +425,20 @@ type PerformanceTrendPoint = {
     number | null;
 
   cls:
+    number | null;
+};
+
+type HealthTrendPoint = {
+  date: string;
+  label: string;
+
+  frontendResponseMs:
+    number | null;
+
+  backendResponseMs:
+    number | null;
+
+  uptime:
     number | null;
 };
 
@@ -501,6 +514,20 @@ function formatCls(
   );
 }
 
+function formatHealthUptime(
+  value: number | null,
+) {
+  if (
+    value === null
+  ) {
+    return "—";
+  }
+
+  return `${value.toFixed(
+    2,
+  )}%`;
+}
+
 function formatChartDate(
   value: string,
 ) {
@@ -568,18 +595,9 @@ function getRequestedDayCount(
 function getPerformanceRangeDays(
   range: SiteAnalyticsRange,
 ) {
-  switch (
-    range
-  ) {
-    case "30d":
-      return 30;
-
-    case "90d":
-      return 90;
-
-    default:
-      return 7;
-  }
+  return getRequestedDayCount(
+    range,
+  );
 }
 
 function getDateKey(
@@ -648,6 +666,29 @@ function getTickGap(
   }
 
   return 20;
+}
+
+function getHealthStatusTone(
+  status: SiteHealthStatus,
+):
+  | "success"
+  | "danger"
+  | "neutral" {
+  if (
+    status ===
+    "online"
+  ) {
+    return "success";
+  }
+
+  if (
+    status ===
+    "offline"
+  ) {
+    return "danger";
+  }
+
+  return "neutral";
 }
 
 /* =========================================================
@@ -924,6 +965,38 @@ export default function AdminSiteDetails({
     );
 
   /* =======================================================
+     HEALTH
+     ======================================================= */
+
+  const [
+    healthData,
+    setHealthData,
+  ] =
+    useState<
+      AvailableSiteHealth | null
+    >(
+      null,
+    );
+
+  const [
+    healthLoading,
+    setHealthLoading,
+  ] =
+    useState(
+      false,
+    );
+
+  const [
+    healthError,
+    setHealthError,
+  ] =
+    useState<
+      string | null
+    >(
+      null,
+    );
+
+  /* =======================================================
      UI
      ======================================================= */
 
@@ -1092,6 +1165,12 @@ export default function AdminSiteDetails({
           waitingChecks:
             "Health checks ገና አልተጀመሩም",
 
+          healthLoading:
+            "Health monitoring በመጫን ላይ...",
+
+          healthMonitoringActive:
+            "Live health monitoring",
+
           frontend:
             "Frontend",
 
@@ -1110,8 +1189,17 @@ export default function AdminSiteDetails({
           healthEndpoint:
             "Health Endpoint",
 
+          online:
+            "Online",
+
+          offline:
+            "Offline",
+
           notChecked:
             "Not checked",
+
+          notConfigured:
+            "አልተዘጋጀም",
 
           settingsDescription:
             "Site connection information እና monitoring setup።",
@@ -1255,6 +1343,12 @@ export default function AdminSiteDetails({
           waitingChecks:
             "Health checks have not started yet",
 
+          healthLoading:
+            "Loading health monitoring...",
+
+          healthMonitoringActive:
+            "Live health monitoring",
+
           frontend:
             "Frontend",
 
@@ -1273,8 +1367,17 @@ export default function AdminSiteDetails({
           healthEndpoint:
             "Health Endpoint",
 
+          online:
+            "Online",
+
+          offline:
+            "Offline",
+
           notChecked:
             "Not checked",
+
+          notConfigured:
+            "Not configured",
 
           settingsDescription:
             "Site connection information and monitoring configuration.",
@@ -1514,6 +1617,89 @@ export default function AdminSiteDetails({
   ]);
 
   /* =======================================================
+     LOAD HEALTH
+     ======================================================= */
+
+  useEffect(() => {
+    if (
+      activeTab !==
+      "health"
+    ) {
+      return;
+    }
+
+    let cancelled =
+      false;
+
+    async function load() {
+      setHealthLoading(
+        true,
+      );
+
+      setHealthError(
+        null,
+      );
+
+      try {
+        const result =
+          await getSiteHealth(
+            siteId,
+            range,
+            language,
+          );
+
+        if (
+          cancelled
+        ) {
+          return;
+        }
+
+        setHealthData(
+          result,
+        );
+      } catch (
+        loadError
+      ) {
+        if (
+          cancelled
+        ) {
+          return;
+        }
+
+        setHealthData(
+          null,
+        );
+
+        setHealthError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load health data.",
+        );
+      } finally {
+        if (
+          !cancelled
+        ) {
+          setHealthLoading(
+            false,
+          );
+        }
+      }
+    }
+
+    void load();
+
+    return () => {
+      cancelled =
+        true;
+    };
+  }, [
+    activeTab,
+    siteId,
+    range,
+    language,
+  ]);
+
+  /* =======================================================
      AVAILABLE ANALYTICS
      ======================================================= */
 
@@ -1524,7 +1710,7 @@ export default function AdminSiteDetails({
         : null;
 
   /* =======================================================
-     EFFECTIVE ANALYTICS RANGE
+     RANGES
      ======================================================= */
 
   const effectiveDayCount =
@@ -1535,6 +1721,11 @@ export default function AdminSiteDetails({
 
   const performanceDayCount =
     getPerformanceRangeDays(
+      range,
+    );
+
+  const healthDayCount =
+    getRequestedDayCount(
       range,
     );
 
@@ -1556,52 +1747,7 @@ export default function AdminSiteDetails({
     );
 
   /* =======================================================
-     HEALTH PLACEHOLDER DATA
-
-     Performance no longer uses this.
-     ======================================================= */
-
-  const placeholderTrend =
-    useMemo<
-      PlaceholderTrendPoint[]
-    >(
-      () =>
-        trafficData.map(
-          (
-            point,
-          ) => ({
-            ...point,
-
-            performance:
-              0,
-
-            responseTime:
-              0,
-
-            uptime:
-              0,
-          }),
-        ),
-      [
-        trafficData,
-      ],
-    );
-
-  /* =======================================================
      REAL PERFORMANCE TREND
-
-     Backend groups performance metrics by UTC day.
-
-     We therefore generate the missing chart dates using
-     UTC too so returned rows always match correctly.
-
-     IMPORTANT:
-
-     If the selected period has NO performance data, we
-     intentionally display a zero baseline.
-
-     Once real performance data exists, a missing day becomes
-     null instead of fake score 0.
      ======================================================= */
 
   const performanceTrendData =
@@ -1709,6 +1855,107 @@ export default function AdminSiteDetails({
     );
 
   /* =======================================================
+     REAL HEALTH TREND
+
+     Unlike Performance, missing health data is NOT shown as
+     zero because 0% uptime would incorrectly imply downtime.
+     ======================================================= */
+
+  const healthTrendData =
+    useMemo<
+      HealthTrendPoint[]
+    >(
+      () => {
+        const realPoints =
+          new Map(
+            (
+              healthData?.trend ??
+              []
+            ).map(
+              (
+                point,
+              ) => [
+                point.date,
+                point,
+              ],
+            ),
+          );
+
+        const today =
+          new Date();
+
+        today.setUTCHours(
+          0,
+          0,
+          0,
+          0,
+        );
+
+        const result:
+          HealthTrendPoint[] = [];
+
+        for (
+          let index =
+            healthDayCount -
+            1;
+          index >= 0;
+          index -= 1
+        ) {
+          const date =
+            new Date(
+              today,
+            );
+
+          date.setUTCDate(
+            today.getUTCDate() -
+              index,
+          );
+
+          const dateKey =
+            getUtcDateKey(
+              date,
+            );
+
+          const realPoint =
+            realPoints.get(
+              dateKey,
+            );
+
+          result.push({
+            date:
+              dateKey,
+
+            label:
+              formatChartDate(
+                dateKey,
+              ),
+
+            frontendResponseMs:
+              realPoint
+                ?.frontendResponseMs ??
+              null,
+
+            backendResponseMs:
+              realPoint
+                ?.backendResponseMs ??
+              null,
+
+            uptime:
+              realPoint
+                ?.uptime ??
+              null,
+          });
+        }
+
+        return result;
+      },
+      [
+        healthData,
+        healthDayCount,
+      ],
+    );
+
+  /* =======================================================
      TRAFFIC SCALE
      ======================================================= */
 
@@ -1765,6 +2012,79 @@ export default function AdminSiteDetails({
       },
       [
         trafficData,
+      ],
+    );
+
+  /* =======================================================
+     HEALTH RESPONSE SCALE
+     ======================================================= */
+
+  const healthResponseYAxisMax =
+    useMemo(
+      () => {
+        const values =
+          healthTrendData.flatMap(
+            (
+              point,
+            ) => [
+              point.frontendResponseMs,
+              point.backendResponseMs,
+            ],
+          );
+
+        const realValues =
+          values.filter(
+            (
+              value,
+            ): value is number =>
+              typeof value ===
+                "number" &&
+              Number.isFinite(
+                value,
+              ),
+          );
+
+        const highest =
+          Math.max(
+            0,
+            ...realValues,
+          );
+
+        if (
+          highest === 0
+        ) {
+          return 1000;
+        }
+
+        if (
+          highest <= 250
+        ) {
+          return 250;
+        }
+
+        if (
+          highest <= 500
+        ) {
+          return 500;
+        }
+
+        if (
+          highest <= 1000
+        ) {
+          return 1000;
+        }
+
+        return Math.ceil(
+          (
+            highest *
+            1.2
+          ) /
+            100,
+        ) *
+          100;
+      },
+      [
+        healthTrendData,
       ],
     );
 
@@ -1947,12 +2267,20 @@ export default function AdminSiteDetails({
 
   const responseConfig:
     ChartConfig = {
-      responseTime: {
+      frontendResponseMs: {
         label:
-          copy.responseTime,
+          copy.frontend,
 
         color:
           "#426c2b",
+      },
+
+      backendResponseMs: {
+        label:
+          copy.backend,
+
+        color:
+          "#9fbe89",
       },
     };
 
@@ -2078,14 +2406,96 @@ export default function AdminSiteDetails({
     !analytics.available;
 
   /* =======================================================
+     HEALTH CURRENT STATUS
+     ======================================================= */
+
+  const frontendHealthStatus:
+    SiteHealthStatus =
+      healthData?.current
+        .frontend
+        .status ??
+      "not_checked";
+
+  const backendHealthStatus:
+    SiteHealthStatus =
+      healthData?.current
+        .backend
+        .status ??
+      (
+        site.healthUrl ||
+        site.backendUrl
+          ? "not_checked"
+          : "not_configured"
+      );
+
+  function healthStatusText(
+    status:
+      SiteHealthStatus,
+  ) {
+    switch (
+      status
+    ) {
+      case "online":
+        return copy.online;
+
+      case "offline":
+        return copy.offline;
+
+      case "not_configured":
+        return copy.notConfigured;
+
+      default:
+        return copy.notChecked;
+    }
+  }
+
+  function healthDetail(
+    endpoint:
+      AvailableSiteHealth["current"]["frontend"] |
+      undefined,
+  ) {
+    if (
+      !endpoint
+    ) {
+      return null;
+    }
+
+    const parts:
+      string[] = [];
+
+    if (
+      endpoint.statusCode !==
+      null
+    ) {
+      parts.push(
+        `HTTP ${endpoint.statusCode}`,
+      );
+    }
+
+    if (
+      endpoint.responseMs !==
+      null
+    ) {
+      parts.push(
+        `${endpoint.responseMs}ms`,
+      );
+    }
+
+    return parts.length >
+      0
+      ? parts.join(
+          " • ",
+        )
+      : endpoint.errorMessage;
+  }
+
+  /* =======================================================
      RENDER
      ======================================================= */
 
   return (
     <div className="pb-10">
-      {/* =================================================
-          BACK
-         ================================================= */}
+      {/* BACK */}
 
       <Link
         href="/admin/sites"
@@ -2100,9 +2510,7 @@ export default function AdminSiteDetails({
         }
       </Link>
 
-      {/* =================================================
-          HERO
-         ================================================= */}
+      {/* HERO */}
 
       <section className="overflow-hidden rounded-[26px] border border-black/[0.055] bg-[radial-gradient(circle_at_92%_0%,rgba(128,201,60,0.11),transparent_32%),linear-gradient(135deg,#ffffff,#f5f8f1)] p-6 shadow-[0_12px_40px_rgba(39,53,30,0.035)] sm:p-8">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
@@ -2164,8 +2572,6 @@ export default function AdminSiteDetails({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {/* RANGE */}
-
             <div className="flex items-center rounded-xl border border-black/[0.06] bg-white p-1 shadow-sm">
               {(
                 [
@@ -2184,7 +2590,8 @@ export default function AdminSiteDetails({
                     type="button"
                     disabled={
                       analyticsLoading ||
-                      performanceLoading
+                      performanceLoading ||
+                      healthLoading
                     }
                     onClick={() =>
                       setRange(
@@ -2206,8 +2613,6 @@ export default function AdminSiteDetails({
               )}
             </div>
 
-            {/* LIVE SITE */}
-
             <a
               href={
                 site.frontendUrl
@@ -2228,9 +2633,7 @@ export default function AdminSiteDetails({
         </div>
       </section>
 
-      {/* =================================================
-          TABS
-         ================================================= */}
+      {/* TABS */}
 
       <div className="mt-5 overflow-x-auto rounded-[16px] border border-black/[0.055] bg-white p-1.5 shadow-[0_5px_18px_rgba(36,49,28,0.02)]">
         <div className="flex min-w-max items-center gap-1">
@@ -2275,9 +2678,7 @@ export default function AdminSiteDetails({
         </div>
       </div>
 
-      {/* =================================================
-          GENERAL ERROR
-         ================================================= */}
+      {/* GENERAL ERROR */}
 
       {error && (
         <div className="mt-4 flex items-center gap-3 rounded-[15px] border border-red-100 bg-red-50 p-4">
@@ -2293,9 +2694,7 @@ export default function AdminSiteDetails({
         </div>
       )}
 
-      {/* =================================================
-          OVERVIEW / ANALYTICS
-         ================================================= */}
+      {/* OVERVIEW / ANALYTICS */}
 
       {(activeTab ===
         "overview" ||
@@ -3112,15 +3511,11 @@ export default function AdminSiteDetails({
         </>
       )}
 
-      {/* =================================================
-          PERFORMANCE
-         ================================================= */}
+      {/* PERFORMANCE */}
 
       {activeTab ===
         "performance" && (
         <>
-          {/* PERFORMANCE ERROR */}
-
           {performanceError && (
             <div className="mt-5 flex items-center gap-3 rounded-[15px] border border-red-100 bg-red-50 p-4">
               <span className="h-4 w-4 shrink-0 text-red-500">
@@ -3134,8 +3529,6 @@ export default function AdminSiteDetails({
               </p>
             </div>
           )}
-
-          {/* METRICS */}
 
           <section className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <MetricCard
@@ -3217,8 +3610,6 @@ export default function AdminSiteDetails({
               }
             />
           </section>
-
-          {/* PERFORMANCE TREND */}
 
           <section className="mt-4 rounded-[23px] border border-black/[0.055] bg-white p-5 shadow-[0_8px_30px_rgba(32,45,25,0.025)] sm:p-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -3339,39 +3730,68 @@ export default function AdminSiteDetails({
                 />
 
                 <Area
-  type="monotone"
-  dataKey="performance"
-  stroke="var(--color-performance)"
-  fill="transparent"
-  strokeWidth={2.2}
-  dot={{
-    r: 4,
-    strokeWidth: 2,
-  }}
-  activeDot={{
-    r: 5,
-  }}
-  connectNulls={true}
-/>
+                  type="monotone"
+                  dataKey="performance"
+                  stroke="var(--color-performance)"
+                  fill="transparent"
+                  strokeWidth={
+                    2.2
+                  }
+                  dot={{
+                    r:
+                      4,
+
+                    strokeWidth:
+                      2,
+                  }}
+                  activeDot={{
+                    r:
+                      5,
+                  }}
+                  connectNulls={
+                    true
+                  }
+                />
               </AreaChart>
             </ChartContainer>
           </section>
         </>
       )}
 
-      {/* =================================================
-          HEALTH
-         ================================================= */}
+      {/* HEALTH */}
 
       {activeTab ===
         "health" && (
         <>
+          {healthError && (
+            <div className="mt-5 flex items-center gap-3 rounded-[15px] border border-red-100 bg-red-50 p-4">
+              <span className="h-4 w-4 shrink-0 text-red-500">
+                <WarningIcon />
+              </span>
+
+              <p className="text-[8.5px] text-red-600">
+                {
+                  healthError
+                }
+              </p>
+            </div>
+          )}
+
           <section className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <MetricCard
               label={
                 copy.frontend
               }
-              value="0ms"
+              value={
+                healthLoading
+                  ? "—"
+                  : formatMilliseconds(
+                      healthData
+                        ?.totals
+                        .frontendResponseMs ??
+                        null,
+                    )
+              }
               icon={
                 <GlobeIcon />
               }
@@ -3381,7 +3801,16 @@ export default function AdminSiteDetails({
               label={
                 copy.backend
               }
-              value="0ms"
+              value={
+                healthLoading
+                  ? "—"
+                  : formatMilliseconds(
+                      healthData
+                        ?.totals
+                        .backendResponseMs ??
+                        null,
+                    )
+              }
               icon={
                 <PulseIcon />
               }
@@ -3391,7 +3820,16 @@ export default function AdminSiteDetails({
               label={
                 copy.uptime
               }
-              value="0%"
+              value={
+                healthLoading
+                  ? "—"
+                  : formatHealthUptime(
+                      healthData
+                        ?.totals
+                        .uptime ??
+                        null,
+                    )
+              }
               icon={
                 <ChartIcon />
               }
@@ -3401,7 +3839,16 @@ export default function AdminSiteDetails({
               label={
                 copy.incidents
               }
-              value="0"
+              value={
+                healthLoading ||
+                !healthData?.hasData
+                  ? "—"
+                  : String(
+                      healthData
+                        .totals
+                        .incidents,
+                    )
+              }
               icon={
                 <WarningIcon />
               }
@@ -3426,22 +3873,40 @@ export default function AdminSiteDetails({
                 </div>
 
                 <span className="rounded-full bg-[#f1f5ed] px-2.5 py-1 text-[6.5px] font-bold text-black/30">
-                  {
-                    copy.waitingChecks
-                  }
+                  {healthLoading
+                    ? copy.healthLoading
+                    : healthData?.hasData
+                      ? copy.healthMonitoringActive
+                      : copy.waitingChecks}
                 </span>
+              </div>
+
+              <div className="mt-4 flex items-center gap-4">
+                <LegendDot
+                  color="#426c2b"
+                  label={
+                    copy.frontend
+                  }
+                />
+
+                <LegendDot
+                  color="#9fbe89"
+                  label={
+                    copy.backend
+                  }
+                />
               </div>
 
               <ChartContainer
                 config={
                   responseConfig
                 }
-                className="mt-5 h-[300px] w-full"
+                className="mt-3 h-[300px] w-full"
               >
                 <AreaChart
                   accessibilityLayer
                   data={
-                    placeholderTrend
+                    healthTrendData
                   }
                   margin={{
                     top:
@@ -3471,7 +3936,7 @@ export default function AdminSiteDetails({
                     }
                     minTickGap={
                       getTickGap(
-                        effectiveDayCount,
+                        healthDayCount,
                       )
                     }
                     tick={{
@@ -3486,7 +3951,7 @@ export default function AdminSiteDetails({
                   <YAxis
                     domain={[
                       0,
-                      1000,
+                      healthResponseYAxisMax,
                     ]}
                     tickLine={
                       false
@@ -3495,10 +3960,10 @@ export default function AdminSiteDetails({
                       false
                     }
                     tickCount={
-                      3
+                      4
                     }
                     width={
-                      45
+                      48
                     }
                     allowDecimals={
                       false
@@ -3532,14 +3997,49 @@ export default function AdminSiteDetails({
 
                   <Area
                     type="monotone"
-                    dataKey="responseTime"
-                    stroke="var(--color-responseTime)"
+                    dataKey="frontendResponseMs"
+                    stroke="var(--color-frontendResponseMs)"
                     fill="transparent"
                     strokeWidth={
                       2.2
                     }
-                    dot={
-                      false
+                    dot={{
+                      r:
+                        3.5,
+
+                      strokeWidth:
+                        2,
+                    }}
+                    activeDot={{
+                      r:
+                        5,
+                    }}
+                    connectNulls={
+                      true
+                    }
+                  />
+
+                  <Area
+                    type="monotone"
+                    dataKey="backendResponseMs"
+                    stroke="var(--color-backendResponseMs)"
+                    fill="transparent"
+                    strokeWidth={
+                      2
+                    }
+                    dot={{
+                      r:
+                        3.5,
+
+                      strokeWidth:
+                        2,
+                    }}
+                    activeDot={{
+                      r:
+                        5,
+                    }}
+                    connectNulls={
+                      true
                     }
                   />
                 </AreaChart>
@@ -3554,9 +4054,11 @@ export default function AdminSiteDetails({
               </h3>
 
               <p className="mt-1 text-[7.5px] text-black/30">
-                {
-                  copy.waitingChecks
-                }
+                {healthLoading
+                  ? copy.healthLoading
+                  : healthData?.hasData
+                    ? copy.healthMonitoringActive
+                    : copy.waitingChecks}
               </p>
 
               <div className="mt-6 space-y-3">
@@ -3565,7 +4067,21 @@ export default function AdminSiteDetails({
                     copy.frontend
                   }
                   value={
-                    copy.notChecked
+                    healthStatusText(
+                      frontendHealthStatus,
+                    )
+                  }
+                  detail={
+                    healthDetail(
+                      healthData
+                        ?.current
+                        .frontend,
+                    )
+                  }
+                  tone={
+                    getHealthStatusTone(
+                      frontendHealthStatus,
+                    )
                   }
                 />
 
@@ -3574,7 +4090,21 @@ export default function AdminSiteDetails({
                     copy.backend
                   }
                   value={
-                    copy.notChecked
+                    healthStatusText(
+                      backendHealthStatus,
+                    )
+                  }
+                  detail={
+                    healthDetail(
+                      healthData
+                        ?.current
+                        .backend,
+                    )
+                  }
+                  tone={
+                    getHealthStatusTone(
+                      backendHealthStatus,
+                    )
                   }
                 />
 
@@ -3602,18 +4132,28 @@ export default function AdminSiteDetails({
           </section>
 
           <section className="mt-4 rounded-[23px] border border-black/[0.055] bg-white p-5 shadow-[0_8px_30px_rgba(32,45,25,0.025)] sm:p-6">
-            <div>
-              <h3 className="text-[12px] font-extrabold text-[#20251d]">
-                {
-                  copy.uptimeHistory
-                }
-              </h3>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="text-[12px] font-extrabold text-[#20251d]">
+                  {
+                    copy.uptimeHistory
+                  }
+                </h3>
 
-              <p className="mt-1 text-[7.5px] text-black/30">
-                {
-                  copy.uptimeDescription
-                }
-              </p>
+                <p className="mt-1 text-[7.5px] text-black/30">
+                  {
+                    copy.uptimeDescription
+                  }
+                </p>
+              </div>
+
+              <span className="rounded-full bg-[#f1f5ed] px-2.5 py-1 text-[6.5px] font-bold text-black/30">
+                {healthLoading
+                  ? copy.healthLoading
+                  : healthData?.hasData
+                    ? `${healthData.totals.monitoringRuns} checks`
+                    : copy.waitingChecks}
+              </span>
             </div>
 
             <ChartContainer
@@ -3625,7 +4165,7 @@ export default function AdminSiteDetails({
               <BarChart
                 accessibilityLayer
                 data={
-                  placeholderTrend
+                  healthTrendData
                 }
                 margin={{
                   top:
@@ -3655,7 +4195,7 @@ export default function AdminSiteDetails({
                   }
                   minTickGap={
                     getTickGap(
-                      effectiveDayCount,
+                      healthDayCount,
                     )
                   }
                   tick={{
@@ -3727,9 +4267,7 @@ export default function AdminSiteDetails({
         </>
       )}
 
-      {/* =================================================
-          SETTINGS
-         ================================================= */}
+      {/* SETTINGS */}
 
       {activeTab ===
         "settings" && (
@@ -3990,20 +4528,61 @@ function ConnectionRow({
 function StatusRow({
   label,
   value,
+  detail,
+  tone =
+    "neutral",
 }: {
   label: string;
   value: string;
+  detail?: string | null;
+
+  tone?:
+    | "success"
+    | "danger"
+    | "neutral";
 }) {
+  const badgeClasses =
+    tone ===
+    "success"
+      ? "bg-[#eaf5e4] text-[#507d33]"
+      : tone ===
+          "danger"
+        ? "bg-red-50 text-red-500"
+        : "bg-black/[0.04] text-black/30";
+
+  const dotClasses =
+    tone ===
+    "success"
+      ? "bg-[#80c93c]"
+      : tone ===
+          "danger"
+        ? "bg-red-400"
+        : "bg-black/15";
+
   return (
     <div className="flex items-center justify-between gap-4 rounded-xl bg-[#f7f8f4] px-3.5 py-3">
-      <span className="text-[7px] font-semibold text-black/30">
-        {
-          label
-        }
-      </span>
+      <div className="min-w-0">
+        <span className="block text-[7px] font-semibold text-black/30">
+          {
+            label
+          }
+        </span>
 
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-black/[0.04] px-2 py-1 text-[6.5px] font-bold text-black/30">
-        <span className="h-1.5 w-1.5 rounded-full bg-black/15" />
+        {detail && (
+          <span className="mt-0.5 block max-w-[170px] truncate text-[6.5px] text-black/25">
+            {
+              detail
+            }
+          </span>
+        )}
+      </div>
+
+      <span
+        className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-1 text-[6.5px] font-bold ${badgeClasses}`}
+      >
+        <span
+          className={`h-1.5 w-1.5 rounded-full ${dotClasses}`}
+        />
 
         {
           value
