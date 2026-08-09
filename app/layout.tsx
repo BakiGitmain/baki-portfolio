@@ -1,29 +1,67 @@
-import type { Metadata } from "next";
-import { Geist } from "next/font/google";
+import type {
+  Metadata,
+} from "next";
+
+import {
+  Geist,
+} from "next/font/google";
+
+import {
+  Analytics,
+} from "@vercel/analytics/next";
+
+import {
+  SpeedInsights,
+} from "@vercel/speed-insights/next";
 
 import ExperienceShell from "@/components/layout/experience-shell";
+
 import ExperienceModeProvider from "@/components/providers/experience-mode-provider";
+
 import LanguageProvider from "@/components/providers/language-provider";
+
 import LoadingProvider from "@/components/providers/loading-provider";
-import { Analytics } from "@vercel/analytics/next";
+
+import WebVitalsReporter from "@/components/performance/web-vitals-reporter";
+
 import "./globals.css";
 
-const geist = Geist({
-  subsets: ["latin"],
-  variable: "--font-geist",
-});
+/* =========================================================
+   FONT
+   ========================================================= */
 
-export const metadata: Metadata = {
-  title: "Baki | Full-Stack Developer",
+const geist =
+  Geist({
+    subsets: [
+      "latin",
+    ],
 
-  description:
-    "Baki is a full-stack developer building modern, scalable and thoughtful digital products.",
-};
+    variable:
+      "--font-geist",
+  });
+
+/* =========================================================
+   METADATA
+   ========================================================= */
+
+export const metadata:
+  Metadata = {
+    title:
+      "Baki | Full-Stack Developer",
+
+    description:
+      "Baki is a full-stack developer building modern, scalable and thoughtful digital products.",
+  };
+
+/* =========================================================
+   ROOT
+   ========================================================= */
 
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode;
+  children:
+    React.ReactNode;
 }>) {
   return (
     <html
@@ -37,12 +75,25 @@ export default function RootLayout({
           <ExperienceModeProvider>
             <LoadingProvider>
               <ExperienceShell>
-                {children}
+                {
+                  children
+                }
               </ExperienceShell>
             </LoadingProvider>
           </ExperienceModeProvider>
         </LanguageProvider>
+
+        {/* VERCEL WEB ANALYTICS */}
+
         <Analytics />
+
+        {/* VERCEL SPEED INSIGHTS */}
+
+        <SpeedInsights />
+
+        {/* OUR CUSTOM PERFORMANCE DATABASE */}
+
+        <WebVitalsReporter />
       </body>
     </html>
   );

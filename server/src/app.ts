@@ -6,9 +6,7 @@ import express, {
 } from "express";
 
 import cors from "cors";
-
 import helmetModule from "helmet";
-
 import cookieParser from "cookie-parser";
 
 import {
@@ -29,12 +27,28 @@ import adminSitesRouter from "./routes/admin-sites.routes.js";
 
 import adminSiteAnalyticsRouter from "./routes/admin-site-analytics.routes.js";
 
+import adminSitePerformanceRouter from "./routes/admin-site-performance.routes.js";
+
+import performanceRouter from "./routes/performance.routes.js";
+
 import healthRouter from "./routes/health.routes.js";
 
 import projectsRouter from "./routes/projects.routes.js";
 
+/* =========================================================
+   APP
+   ========================================================= */
+
 const app =
   express();
+
+/* =========================================================
+   HELMET TYPESCRIPT WORKAROUND
+
+   Keep this.
+
+   This is required by the current Vercel / NodeNext setup.
+   ========================================================= */
 
 const helmet =
   helmetModule as unknown as (
@@ -43,6 +57,10 @@ const helmet =
       unknown
     >,
   ) => RequestHandler;
+
+/* =========================================================
+   PROXY
+   ========================================================= */
 
 app.set(
   "trust proxy",
@@ -58,7 +76,55 @@ app.use(
 );
 
 /* =========================================================
-   CORS
+   PUBLIC PERFORMANCE COLLECTOR
+
+   IMPORTANT:
+
+   This route is mounted BEFORE the normal admin CORS rule.
+
+   Future monitored websites can send performance metrics
+   here even if they use a different frontend origin.
+
+   The route itself verifies that the submitted origin
+   exactly matches the frontend_url stored for that site.
+   ========================================================= */
+
+app.use(
+  "/api/performance",
+
+  cors({
+    origin:
+      true,
+
+    credentials:
+      false,
+
+    methods: [
+      "POST",
+      "OPTIONS",
+    ],
+
+    allowedHeaders: [
+      "Content-Type",
+      "Accept",
+    ],
+
+    maxAge:
+      86400,
+  }),
+
+  express.json({
+    limit:
+      "32kb",
+  }),
+
+  performanceRouter,
+);
+
+/* =========================================================
+   NORMAL CORS
+
+   Admin/auth API remains restricted to the main frontend.
    ========================================================= */
 
 app.use(
@@ -166,12 +232,21 @@ app.use(
 );
 
 /* =========================================================
-   ADMIN SITES ANALYTICS
+   ADMIN SITE ANALYTICS
    ========================================================= */
 
 app.use(
   "/api/admin/sites",
   adminSiteAnalyticsRouter,
+);
+
+/* =========================================================
+   ADMIN SITE PERFORMANCE
+   ========================================================= */
+
+app.use(
+  "/api/admin/sites",
+  adminSitePerformanceRouter,
 );
 
 /* =========================================================
@@ -202,9 +277,7 @@ app.use(
     res,
   ) => {
     res
-      .status(
-        404,
-      )
+      .status(404)
       .json({
         success:
           false,
@@ -243,9 +316,7 @@ app.use(
     );
 
     res
-      .status(
-        500,
-      )
+      .status(500)
       .json({
         success:
           false,

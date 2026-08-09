@@ -751,7 +751,76 @@ function parseCount(
     pageViews,
   };
 }
+function parsePeriodAggregateCount(
+  value: unknown,
+): AnalyticsCount {
+  const rows =
+    getRows(
+      value,
+    );
 
+  if (
+    rows.length === 0
+  ) {
+    return {
+      visitors: 0,
+      pageViews: 0,
+    };
+  }
+
+  /*
+    We explicitly request only production traffic
+    grouped by environment.
+
+    That should normally give us one "production" row
+    representing the complete selected reporting period.
+  */
+
+  const productionRow =
+    rows.find(
+      (
+        row,
+      ) =>
+        firstString(
+          row,
+          [
+            "environment",
+          ],
+        ).toLowerCase() ===
+        "production",
+    );
+
+  const row =
+    productionRow ??
+    rows[0];
+
+  if (
+    !row
+  ) {
+    return {
+      visitors: 0,
+      pageViews: 0,
+    };
+  }
+
+  return {
+    visitors:
+      firstNumber(
+        row,
+        [
+          "visitors",
+          "uniqueVisitors",
+          "unique_visitors",
+          "visitorCount",
+        ],
+      ),
+
+    pageViews:
+      getAggregateValue(
+        row,
+      ),
+  };
+}
 /* =========================================================
    TREND PARSER
    ========================================================= */
@@ -950,6 +1019,7 @@ async function queryVercel({
   since,
   until,
   by,
+  filter,
   limit,
   silentError = false,
 }: {
@@ -962,11 +1032,13 @@ async function queryVercel({
   since: string;
   until: string;
 
-  by?: string[];
+by?: string[];
 
-  limit?: number;
+filter?: string;
 
-  silentError?: boolean;
+limit?: number;
+
+silentError?: boolean;
 }) {
   const token =
     process.env
@@ -1055,7 +1127,18 @@ async function queryVercel({
       );
     }
   }
+/* =======================================================
+   FILTER
+   ======================================================= */
 
+if (
+  filter
+) {
+  url.searchParams.set(
+    "filter",
+    filter,
+  );
+}
   /* =======================================================
      LIMIT
      ======================================================= */
@@ -1370,10 +1453,14 @@ async function getPreviousCount({
   since,
   until,
 }: {
-  site: SiteRow;
+  site:
+    SiteRow;
 
-  since: string;
-  until: string;
+  since:
+    string;
+
+  until:
+    string;
 }): Promise<
   AnalyticsCount | null
 > {
@@ -1381,7 +1468,7 @@ async function getPreviousCount({
     const raw =
       await queryVercel({
         endpoint:
-          "visits/count",
+          "visits/aggregate",
 
         site,
 
@@ -1389,20 +1476,26 @@ async function getPreviousCount({
 
         until,
 
-        silentError: true,
+        by: [
+          "environment",
+        ],
+
+        filter:
+          "environment eq 'production'",
+
+        limit:
+          10,
+
+        silentError:
+          true,
       });
 
-    return parseCount(
+    return parsePeriodAggregateCount(
       raw,
     );
   } catch (
     error
   ) {
-    /*
-      Limited-history plans may not expose the full
-      previous reporting period.
-    */
-
     if (
       isRangeLimitError(
         error,
@@ -1799,22 +1892,32 @@ router.get(
          CURRENT TOTAL
          =================================================== */
 
-      const currentCountRaw =
-        await queryVercel({
-          endpoint:
-            "visits/count",
+const currentCountRaw =
+  await queryVercel({
+    endpoint:
+      "visits/aggregate",
 
-          site,
+    site,
 
-          since,
+    since,
 
-          until,
-        });
+    until,
 
-      const current =
-        parseCount(
-          currentCountRaw,
-        );
+    by: [
+      "environment",
+    ],
+
+    filter:
+      "environment eq 'production'",
+
+    limit:
+      10,
+  });
+
+const current =
+  parsePeriodAggregateCount(
+    currentCountRaw,
+  );
 
       /* ===================================================
          PREVIOUS PERIOD

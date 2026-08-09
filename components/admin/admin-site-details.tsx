@@ -39,6 +39,11 @@ import {
 } from "@/lib/sites-api";
 
 import {
+  getSitePerformance,
+  type AvailableSitePerformance,
+} from "@/lib/site-performance-api";
+
+import {
   useLanguage,
 } from "@/components/providers/language-provider";
 
@@ -61,7 +66,11 @@ const DEVICE_COLORS = [
 
 function ArrowLeftIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
       <path
         d="M19 12H5M11 18L5 12L11 6"
         stroke="currentColor"
@@ -75,7 +84,11 @@ function ArrowLeftIcon() {
 
 function ExternalIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
       <path
         d="M14 5H19V10"
         stroke="currentColor"
@@ -103,7 +116,11 @@ function ExternalIcon() {
 
 function UsersIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
       <circle
         cx="9"
         cy="8"
@@ -138,7 +155,11 @@ function UsersIcon() {
 
 function EyeIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
       <path
         d="M3 12C5.3 8.4 8.3 6.5 12 6.5C15.7 6.5 18.7 8.4 21 12C18.7 15.6 15.7 17.5 12 17.5C8.3 17.5 5.3 15.6 3 12Z"
         stroke="currentColor"
@@ -158,7 +179,11 @@ function EyeIcon() {
 
 function ChartIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
       <path
         d="M4 19V12"
         stroke="currentColor"
@@ -192,7 +217,11 @@ function ChartIcon() {
 
 function GlobeIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
       <circle
         cx="12"
         cy="12"
@@ -213,7 +242,11 @@ function GlobeIcon() {
 
 function PulseIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
       <path
         d="M3 12H7L9.2 7L13 17L15.5 11H21"
         stroke="currentColor"
@@ -227,7 +260,11 @@ function PulseIcon() {
 
 function SpeedIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
       <path
         d="M5 17C4.4 15.8 4 14.5 4 13C4 8.6 7.6 5 12 5C16.4 5 20 8.6 20 13C20 14.5 19.6 15.8 19 17"
         stroke="currentColor"
@@ -254,7 +291,11 @@ function SpeedIcon() {
 
 function SettingsIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
       <circle
         cx="12"
         cy="12"
@@ -279,7 +320,11 @@ function TrendingIcon({
   down?: boolean;
 }) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
       <path
         d={
           down
@@ -309,7 +354,11 @@ function TrendingIcon({
 
 function WarningIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
       <path
         d="M12 4L21 20H3L12 4Z"
         stroke="currentColor"
@@ -363,6 +412,23 @@ type PlaceholderTrendPoint =
     uptime: number;
   };
 
+type PerformanceTrendPoint = {
+  date: string;
+  label: string;
+
+  performance:
+    number | null;
+
+  lcp:
+    number | null;
+
+  inp:
+    number | null;
+
+  cls:
+    number | null;
+};
+
 /* =========================================================
    HELPERS
    ========================================================= */
@@ -405,6 +471,34 @@ function formatPercent(
   return `${sign}${value.toFixed(
     1,
   )}%`;
+}
+
+function formatMilliseconds(
+  value: number | null,
+) {
+  if (
+    value === null
+  ) {
+    return "—";
+  }
+
+  return `${Math.round(
+    value,
+  )}ms`;
+}
+
+function formatCls(
+  value: number | null,
+) {
+  if (
+    value === null
+  ) {
+    return "—";
+  }
+
+  return value.toFixed(
+    3,
+  );
 }
 
 function formatChartDate(
@@ -471,6 +565,23 @@ function getRequestedDayCount(
   }
 }
 
+function getPerformanceRangeDays(
+  range: SiteAnalyticsRange,
+) {
+  switch (
+    range
+  ) {
+    case "30d":
+      return 30;
+
+    case "90d":
+      return 90;
+
+    default:
+      return 7;
+  }
+}
+
 function getDateKey(
   date: Date,
 ) {
@@ -487,6 +598,31 @@ function getDateKey(
 
     String(
       date.getDate(),
+    ).padStart(
+      2,
+      "0",
+    ),
+  ].join(
+    "-",
+  );
+}
+
+function getUtcDateKey(
+  date: Date,
+) {
+  return [
+    date.getUTCFullYear(),
+
+    String(
+      date.getUTCMonth() +
+        1,
+    ).padStart(
+      2,
+      "0",
+    ),
+
+    String(
+      date.getUTCDate(),
     ).padStart(
       2,
       "0",
@@ -516,12 +652,6 @@ function getTickGap(
 
 /* =========================================================
    TRAFFIC DATA
-
-   For normal ranges we fill missing days with 0.
-
-   If a real 90-day range comes back as weekly aggregate
-   data, we use the actual returned points instead of
-   creating fake zero values between each weekly point.
    ========================================================= */
 
 function buildTrafficData(
@@ -534,10 +664,6 @@ function buildTrafficData(
   const trend =
     analytics?.trend ??
     [];
-
-  /*
-    Long ranges can be grouped weekly by Vercel.
-  */
 
   if (
     days > 62 &&
@@ -565,11 +691,6 @@ function buildTrafficData(
       }),
     );
   }
-
-  /*
-    Empty long-range chart:
-    create weekly zero points so a graph still exists.
-  */
 
   if (
     days > 62 &&
@@ -636,11 +757,6 @@ function buildTrafficData(
 
     return result;
   }
-
-  /*
-    7D / 30D / fallback range:
-    create every single date.
-  */
 
   const realPoints =
     new Map(
@@ -731,6 +847,10 @@ export default function AdminSiteDetails({
     language ===
     "am";
 
+  /* =======================================================
+     SITE
+     ======================================================= */
+
   const [
     site,
     setSite,
@@ -749,6 +869,10 @@ export default function AdminSiteDetails({
       true,
     );
 
+  /* =======================================================
+     ANALYTICS
+     ======================================================= */
+
   const [
     analytics,
     setAnalytics,
@@ -766,6 +890,42 @@ export default function AdminSiteDetails({
     useState(
       true,
     );
+
+  /* =======================================================
+     PERFORMANCE
+     ======================================================= */
+
+  const [
+    performanceData,
+    setPerformanceData,
+  ] =
+    useState<
+      AvailableSitePerformance | null
+    >(
+      null,
+    );
+
+  const [
+    performanceLoading,
+    setPerformanceLoading,
+  ] =
+    useState(
+      false,
+    );
+
+  const [
+    performanceError,
+    setPerformanceError,
+  ] =
+    useState<
+      string | null
+    >(
+      null,
+    );
+
+  /* =======================================================
+     UI
+     ======================================================= */
 
   const [
     range,
@@ -906,10 +1066,16 @@ export default function AdminSiteDetails({
             "Performance Trend",
 
           performanceTrendDescription:
-            "Core Web Vitals እና performance history።",
+            "Real-user Core Web Vitals እና performance history።",
 
           waitingPerformance:
-            "Speed Insights ገና አልተገናኘም",
+            "የእውነተኛ ተጠቃሚ performance data በመጠበቅ ላይ",
+
+          performanceLoading:
+            "Performance data በመጫን ላይ...",
+
+          realUserVitals:
+            "የእውነተኛ ተጠቃሚ Web Vitals",
 
           responseTime:
             "Response Time",
@@ -1063,10 +1229,16 @@ export default function AdminSiteDetails({
             "Performance Trend",
 
           performanceTrendDescription:
-            "Core Web Vitals and performance history.",
+            "Real-user Core Web Vitals and performance history.",
 
           waitingPerformance:
-            "Speed Insights is not connected yet",
+            "Waiting for real-user performance data",
+
+          performanceLoading:
+            "Loading performance data...",
+
+          realUserVitals:
+            "Real-user Web Vitals",
 
           responseTime:
             "Response Time",
@@ -1259,6 +1431,89 @@ export default function AdminSiteDetails({
   ]);
 
   /* =======================================================
+     LOAD PERFORMANCE
+     ======================================================= */
+
+  useEffect(() => {
+    if (
+      activeTab !==
+      "performance"
+    ) {
+      return;
+    }
+
+    let cancelled =
+      false;
+
+    async function load() {
+      setPerformanceLoading(
+        true,
+      );
+
+      setPerformanceError(
+        null,
+      );
+
+      try {
+        const result =
+          await getSitePerformance(
+            siteId,
+            range,
+            language,
+          );
+
+        if (
+          cancelled
+        ) {
+          return;
+        }
+
+        setPerformanceData(
+          result,
+        );
+      } catch (
+        loadError
+      ) {
+        if (
+          cancelled
+        ) {
+          return;
+        }
+
+        setPerformanceData(
+          null,
+        );
+
+        setPerformanceError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load performance data.",
+        );
+      } finally {
+        if (
+          !cancelled
+        ) {
+          setPerformanceLoading(
+            false,
+          );
+        }
+      }
+    }
+
+    void load();
+
+    return () => {
+      cancelled =
+        true;
+    };
+  }, [
+    activeTab,
+    siteId,
+    range,
+    language,
+  ]);
+
+  /* =======================================================
      AVAILABLE ANALYTICS
      ======================================================= */
 
@@ -1269,15 +1524,17 @@ export default function AdminSiteDetails({
         : null;
 
   /* =======================================================
-     EFFECTIVE RANGE
-
-     If 90D was selected but Hobby only gives 30D:
-     graph gets 30 real days, not 60 fake zero days.
+     EFFECTIVE ANALYTICS RANGE
      ======================================================= */
 
   const effectiveDayCount =
     analyticsData?.effectiveDays ??
     getRequestedDayCount(
+      range,
+    );
+
+  const performanceDayCount =
+    getPerformanceRangeDays(
       range,
     );
 
@@ -1299,7 +1556,9 @@ export default function AdminSiteDetails({
     );
 
   /* =======================================================
-     ZERO DATA FOR PERFORMANCE / HEALTH
+     HEALTH PLACEHOLDER DATA
+
+     Performance no longer uses this.
      ======================================================= */
 
   const placeholderTrend =
@@ -1329,6 +1588,127 @@ export default function AdminSiteDetails({
     );
 
   /* =======================================================
+     REAL PERFORMANCE TREND
+
+     Backend groups performance metrics by UTC day.
+
+     We therefore generate the missing chart dates using
+     UTC too so returned rows always match correctly.
+
+     IMPORTANT:
+
+     If the selected period has NO performance data, we
+     intentionally display a zero baseline.
+
+     Once real performance data exists, a missing day becomes
+     null instead of fake score 0.
+     ======================================================= */
+
+  const performanceTrendData =
+    useMemo<
+      PerformanceTrendPoint[]
+    >(
+      () => {
+        const realPoints =
+          new Map(
+            (
+              performanceData?.trend ??
+              []
+            ).map(
+              (
+                point,
+              ) => [
+                point.date,
+                point,
+              ],
+            ),
+          );
+
+        const hasRealData =
+          Boolean(
+            performanceData?.hasData,
+          );
+
+        const today =
+          new Date();
+
+        today.setUTCHours(
+          0,
+          0,
+          0,
+          0,
+        );
+
+        const result:
+          PerformanceTrendPoint[] = [];
+
+        for (
+          let index =
+            performanceDayCount -
+            1;
+          index >= 0;
+          index -= 1
+        ) {
+          const date =
+            new Date(
+              today,
+            );
+
+          date.setUTCDate(
+            today.getUTCDate() -
+              index,
+          );
+
+          const dateKey =
+            getUtcDateKey(
+              date,
+            );
+
+          const realPoint =
+            realPoints.get(
+              dateKey,
+            );
+
+          result.push({
+            date:
+              dateKey,
+
+            label:
+              formatChartDate(
+                dateKey,
+              ),
+
+            performance:
+              realPoint?.performanceScore ??
+              (
+                hasRealData
+                  ? null
+                  : 0
+              ),
+
+            lcp:
+              realPoint?.lcp ??
+              null,
+
+            inp:
+              realPoint?.inp ??
+              null,
+
+            cls:
+              realPoint?.cls ??
+              null,
+          });
+        }
+
+        return result;
+      },
+      [
+        performanceData,
+        performanceDayCount,
+      ],
+    );
+
+  /* =======================================================
      TRAFFIC SCALE
      ======================================================= */
 
@@ -1349,36 +1729,31 @@ export default function AdminSiteDetails({
           );
 
         if (
-          highest ===
-          0
+          highest === 0
         ) {
           return 100;
         }
 
         if (
-          highest <=
-          10
+          highest <= 10
         ) {
           return 10;
         }
 
         if (
-          highest <=
-          25
+          highest <= 25
         ) {
           return 25;
         }
 
         if (
-          highest <=
-          50
+          highest <= 50
         ) {
           return 50;
         }
 
         if (
-          highest <=
-          100
+          highest <= 100
         ) {
           return 100;
         }
@@ -1395,8 +1770,6 @@ export default function AdminSiteDetails({
 
   /* =======================================================
      DEVICES
-
-     Device aggregate uses PAGE VIEWS.
      ======================================================= */
 
   const deviceData =
@@ -1454,13 +1827,6 @@ export default function AdminSiteDetails({
         deviceData,
       ],
     );
-
-  /*
-    A Pie with 0 cannot draw a circle.
-
-    This single value is ONLY the neutral empty shell.
-    The visible real value in the center remains 0.
-  */
 
   const displayedDeviceData =
     useMemo(
@@ -1817,7 +2183,8 @@ export default function AdminSiteDetails({
                     }
                     type="button"
                     disabled={
-                      analyticsLoading
+                      analyticsLoading ||
+                      performanceLoading
                     }
                     onClick={() =>
                       setRange(
@@ -1909,7 +2276,7 @@ export default function AdminSiteDetails({
       </div>
 
       {/* =================================================
-          ERROR
+          GENERAL ERROR
          ================================================= */}
 
       {error && (
@@ -1935,10 +2302,6 @@ export default function AdminSiteDetails({
         activeTab ===
           "analytics") && (
         <>
-          {/* ===============================================
-              METRICS
-             =============================================== */}
-
           <section className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <MetricCard
               label={
@@ -2054,10 +2417,6 @@ export default function AdminSiteDetails({
             />
           </section>
 
-          {/* ===============================================
-              ANALYTICS NOT CONNECTED
-             =============================================== */}
-
           {analyticsUnavailable && (
             <section className="mt-5 flex min-h-[220px] flex-col items-center justify-center rounded-[24px] border border-dashed border-black/[0.09] bg-white px-6 text-center">
               <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#edf5e7] text-[#507d33]">
@@ -2084,32 +2443,16 @@ export default function AdminSiteDetails({
             </section>
           )}
 
-          {/* ===============================================
-              ANALYTICS LOADING
-             =============================================== */}
-
           {analyticsLoading && (
             <section className="mt-5 flex h-[180px] items-center justify-center rounded-[23px] border border-black/[0.055] bg-white">
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-black/[0.08] border-t-[#426c2b]" />
             </section>
           )}
 
-          {/* ===============================================
-              ANALYTICS CONTENT
-             =============================================== */}
-
           {!analyticsLoading &&
             analyticsData && (
               <>
-                {/* ===========================================
-                    TRAFFIC + DEVICES
-                   =========================================== */}
-
                 <section className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.65fr)_minmax(300px,0.75fr)]">
-                  {/* =========================================
-                      TRAFFIC
-                     ========================================= */}
-
                   <article className="overflow-hidden rounded-[23px] border border-black/[0.055] bg-white p-5 shadow-[0_8px_30px_rgba(32,45,25,0.025)] sm:p-6">
                     <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
                       <div>
@@ -2350,10 +2693,6 @@ export default function AdminSiteDetails({
                     </ChartContainer>
                   </article>
 
-                  {/* =========================================
-                      DEVICES
-                     ========================================= */}
-
                   <article className="rounded-[23px] border border-black/[0.055] bg-white p-5 shadow-[0_8px_30px_rgba(32,45,25,0.025)] sm:p-6">
                     <h3 className="text-[12px] font-extrabold text-[#20251d]">
                       {
@@ -2418,8 +2757,6 @@ export default function AdminSiteDetails({
                         </PieChart>
                       </ChartContainer>
 
-                      {/* CENTER VALUE */}
-
                       <div className="pointer-events-none absolute inset-x-0 top-[82px] flex flex-col items-center">
                         <strong className="text-[20px] font-black tracking-[-0.04em] text-[#20251d]">
                           {formatCompact(
@@ -2434,8 +2771,6 @@ export default function AdminSiteDetails({
                         </span>
                       </div>
                     </div>
-
-                    {/* DEVICE LIST */}
 
                     {deviceData.length >
                     0 ? (
@@ -2485,15 +2820,7 @@ export default function AdminSiteDetails({
                   </article>
                 </section>
 
-                {/* ===========================================
-                    TOP PAGES + CONNECTION
-                   =========================================== */}
-
                 <section className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(300px,0.65fr)]">
-                  {/* =========================================
-                      TOP PAGES
-                     ========================================= */}
-
                   <article className="rounded-[23px] border border-black/[0.055] bg-white p-5 shadow-[0_8px_30px_rgba(32,45,25,0.025)] sm:p-6">
                     <h3 className="text-[12px] font-extrabold text-[#20251d]">
                       {
@@ -2657,10 +2984,6 @@ export default function AdminSiteDetails({
                     </div>
                   </article>
 
-                  {/* =========================================
-                      ANALYTICS CONNECTION
-                     ========================================= */}
-
                   <article className="rounded-[23px] border border-black/[0.055] bg-white p-5 shadow-[0_8px_30px_rgba(32,45,25,0.025)] sm:p-6">
                     <div className="flex items-center gap-3">
                       <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-black text-white">
@@ -2756,10 +3079,6 @@ export default function AdminSiteDetails({
                   </article>
                 </section>
 
-                {/* ===========================================
-                    ANALYTICS TAB
-                   =========================================== */}
-
                 {activeTab ===
                   "analytics" && (
                   <section className="mt-4 grid gap-4 lg:grid-cols-2">
@@ -2800,10 +3119,38 @@ export default function AdminSiteDetails({
       {activeTab ===
         "performance" && (
         <>
+          {/* PERFORMANCE ERROR */}
+
+          {performanceError && (
+            <div className="mt-5 flex items-center gap-3 rounded-[15px] border border-red-100 bg-red-50 p-4">
+              <span className="h-4 w-4 shrink-0 text-red-500">
+                <WarningIcon />
+              </span>
+
+              <p className="text-[8.5px] text-red-600">
+                {
+                  performanceError
+                }
+              </p>
+            </div>
+          )}
+
+          {/* METRICS */}
+
           <section className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <MetricCard
               label="LCP"
-              value="0ms"
+              value={
+                performanceLoading
+                  ? "—"
+                  : formatMilliseconds(
+                      performanceData
+                        ?.totals
+                        .lcp
+                        .value ??
+                        null,
+                    )
+              }
               icon={
                 <SpeedIcon />
               }
@@ -2811,7 +3158,17 @@ export default function AdminSiteDetails({
 
             <MetricCard
               label="INP"
-              value="0ms"
+              value={
+                performanceLoading
+                  ? "—"
+                  : formatMilliseconds(
+                      performanceData
+                        ?.totals
+                        .inp
+                        .value ??
+                        null,
+                    )
+              }
               icon={
                 <PulseIcon />
               }
@@ -2819,7 +3176,17 @@ export default function AdminSiteDetails({
 
             <MetricCard
               label="CLS"
-              value="0.000"
+              value={
+                performanceLoading
+                  ? "—"
+                  : formatCls(
+                      performanceData
+                        ?.totals
+                        .cls
+                        .value ??
+                        null,
+                    )
+              }
               icon={
                 <ChartIcon />
               }
@@ -2827,12 +3194,31 @@ export default function AdminSiteDetails({
 
             <MetricCard
               label="Performance Score"
-              value="0"
+              value={
+                performanceLoading
+                  ? "—"
+                  : performanceData
+                      ?.totals
+                      .performanceScore !==
+                    null &&
+                    performanceData
+                      ?.totals
+                      .performanceScore !==
+                    undefined
+                    ? String(
+                        performanceData
+                          .totals
+                          .performanceScore,
+                      )
+                    : "—"
+              }
               icon={
                 <TrendingIcon />
               }
             />
           </section>
+
+          {/* PERFORMANCE TREND */}
 
           <section className="mt-4 rounded-[23px] border border-black/[0.055] bg-white p-5 shadow-[0_8px_30px_rgba(32,45,25,0.025)] sm:p-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -2851,9 +3237,11 @@ export default function AdminSiteDetails({
               </div>
 
               <span className="rounded-full bg-[#f1f5ed] px-2.5 py-1 text-[6.5px] font-bold text-black/30">
-                {
-                  copy.waitingPerformance
-                }
+                {performanceLoading
+                  ? copy.performanceLoading
+                  : performanceData?.hasData
+                    ? copy.realUserVitals
+                    : copy.waitingPerformance}
               </span>
             </div>
 
@@ -2866,7 +3254,7 @@ export default function AdminSiteDetails({
               <AreaChart
                 accessibilityLayer
                 data={
-                  placeholderTrend
+                  performanceTrendData
                 }
                 margin={{
                   top:
@@ -2896,7 +3284,7 @@ export default function AdminSiteDetails({
                   }
                   minTickGap={
                     getTickGap(
-                      effectiveDayCount,
+                      performanceDayCount,
                     )
                   }
                   tick={{
@@ -2951,17 +3339,20 @@ export default function AdminSiteDetails({
                 />
 
                 <Area
-                  type="monotone"
-                  dataKey="performance"
-                  stroke="var(--color-performance)"
-                  fill="transparent"
-                  strokeWidth={
-                    2.2
-                  }
-                  dot={
-                    false
-                  }
-                />
+  type="monotone"
+  dataKey="performance"
+  stroke="var(--color-performance)"
+  fill="transparent"
+  strokeWidth={2.2}
+  dot={{
+    r: 4,
+    strokeWidth: 2,
+  }}
+  activeDot={{
+    r: 5,
+  }}
+  connectNulls={true}
+/>
               </AreaChart>
             </ChartContainer>
           </section>
@@ -3016,10 +3407,6 @@ export default function AdminSiteDetails({
               }
             />
           </section>
-
-          {/* ===============================================
-              RESPONSE TIME
-             =============================================== */}
 
           <section className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(280px,0.65fr)]">
             <article className="rounded-[23px] border border-black/[0.055] bg-white p-5 shadow-[0_8px_30px_rgba(32,45,25,0.025)] sm:p-6">
@@ -3159,10 +3546,6 @@ export default function AdminSiteDetails({
               </ChartContainer>
             </article>
 
-            {/* =============================================
-                CURRENT STATUS
-               ============================================= */}
-
             <article className="rounded-[23px] border border-black/[0.055] bg-white p-5 shadow-[0_8px_30px_rgba(32,45,25,0.025)] sm:p-6">
               <h3 className="text-[12px] font-extrabold text-[#20251d]">
                 {
@@ -3217,10 +3600,6 @@ export default function AdminSiteDetails({
               </div>
             </article>
           </section>
-
-          {/* ===============================================
-              UPTIME
-             =============================================== */}
 
           <section className="mt-4 rounded-[23px] border border-black/[0.055] bg-white p-5 shadow-[0_8px_30px_rgba(32,45,25,0.025)] sm:p-6">
             <div>
@@ -3636,8 +4015,6 @@ function StatusRow({
 
 /* =========================================================
    RANKED ANALYTICS CARD
-
-   Countries + referrers use PAGE VIEWS.
    ========================================================= */
 
 function RankedCard({
@@ -3686,6 +4063,7 @@ function RankedCard({
             pageViews:
               0,
           },
+
           {
             name:
               "—",
@@ -3696,6 +4074,7 @@ function RankedCard({
             pageViews:
               0,
           },
+
           {
             name:
               "—",
@@ -3772,8 +4151,10 @@ function RankedCard({
                       0
                         ? `${Math.max(
                             3,
-                            (item.pageViews /
-                              max) *
+                            (
+                              item.pageViews /
+                              max
+                            ) *
                               100,
                           )}%`
                         : "0%",
