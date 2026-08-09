@@ -324,7 +324,138 @@ function firstString(
 
   return "";
 }
+function getAggregateValue(
+  row:
+    UnknownRecord,
+) {
+  /*
+    First check the common names Vercel may use.
+  */
 
+  const preferredKeys = [
+    "pageviews",
+    "pageViews",
+    "page_views",
+    "views",
+    "visits",
+    "count",
+    "value",
+    "total",
+  ];
+
+  for (
+    const key of preferredKeys
+  ) {
+    const value =
+      row[
+        key
+      ];
+
+    if (
+      typeof value ===
+        "number" &&
+      Number.isFinite(
+        value,
+      )
+    ) {
+      return value;
+    }
+
+    if (
+      typeof value ===
+        "string"
+    ) {
+      const parsed =
+        Number(
+          value,
+        );
+
+      if (
+        Number.isFinite(
+          parsed,
+        )
+      ) {
+        return parsed;
+      }
+    }
+  }
+
+  /*
+    Some SDK representations can place dynamic numeric
+    aggregate fields inside additionalProperties.
+  */
+
+  const additionalProperties =
+    row.additionalProperties;
+
+  if (
+    isRecord(
+      additionalProperties,
+    )
+  ) {
+    for (
+      const value of Object.values(
+        additionalProperties,
+      )
+    ) {
+      if (
+        typeof value ===
+          "number" &&
+        Number.isFinite(
+          value,
+        )
+      ) {
+        return value;
+      }
+    }
+  }
+
+  /*
+    Vercel's aggregate response permits dynamic numeric
+    properties.
+
+    Find the first usable numeric aggregate while ignoring
+    timestamp-like fields.
+  */
+
+  const ignoredNumericKeys =
+    new Set([
+      "timestamp",
+      "time",
+      "version",
+      "since",
+      "until",
+    ]);
+
+  for (
+    const [
+      key,
+      value,
+    ] of Object.entries(
+      row,
+    )
+  ) {
+    if (
+      ignoredNumericKeys.has(
+        key,
+      )
+    ) {
+      continue;
+    }
+
+    if (
+      typeof value ===
+        "number" &&
+      Number.isFinite(
+        value,
+      )
+    ) {
+      return value;
+    }
+  }
+
+  return 0;
+}
 /* =========================================================
    DATE HELPERS
    ========================================================= */
@@ -770,6 +901,19 @@ function parseCount(
     );
 
   if (
+    typeof data ===
+      "number"
+  ) {
+    return {
+      visitors:
+        0,
+
+      pageViews:
+        data,
+    };
+  }
+
+  if (
     !isRecord(
       data,
     )
@@ -783,27 +927,41 @@ function parseCount(
     };
   }
 
-  return {
-    visitors:
-      firstNumber(
-        data,
-        [
-          "visitors",
-          "uniqueVisitors",
-          "unique_visitors",
-        ],
-      ),
+  const visitors =
+    firstNumber(
+      data,
+      [
+        "visitors",
+        "uniqueVisitors",
+        "unique_visitors",
+        "visitorCount",
+      ],
+    );
 
-    pageViews:
-      firstNumber(
-        data,
-        [
-          "pageviews",
-          "pageViews",
-          "views",
-          "count",
-        ],
-      ),
+  const pageViewsFromKnownField =
+    firstNumber(
+      data,
+      [
+        "pageviews",
+        "pageViews",
+        "page_views",
+        "views",
+        "count",
+        "total",
+      ],
+    );
+
+  const pageViews =
+    pageViewsFromKnownField >
+    0
+      ? pageViewsFromKnownField
+      : getAggregateValue(
+          data,
+        );
+
+  return {
+    visitors,
+    pageViews,
   };
 }
 
@@ -828,29 +986,26 @@ function parseTrend(
               row.interval,
           );
 
+        const visitors =
+          firstNumber(
+            row,
+            [
+              "visitors",
+              "uniqueVisitors",
+              "unique_visitors",
+              "visitorCount",
+            ],
+          );
+
+        const pageViews =
+          getAggregateValue(
+            row,
+          );
+
         return {
           date,
-
-          visitors:
-            firstNumber(
-              row,
-              [
-                "visitors",
-                "uniqueVisitors",
-                "unique_visitors",
-              ],
-            ),
-
-          pageViews:
-            firstNumber(
-              row,
-              [
-                "pageviews",
-                "pageViews",
-                "views",
-                "count",
-              ],
-            ),
+          visitors,
+          pageViews,
         };
       },
     )
@@ -902,31 +1057,36 @@ function parseDimension(
           ) ||
           fallback;
 
+        const visitors =
+          firstNumber(
+            row,
+            [
+              "visitors",
+              "uniqueVisitors",
+              "unique_visitors",
+              "visitorCount",
+            ],
+          );
+
+        const pageViews =
+          getAggregateValue(
+            row,
+          );
+
         return {
           name,
-
-          visitors:
-            firstNumber(
-              row,
-              [
-                "visitors",
-                "uniqueVisitors",
-                "unique_visitors",
-              ],
-            ),
-
-          pageViews:
-            firstNumber(
-              row,
-              [
-                "pageviews",
-                "pageViews",
-                "views",
-                "count",
-              ],
-            ),
+          visitors,
+          pageViews,
         };
       },
+    )
+    .filter(
+      (
+        item,
+      ) =>
+        Boolean(
+          item.name,
+        ),
     )
     .sort(
       (

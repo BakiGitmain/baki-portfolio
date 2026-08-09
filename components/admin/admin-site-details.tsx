@@ -61,11 +61,7 @@ const DEVICE_COLORS = [
 
 function ArrowLeftIcon() {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path
         d="M19 12H5M11 18L5 12L11 6"
         stroke="currentColor"
@@ -79,11 +75,7 @@ function ArrowLeftIcon() {
 
 function ExternalIcon() {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path
         d="M14 5H19V10"
         stroke="currentColor"
@@ -111,11 +103,7 @@ function ExternalIcon() {
 
 function UsersIcon() {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <circle
         cx="9"
         cy="8"
@@ -150,11 +138,7 @@ function UsersIcon() {
 
 function EyeIcon() {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path
         d="M3 12C5.3 8.4 8.3 6.5 12 6.5C15.7 6.5 18.7 8.4 21 12C18.7 15.6 15.7 17.5 12 17.5C8.3 17.5 5.3 15.6 3 12Z"
         stroke="currentColor"
@@ -174,11 +158,7 @@ function EyeIcon() {
 
 function ChartIcon() {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path
         d="M4 19V12"
         stroke="currentColor"
@@ -212,11 +192,7 @@ function ChartIcon() {
 
 function GlobeIcon() {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <circle
         cx="12"
         cy="12"
@@ -237,11 +213,7 @@ function GlobeIcon() {
 
 function PulseIcon() {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path
         d="M3 12H7L9.2 7L13 17L15.5 11H21"
         stroke="currentColor"
@@ -255,11 +227,7 @@ function PulseIcon() {
 
 function SpeedIcon() {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path
         d="M5 17C4.4 15.8 4 14.5 4 13C4 8.6 7.6 5 12 5C16.4 5 20 8.6 20 13C20 14.5 19.6 15.8 19 17"
         stroke="currentColor"
@@ -286,11 +254,7 @@ function SpeedIcon() {
 
 function SettingsIcon() {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <circle
         cx="12"
         cy="12"
@@ -312,15 +276,10 @@ function SettingsIcon() {
 function TrendingIcon({
   down = false,
 }: {
-  down?:
-    boolean;
+  down?: boolean;
 }) {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path
         d={
           down
@@ -350,11 +309,7 @@ function TrendingIcon({
 
 function WarningIcon() {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path
         d="M12 4L21 20H3L12 4Z"
         stroke="currentColor"
@@ -391,34 +346,21 @@ type TabKey =
   | "settings";
 
 type AdminSiteDetailsProps = {
-  siteId:
-    string;
+  siteId: string;
 };
 
 type TrafficPoint = {
-  date:
-    string;
-
-  label:
-    string;
-
-  visitors:
-    number;
-
-  pageViews:
-    number;
+  date: string;
+  label: string;
+  visitors: number;
+  pageViews: number;
 };
 
 type PlaceholderTrendPoint =
   TrafficPoint & {
-    performance:
-      number;
-
-    responseTime:
-      number;
-
-    uptime:
-      number;
+    performance: number;
+    responseTime: number;
+    uptime: number;
   };
 
 /* =========================================================
@@ -426,8 +368,7 @@ type PlaceholderTrendPoint =
    ========================================================= */
 
 function formatCompact(
-  value:
-    number,
+  value: number,
 ) {
   return new Intl.NumberFormat(
     "en-US",
@@ -448,8 +389,7 @@ function formatCompact(
 }
 
 function formatPercent(
-  value:
-    number | null,
+  value: number | null,
 ) {
   if (
     value === null
@@ -468,8 +408,7 @@ function formatPercent(
 }
 
 function formatChartDate(
-  value:
-    string,
+  value: string,
 ) {
   const date =
     new Date(
@@ -499,11 +438,8 @@ function formatChartDate(
 }
 
 function truncate(
-  value:
-    string,
-
-  max =
-    18,
+  value: string,
+  max = 18,
 ) {
   if (
     value.length <=
@@ -518,9 +454,8 @@ function truncate(
   )}…`;
 }
 
-function getRangeDayCount(
-  range:
-    SiteAnalyticsRange,
+function getRequestedDayCount(
+  range: SiteAnalyticsRange,
 ) {
   switch (
     range
@@ -537,8 +472,7 @@ function getRangeDayCount(
 }
 
 function getDateKey(
-  date:
-    Date,
+  date: Date,
 ) {
   return [
     date.getFullYear(),
@@ -562,34 +496,155 @@ function getDateKey(
   );
 }
 
+function getTickGap(
+  days: number,
+) {
+  if (
+    days > 62
+  ) {
+    return 55;
+  }
+
+  if (
+    days > 14
+  ) {
+    return 38;
+  }
+
+  return 20;
+}
+
 /* =========================================================
-   FULL TRAFFIC RANGE
+   TRAFFIC DATA
 
-   Always creates every date in the selected range.
+   For normal ranges we fill missing days with 0.
 
-   If Vercel provides no value for a date:
-   visitors = 0
-   pageViews = 0
+   If a real 90-day range comes back as weekly aggregate
+   data, we use the actual returned points instead of
+   creating fake zero values between each weekly point.
    ========================================================= */
 
 function buildTrafficData(
   analytics:
     AvailableSiteAnalytics | null,
 
-  range:
-    SiteAnalyticsRange,
+  days:
+    number,
 ): TrafficPoint[] {
-  const days =
-    getRangeDayCount(
-      range,
+  const trend =
+    analytics?.trend ??
+    [];
+
+  /*
+    Long ranges can be grouped weekly by Vercel.
+  */
+
+  if (
+    days > 62 &&
+    trend.length > 0
+  ) {
+    return trend.map(
+      (
+        point,
+      ) => ({
+        date:
+          point.date,
+
+        label:
+          formatChartDate(
+            point.date,
+          ),
+
+        visitors:
+          point.visitors ??
+          0,
+
+        pageViews:
+          point.pageViews ??
+          0,
+      }),
     );
+  }
+
+  /*
+    Empty long-range chart:
+    create weekly zero points so a graph still exists.
+  */
+
+  if (
+    days > 62 &&
+    trend.length === 0
+  ) {
+    const today =
+      new Date();
+
+    today.setHours(
+      0,
+      0,
+      0,
+      0,
+    );
+
+    const numberOfWeeks =
+      Math.ceil(
+        days /
+          7,
+      );
+
+    const result:
+      TrafficPoint[] = [];
+
+    for (
+      let index =
+        numberOfWeeks -
+        1;
+      index >= 0;
+      index -= 1
+    ) {
+      const date =
+        new Date(
+          today,
+        );
+
+      date.setDate(
+        today.getDate() -
+          index *
+            7,
+      );
+
+      const dateKey =
+        getDateKey(
+          date,
+        );
+
+      result.push({
+        date:
+          dateKey,
+
+        label:
+          formatChartDate(
+            dateKey,
+          ),
+
+        visitors:
+          0,
+
+        pageViews:
+          0,
+      });
+    }
+
+    return result;
+  }
+
+  /*
+    7D / 30D / fallback range:
+    create every single date.
+  */
 
   const realPoints =
     new Map(
-      (
-        analytics?.trend ??
-        []
-      ).map(
+      trend.map(
         (
           point,
         ) => [
@@ -614,9 +669,9 @@ function buildTrafficData(
 
   for (
     let index =
-      days - 1;
-    index >=
-    0;
+      days -
+      1;
+    index >= 0;
     index -= 1
   ) {
     const date =
@@ -800,7 +855,7 @@ export default function AdminSiteDetails({
             "Devices",
 
           devicesDescription:
-            "Visitors በdevice type።",
+            "Page views በdevice type።",
 
           countries:
             "Top Countries",
@@ -957,7 +1012,7 @@ export default function AdminSiteDetails({
             "Devices",
 
           devicesDescription:
-            "Visitor distribution by device type.",
+            "Page views by device type.",
 
           countries:
             "Top Countries",
@@ -1214,6 +1269,19 @@ export default function AdminSiteDetails({
         : null;
 
   /* =======================================================
+     EFFECTIVE RANGE
+
+     If 90D was selected but Hobby only gives 30D:
+     graph gets 30 real days, not 60 fake zero days.
+     ======================================================= */
+
+  const effectiveDayCount =
+    analyticsData?.effectiveDays ??
+    getRequestedDayCount(
+      range,
+    );
+
+  /* =======================================================
      TRAFFIC DATA
      ======================================================= */
 
@@ -1222,20 +1290,16 @@ export default function AdminSiteDetails({
       () =>
         buildTrafficData(
           analyticsData,
-          range,
+          effectiveDayCount,
         ),
       [
         analyticsData,
-        range,
+        effectiveDayCount,
       ],
     );
 
   /* =======================================================
-     PLACEHOLDER PERFORMANCE + HEALTH
-
-     These are visual zero states only.
-
-     We are NOT pretending this is measured performance.
+     ZERO DATA FOR PERFORMANCE / HEALTH
      ======================================================= */
 
   const placeholderTrend =
@@ -1330,42 +1394,51 @@ export default function AdminSiteDetails({
     );
 
   /* =======================================================
-     DEVICE DATA
+     DEVICES
+
+     Device aggregate uses PAGE VIEWS.
      ======================================================= */
 
-const deviceData =
-  useMemo(
-    () =>
-      analyticsData?.devices
-        .slice(
-          0,
-          6,
-        )
-        .map(
-          (
-            item,
-            index,
-          ) => ({
-            device:
-              item.name,
+  const deviceData =
+    useMemo(
+      () =>
+        analyticsData?.devices
+          .filter(
+            (
+              item,
+            ) =>
+              item.pageViews >
+              0,
+          )
+          .slice(
+            0,
+            6,
+          )
+          .map(
+            (
+              item,
+              index,
+            ) => ({
+              device:
+                item.name,
 
-            visitors:
-              item.pageViews,
+              pageViews:
+                item.pageViews,
 
-            fill:
-              DEVICE_COLORS[
-                index %
-                  DEVICE_COLORS.length
-              ],
-          }),
-        ) ??
-      [],
-    [
-      analyticsData,
-    ],
-  );
+              fill:
+                DEVICE_COLORS[
+                  index %
+                    DEVICE_COLORS.length
+                ],
+            }),
+          ) ??
+        [],
+      [
+        analyticsData,
+      ],
+    );
 
-  const deviceVisitorsTotal =
+  const devicePageViewsTotal =
     useMemo(
       () =>
         deviceData.reduce(
@@ -1374,7 +1447,7 @@ const deviceData =
             item,
           ) =>
             total +
-            item.visitors,
+            item.pageViews,
           0,
         ),
       [
@@ -1383,10 +1456,10 @@ const deviceData =
     );
 
   /*
-    Pie charts cannot visually render a total value of zero.
+    A Pie with 0 cannot draw a circle.
 
-    The neutral ring below is only a placeholder shell.
-    The center still reports the REAL value: 0.
+    This single value is ONLY the neutral empty shell.
+    The visible real value in the center remains 0.
   */
 
   const displayedDeviceData =
@@ -1404,7 +1477,7 @@ const deviceData =
             device:
               copy.noData,
 
-            visitors:
+            pageViews:
               1,
 
             fill:
@@ -1419,7 +1492,7 @@ const deviceData =
     );
 
   /* =======================================================
-     TOP PAGE DATA
+     TOP PAGES
      ======================================================= */
 
   const displayedTopPages =
@@ -1451,7 +1524,7 @@ const deviceData =
     );
 
   /* =======================================================
-     CHART CONFIGS
+     CHART CONFIG
      ======================================================= */
 
   const trafficConfig:
@@ -1486,9 +1559,9 @@ const deviceData =
 
   const deviceConfig:
     ChartConfig = {
-      visitors: {
+      pageViews: {
         label:
-          copy.visitors,
+          copy.pageViews,
 
         color:
           "#426c2b",
@@ -1529,7 +1602,7 @@ const deviceData =
     };
 
   /* =======================================================
-     LOADING
+     LOADING SITE
      ======================================================= */
 
   if (
@@ -1725,6 +1798,8 @@ const deviceData =
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {/* RANGE */}
+
             <div className="flex items-center rounded-xl border border-black/[0.06] bg-white p-1 shadow-sm">
               {(
                 [
@@ -1754,7 +1829,7 @@ const deviceData =
                       item
                         ? "bg-[#edf5e7] text-[#426c2b]"
                         : "text-black/30 hover:text-black/55"
-                    } disabled:opacity-45`}
+                    } disabled:cursor-wait disabled:opacity-45`}
                   >
                     {
                       item
@@ -1763,6 +1838,8 @@ const deviceData =
                 ),
               )}
             </div>
+
+            {/* LIVE SITE */}
 
             <a
               href={
@@ -2008,7 +2085,7 @@ const deviceData =
           )}
 
           {/* ===============================================
-              LOADING
+              ANALYTICS LOADING
              =============================================== */}
 
           {analyticsLoading && (
@@ -2160,13 +2237,9 @@ const deviceData =
                             12
                           }
                           minTickGap={
-                            range ===
-                            "90d"
-                              ? 55
-                              : range ===
-                                  "30d"
-                                ? 38
-                                : 20
+                            getTickGap(
+                              effectiveDayCount,
+                            )
                           }
                           tick={{
                             fontSize:
@@ -2320,7 +2393,7 @@ const deviceData =
                             data={
                               displayedDeviceData
                             }
-                            dataKey="visitors"
+                            dataKey="pageViews"
                             nameKey="device"
                             innerRadius={
                               58
@@ -2345,20 +2418,24 @@ const deviceData =
                         </PieChart>
                       </ChartContainer>
 
+                      {/* CENTER VALUE */}
+
                       <div className="pointer-events-none absolute inset-x-0 top-[82px] flex flex-col items-center">
                         <strong className="text-[20px] font-black tracking-[-0.04em] text-[#20251d]">
                           {formatCompact(
-                            deviceVisitorsTotal,
+                            devicePageViewsTotal,
                           )}
                         </strong>
 
                         <span className="mt-0.5 text-[6.5px] font-bold uppercase tracking-[0.1em] text-black/25">
                           {
-                            copy.visitors
+                            copy.pageViews
                           }
                         </span>
                       </div>
                     </div>
+
+                    {/* DEVICE LIST */}
 
                     {deviceData.length >
                     0 ? (
@@ -2391,7 +2468,7 @@ const deviceData =
 
                               <strong className="text-[8px] font-bold text-[#252b21]">
                                 {formatCompact(
-                                  device.visitors,
+                                  device.pageViews,
                                 )}
                               </strong>
                             </div>
@@ -2511,7 +2588,7 @@ const deviceData =
                               false
                             }
                             width={
-                              115
+                              125
                             }
                             tick={{
                               fontSize:
@@ -2527,7 +2604,7 @@ const deviceData =
                                 String(
                                   value,
                                 ),
-                                19,
+                                21,
                               )
                             }
                           />
@@ -2581,7 +2658,7 @@ const deviceData =
                   </article>
 
                   {/* =========================================
-                      CONNECTION
+                      ANALYTICS CONNECTION
                      ========================================= */}
 
                   <article className="rounded-[23px] border border-black/[0.055] bg-white p-5 shadow-[0_8px_30px_rgba(32,45,25,0.025)] sm:p-6">
@@ -2680,7 +2757,7 @@ const deviceData =
                 </section>
 
                 {/* ===========================================
-                    ANALYTICS EXTRA
+                    ANALYTICS TAB
                    =========================================== */}
 
                 {activeTab ===
@@ -2723,10 +2800,6 @@ const deviceData =
       {activeTab ===
         "performance" && (
         <>
-          {/* ===============================================
-              PERFORMANCE METRICS
-             =============================================== */}
-
           <section className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <MetricCard
               label="LCP"
@@ -2760,10 +2833,6 @@ const deviceData =
               }
             />
           </section>
-
-          {/* ===============================================
-              PERFORMANCE GRAPH
-             =============================================== */}
 
           <section className="mt-4 rounded-[23px] border border-black/[0.055] bg-white p-5 shadow-[0_8px_30px_rgba(32,45,25,0.025)] sm:p-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -2826,10 +2895,9 @@ const deviceData =
                     false
                   }
                   minTickGap={
-                    range ===
-                    "90d"
-                      ? 55
-                      : 30
+                    getTickGap(
+                      effectiveDayCount,
+                    )
                   }
                   tick={{
                     fontSize:
@@ -2907,10 +2975,6 @@ const deviceData =
       {activeTab ===
         "health" && (
         <>
-          {/* ===============================================
-              HEALTH METRICS
-             =============================================== */}
-
           <section className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <MetricCard
               label={
@@ -2954,7 +3018,7 @@ const deviceData =
           </section>
 
           {/* ===============================================
-              RESPONSE TIME + STATUS
+              RESPONSE TIME
              =============================================== */}
 
           <section className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(280px,0.65fr)]">
@@ -3019,10 +3083,9 @@ const deviceData =
                       false
                     }
                     minTickGap={
-                      range ===
-                      "90d"
-                        ? 55
-                        : 30
+                      getTickGap(
+                        effectiveDayCount,
+                      )
                     }
                     tick={{
                       fontSize:
@@ -3097,7 +3160,7 @@ const deviceData =
             </article>
 
             {/* =============================================
-                CURRENT HEALTH STATUS
+                CURRENT STATUS
                ============================================= */}
 
             <article className="rounded-[23px] border border-black/[0.055] bg-white p-5 shadow-[0_8px_30px_rgba(32,45,25,0.025)] sm:p-6">
@@ -3156,7 +3219,7 @@ const deviceData =
           </section>
 
           {/* ===============================================
-              UPTIME GRAPH
+              UPTIME
              =============================================== */}
 
           <section className="mt-4 rounded-[23px] border border-black/[0.055] bg-white p-5 shadow-[0_8px_30px_rgba(32,45,25,0.025)] sm:p-6">
@@ -3212,10 +3275,9 @@ const deviceData =
                     false
                   }
                   minTickGap={
-                    range ===
-                    "90d"
-                      ? 55
-                      : 30
+                    getTickGap(
+                      effectiveDayCount,
+                    )
                   }
                   tick={{
                     fontSize:
@@ -3365,20 +3427,11 @@ function MetricCard({
   change,
   sublabel,
 }: {
-  label:
-    string;
-
-  value:
-    string;
-
-  icon:
-    ReactNode;
-
-  change?:
-    number | null;
-
-  sublabel?:
-    string;
+  label: string;
+  value: string;
+  icon: ReactNode;
+  change?: number | null;
+  sublabel?: string;
 }) {
   const hasComparison =
     change !==
@@ -3471,11 +3524,8 @@ function LegendDot({
   color,
   label,
 }: {
-  color:
-    string;
-
-  label:
-    string;
+  color: string;
+  label: string;
 }) {
   return (
     <div className="flex items-center gap-2">
@@ -3497,7 +3547,7 @@ function LegendDot({
 }
 
 /* =========================================================
-   CONNECTION ROW
+   CONNECTION
    ========================================================= */
 
 function ConnectionRow({
@@ -3507,20 +3557,11 @@ function ConnectionRow({
   yes,
   no,
 }: {
-  label:
-    string;
-
-  value?:
-    string | null;
-
-  configured:
-    boolean;
-
-  yes:
-    string;
-
-  no:
-    string;
+  label: string;
+  value?: string | null;
+  configured: boolean;
+  yes: string;
+  no: string;
 }) {
   return (
     <div className="flex items-center justify-between gap-4 rounded-xl bg-[#f7f8f4] px-3.5 py-3">
@@ -3564,18 +3605,15 @@ function ConnectionRow({
 }
 
 /* =========================================================
-   STATUS ROW
+   STATUS
    ========================================================= */
 
 function StatusRow({
   label,
   value,
 }: {
-  label:
-    string;
-
-  value:
-    string;
+  label: string;
+  value: string;
 }) {
   return (
     <div className="flex items-center justify-between gap-4 rounded-xl bg-[#f7f8f4] px-3.5 py-3">
@@ -3597,7 +3635,9 @@ function StatusRow({
 }
 
 /* =========================================================
-   RANKED CARD
+   RANKED ANALYTICS CARD
+
+   Countries + referrers use PAGE VIEWS.
    ========================================================= */
 
 function RankedCard({
@@ -3622,10 +3662,19 @@ function RankedCard({
   emptyText:
     string;
 }) {
+  const realItems =
+    items.filter(
+      (
+        item,
+      ) =>
+        item.pageViews >
+        0,
+    );
+
   const displayItems =
-    items.length >
+    realItems.length >
     0
-      ? items
+      ? realItems
       : [
           {
             name:
@@ -3672,11 +3721,17 @@ function RankedCard({
 
   return (
     <article className="rounded-[23px] border border-black/[0.055] bg-white p-5 shadow-[0_8px_30px_rgba(32,45,25,0.025)] sm:p-6">
-      <h3 className="text-[12px] font-extrabold text-[#20251d]">
-        {
-          title
-        }
-      </h3>
+      <div className="flex items-center justify-between gap-4">
+        <h3 className="text-[12px] font-extrabold text-[#20251d]">
+          {
+            title
+          }
+        </h3>
+
+        <span className="text-[6.5px] font-bold uppercase tracking-[0.1em] text-black/20">
+          Page Views
+        </span>
+      </div>
 
       <div className="mt-5 space-y-4">
         {displayItems.map(
@@ -3741,11 +3796,8 @@ function InfoCard({
   label,
   value,
 }: {
-  label:
-    string;
-
-  value:
-    string;
+  label: string;
+  value: string;
 }) {
   return (
     <div className="min-w-0 rounded-[16px] border border-black/[0.05] bg-[#f8f9f5] p-4">
