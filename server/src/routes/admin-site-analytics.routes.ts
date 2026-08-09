@@ -1,128 +1,71 @@
-import {
-  Router,
-} from "express";
+import { Router } from "express";
+import { z } from "zod";
 
-import {
-  z,
-} from "zod";
-
-import {
-  db,
-} from "../config/db.js";
-
-import {
-  requireAdmin,
-} from "../middleware/auth.middleware.js";
+import { db } from "../config/db.js";
+import { requireAdmin } from "../middleware/auth.middleware.js";
 
 /* =========================================================
    ROUTER
    ========================================================= */
 
-const router =
-  Router();
+const router = Router();
 
 /* =========================================================
    TYPES
    ========================================================= */
 
-type AnalyticsRange =
-  | "7d"
-  | "30d"
-  | "90d";
+type AnalyticsRange = "7d" | "30d" | "90d";
 
-type TimeGranularity =
-  | "day"
-  | "week";
+type TimeGranularity = "day" | "week";
 
 type SiteRow = {
-  id:
-    string;
+  id: string;
+  name: string;
+  slug: string;
 
-  name:
-    string;
+  frontend_url: string;
+  backend_url: string | null;
+  health_url: string | null;
 
-  slug:
-    string;
+  vercel_project_id: string | null;
+  vercel_team_id: string | null;
 
-  frontend_url:
-    string;
-
-  backend_url:
-    string | null;
-
-  health_url:
-    string | null;
-
-  vercel_project_id:
-    string | null;
-
-  vercel_team_id:
-    string | null;
-
-  analytics_enabled:
-    boolean;
-
-  monitoring_enabled:
-    boolean;
+  analytics_enabled: boolean;
+  monitoring_enabled: boolean;
 };
 
-type UnknownRecord =
-  Record<
-    string,
-    unknown
-  >;
+type UnknownRecord = Record<string, unknown>;
 
 type AnalyticsCount = {
-  visitors:
-    number;
-
-  pageViews:
-    number;
+  visitors: number;
+  pageViews: number;
 };
 
 type AnalyticsTrendPoint = {
-  date:
-    string;
-
-  visitors:
-    number;
-
-  pageViews:
-    number;
+  date: string;
+  visitors: number;
+  pageViews: number;
 };
 
 type AnalyticsDimension = {
-  name:
-    string;
-
-  visitors:
-    number;
-
-  pageViews:
-    number;
+  name: string;
+  visitors: number;
+  pageViews: number;
 };
 
 type ResolvedAnalyticsRange = {
-  effectiveDays:
-    number;
+  effectiveDays: number;
 
-  sinceDate:
-    Date;
+  sinceDate: Date;
 
-  since:
-    string;
+  since: string;
+  until: string;
 
-  until:
-    string;
+  trendRaw: unknown;
 
-  trendRaw:
-    unknown;
+  trendGranularity: TimeGranularity;
 
-  trendGranularity:
-    TimeGranularity;
-
-  limited:
-    boolean;
+  limited: boolean;
 };
 
 /* =========================================================
@@ -130,17 +73,13 @@ type ResolvedAnalyticsRange = {
    ========================================================= */
 
 class VercelAnalyticsError extends Error {
-  status:
-    number;
+  status: number;
 
-  code:
-    string | null;
+  code: string | null;
 
-  url:
-    string;
+  url: string;
 
-  responseText:
-    string;
+  responseText: string;
 
   constructor({
     status,
@@ -149,39 +88,20 @@ class VercelAnalyticsError extends Error {
     url,
     responseText,
   }: {
-    status:
-      number;
-
-    code:
-      string | null;
-
-    message:
-      string;
-
-    url:
-      string;
-
-    responseText:
-      string;
+    status: number;
+    code: string | null;
+    message: string;
+    url: string;
+    responseText: string;
   }) {
-    super(
-      message,
-    );
+    super(message);
 
-    this.name =
-      "VercelAnalyticsError";
+    this.name = "VercelAnalyticsError";
 
-    this.status =
-      status;
-
-    this.code =
-      code;
-
-    this.url =
-      url;
-
-    this.responseText =
-      responseText;
+    this.status = status;
+    this.code = code;
+    this.url = url;
+    this.responseText = responseText;
   }
 }
 
@@ -189,17 +109,13 @@ class VercelAnalyticsError extends Error {
    VALIDATION
    ========================================================= */
 
-const idSchema =
-  z
-    .string()
-    .uuid();
+const idSchema = z.string().uuid();
 
-const rangeSchema =
-  z.enum([
-    "7d",
-    "30d",
-    "90d",
-  ]);
+const rangeSchema = z.enum([
+  "7d",
+  "30d",
+  "90d",
+]);
 
 /* =========================================================
    VERCEL
@@ -213,177 +129,131 @@ const VERCEL_ANALYTICS_BASE_URL =
    ========================================================= */
 
 function isRecord(
-  value:
-    unknown,
+  value: unknown,
 ): value is UnknownRecord {
   return (
-    typeof value ===
-      "object" &&
-    value !==
-      null &&
-    !Array.isArray(
-      value,
-    )
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value)
   );
 }
 
-function asNumber(
-  value:
-    unknown,
-) {
+function toFiniteNumber(
+  value: unknown,
+): number | null {
   if (
-    typeof value ===
-      "number" &&
-    Number.isFinite(
-      value,
-    )
+    typeof value === "number" &&
+    Number.isFinite(value)
   ) {
     return value;
   }
 
   if (
-    typeof value ===
-      "string"
+    typeof value === "string" &&
+    value.trim()
   ) {
-    const parsed =
-      Number(
-        value,
-      );
+    const parsed = Number(value);
 
     if (
-      Number.isFinite(
-        parsed,
-      )
+      Number.isFinite(parsed)
     ) {
       return parsed;
     }
   }
 
-  return 0;
+  return null;
 }
 
 function asString(
-  value:
-    unknown,
+  value: unknown,
 ) {
-  return typeof value ===
-    "string"
+  return typeof value === "string"
     ? value
     : "";
 }
 
 function firstNumber(
-  row:
-    UnknownRecord,
-
-  keys:
-    string[],
+  row: UnknownRecord,
+  keys: string[],
 ) {
-  for (
-    const key of keys
-  ) {
-    if (
-      !(key in row)
-    ) {
-      continue;
-    }
+  for (const key of keys) {
+    const number =
+      toFiniteNumber(
+        row[key],
+      );
 
-    return asNumber(
-      row[
-        key
-      ],
-    );
+    if (
+      number !== null
+    ) {
+      return number;
+    }
   }
 
   return 0;
 }
 
 function firstString(
-  row:
-    UnknownRecord,
-
-  keys:
-    string[],
+  row: UnknownRecord,
+  keys: string[],
 ) {
-  for (
-    const key of keys
-  ) {
+  for (const key of keys) {
     const value =
       asString(
-        row[
-          key
-        ],
+        row[key],
       ).trim();
 
-    if (
-      value
-    ) {
+    if (value) {
       return value;
     }
   }
 
   return "";
 }
-function getAggregateValue(
-  row:
-    UnknownRecord,
-) {
-  /*
-    First check the common names Vercel may use.
-  */
 
+/* =========================================================
+   AGGREGATE VALUE
+
+   Vercel aggregate responses can contain the numeric
+   aggregate under different property names.
+
+   Known names are checked first.
+
+   If none are found, the function searches for another
+   finite numeric property while ignoring timestamps.
+   ========================================================= */
+
+function getAggregateValue(
+  row: UnknownRecord,
+) {
   const preferredKeys = [
     "pageviews",
     "pageViews",
     "page_views",
     "views",
-    "visits",
     "count",
-    "value",
     "total",
+    "value",
+    "_count",
   ];
 
   for (
     const key of preferredKeys
   ) {
-    const value =
-      row[
-        key
-      ];
+    const number =
+      toFiniteNumber(
+        row[key],
+      );
 
     if (
-      typeof value ===
-        "number" &&
-      Number.isFinite(
-        value,
-      )
+      number !== null
     ) {
-      return value;
-    }
-
-    if (
-      typeof value ===
-        "string"
-    ) {
-      const parsed =
-        Number(
-          value,
-        );
-
-      if (
-        Number.isFinite(
-          parsed,
-        )
-      ) {
-        return parsed;
-      }
+      return number;
     }
   }
 
-  /*
-    Some SDK representations can place dynamic numeric
-    aggregate fields inside additionalProperties.
-  */
+  /* =======================================================
+     SDK additional properties
+     ======================================================= */
 
   const additionalProperties =
     row.additionalProperties;
@@ -398,25 +268,22 @@ function getAggregateValue(
         additionalProperties,
       )
     ) {
-      if (
-        typeof value ===
-          "number" &&
-        Number.isFinite(
+      const number =
+        toFiniteNumber(
           value,
-        )
+        );
+
+      if (
+        number !== null
       ) {
-        return value;
+        return number;
       }
     }
   }
 
-  /*
-    Vercel's aggregate response permits dynamic numeric
-    properties.
-
-    Find the first usable numeric aggregate while ignoring
-    timestamp-like fields.
-  */
+  /* =======================================================
+     RAW API numeric property
+     ======================================================= */
 
   const ignoredNumericKeys =
     new Set([
@@ -443,26 +310,27 @@ function getAggregateValue(
       continue;
     }
 
-    if (
-      typeof value ===
-        "number" &&
-      Number.isFinite(
+    const number =
+      toFiniteNumber(
         value,
-      )
+      );
+
+    if (
+      number !== null
     ) {
-      return value;
+      return number;
     }
   }
 
   return 0;
 }
+
 /* =========================================================
    DATE HELPERS
    ========================================================= */
 
 function startOfUtcDay(
-  date:
-    Date,
+  date: Date,
 ) {
   return new Date(
     Date.UTC(
@@ -474,16 +342,11 @@ function startOfUtcDay(
 }
 
 function addUtcDays(
-  date:
-    Date,
-
-  days:
-    number,
+  date: Date,
+  days: number,
 ) {
   const result =
-    new Date(
-      date,
-    );
+    new Date(date);
 
   result.setUTCDate(
     result.getUTCDate() +
@@ -494,8 +357,7 @@ function addUtcDays(
 }
 
 function formatDate(
-  date:
-    Date,
+  date: Date,
 ) {
   return date
     .toISOString()
@@ -506,17 +368,13 @@ function formatDate(
 }
 
 function normalizeDate(
-  value:
-    unknown,
+  value: unknown,
 ) {
   if (
-    typeof value ===
-      "number"
+    typeof value === "number"
   ) {
     const date =
-      new Date(
-        value,
-      );
+      new Date(value);
 
     if (
       !Number.isNaN(
@@ -530,8 +388,7 @@ function normalizeDate(
   }
 
   if (
-    typeof value ===
-      "string"
+    typeof value === "string"
   ) {
     if (
       /^\d{4}-\d{2}-\d{2}/.test(
@@ -545,9 +402,7 @@ function normalizeDate(
     }
 
     const numericValue =
-      Number(
-        value,
-      );
+      Number(value);
 
     if (
       Number.isFinite(
@@ -571,9 +426,7 @@ function normalizeDate(
     }
 
     const date =
-      new Date(
-        value,
-      );
+      new Date(value);
 
     if (
       !Number.isNaN(
@@ -594,12 +447,9 @@ function normalizeDate(
    ========================================================= */
 
 function getRequestedDays(
-  range:
-    AnalyticsRange,
+  range: AnalyticsRange,
 ) {
-  switch (
-    range
-  ) {
+  switch (range) {
     case "30d":
       return 30;
 
@@ -612,20 +462,18 @@ function getRequestedDays(
 }
 
 /*
-  We try the user's requested range first.
+  Try the requested range first.
 
-  If Vercel rejects it because the current plan does not
-  expose that much historical data, we automatically try
-  progressively smaller windows.
+  If Vercel rejects that reporting window because the
+  account only exposes less history, progressively use a
+  smaller range.
 */
 
 function getCandidateRanges(
-  requestedDays:
-    number,
+  requestedDays: number,
 ) {
   if (
-    requestedDays >=
-    90
+    requestedDays >= 90
   ) {
     return [
       90,
@@ -637,8 +485,7 @@ function getCandidateRanges(
   }
 
   if (
-    requestedDays >=
-    30
+    requestedDays >= 30
   ) {
     return [
       30,
@@ -654,73 +501,48 @@ function getCandidateRanges(
 }
 
 function getTimeGranularity(
-  days:
-    number,
+  days: number,
 ): TimeGranularity {
-  /*
-    Vercel rejected daily grouping beyond 62 days
-    for this project.
-
-    For larger windows we use weekly aggregation.
-  */
-
-  return days >
-    62
+  return days > 62
     ? "week"
     : "day";
 }
 
 function percentageChange(
-  current:
-    number,
-
-  previous:
-    number | null,
+  current: number,
+  previous: number | null,
 ): number | null {
   if (
-    previous ===
-    null
+    previous === null
   ) {
     return null;
   }
 
   if (
-    previous ===
-    0
+    previous === 0
   ) {
     if (
-      current ===
-      0
+      current === 0
     ) {
       return 0;
     }
-
-    /*
-      Growth from zero cannot be represented as a normal
-      percentage without being misleading.
-    */
 
     return null;
   }
 
   return (
-    ((current -
-      previous) /
+    ((current - previous) /
       previous) *
     100
   );
 }
 
 function round(
-  value:
-    number,
-
-  digits =
-    2,
+  value: number,
+  digits = 2,
 ) {
   const multiplier =
-    10 **
-    digits;
+    10 ** digits;
 
   return (
     Math.round(
@@ -736,8 +558,7 @@ function round(
    ========================================================= */
 
 function isRangeLimitError(
-  error:
-    unknown,
+  error: unknown,
 ) {
   if (
     !(
@@ -749,8 +570,7 @@ function isRangeLimitError(
   }
 
   if (
-    error.status !==
-    400
+    error.status !== 400
   ) {
     return false;
   }
@@ -763,16 +583,18 @@ function isRangeLimitError(
   }
 
   const message =
-    error.message.toLowerCase();
+    error.message
+      .toLowerCase();
 
   return (
-    message.includes(
-      "latest",
-    ) &&
-    message.includes(
-      "days",
-    )
-  ) ||
+    (
+      message.includes(
+        "latest",
+      ) &&
+      message.includes(
+        "days",
+      )
+    ) ||
     message.includes(
       "date range",
     ) ||
@@ -784,12 +606,12 @@ function isRangeLimitError(
     ) ||
     message.includes(
       "can only query up to",
-    );
+    )
+  );
 }
 
 function isAnalyticsNotEnabledError(
-  error:
-    unknown,
+  error: unknown,
 ) {
   return (
     error instanceof
@@ -800,8 +622,7 @@ function isAnalyticsNotEnabledError(
 }
 
 function logVercelError(
-  error:
-    VercelAnalyticsError,
+  error: VercelAnalyticsError,
 ) {
   console.error(
     "=========================================",
@@ -841,13 +662,10 @@ function logVercelError(
    ========================================================= */
 
 function getData(
-  value:
-    unknown,
+  value: unknown,
 ) {
   if (
-    isRecord(
-      value,
-    ) &&
+    isRecord(value) &&
     "data" in value
   ) {
     return value.data;
@@ -857,18 +675,13 @@ function getData(
 }
 
 function getRows(
-  value:
-    unknown,
+  value: unknown,
 ): UnknownRecord[] {
   const data =
-    getData(
-      value,
-    );
+    getData(value);
 
   if (
-    Array.isArray(
-      data,
-    )
+    Array.isArray(data)
   ) {
     return data.filter(
       isRecord,
@@ -876,9 +689,7 @@ function getRows(
   }
 
   if (
-    isRecord(
-      data,
-    ) &&
+    isRecord(data) &&
     Array.isArray(
       data.rows,
     )
@@ -891,39 +702,31 @@ function getRows(
   return [];
 }
 
+/* =========================================================
+   COUNT PARSER
+   ========================================================= */
+
 function parseCount(
-  value:
-    unknown,
+  value: unknown,
 ): AnalyticsCount {
   const data =
-    getData(
-      value,
-    );
+    getData(value);
 
   if (
-    typeof data ===
-      "number"
+    typeof data === "number"
   ) {
     return {
-      visitors:
-        0,
-
-      pageViews:
-        data,
+      visitors: 0,
+      pageViews: data,
     };
   }
 
   if (
-    !isRecord(
-      data,
-    )
+    !isRecord(data)
   ) {
     return {
-      visitors:
-        0,
-
-      pageViews:
-        0,
+      visitors: 0,
+      pageViews: 0,
     };
   }
 
@@ -938,26 +741,10 @@ function parseCount(
       ],
     );
 
-  const pageViewsFromKnownField =
-    firstNumber(
-      data,
-      [
-        "pageviews",
-        "pageViews",
-        "page_views",
-        "views",
-        "count",
-        "total",
-      ],
-    );
-
   const pageViews =
-    pageViewsFromKnownField >
-    0
-      ? pageViewsFromKnownField
-      : getAggregateValue(
-          data,
-        );
+    getAggregateValue(
+      data,
+    );
 
   return {
     visitors,
@@ -965,13 +752,14 @@ function parseCount(
   };
 }
 
+/* =========================================================
+   TREND PARSER
+   ========================================================= */
+
 function parseTrend(
-  value:
-    unknown,
+  value: unknown,
 ): AnalyticsTrendPoint[] {
-  return getRows(
-    value,
-  )
+  return getRows(value)
     .map(
       (
         row,
@@ -1028,58 +816,94 @@ function parseTrend(
     );
 }
 
+/* =========================================================
+   DIMENSION PARSER
+
+   Breakdown requests also include a time granularity.
+
+   Example:
+
+   day + deviceType
+
+   Vercel may therefore return multiple rows for Desktop,
+   one for every day.
+
+   This Map merges those rows into one final total.
+   ========================================================= */
+
 function parseDimension(
-  value:
-    unknown,
-
-  dimensionKeys:
-    string[],
-
-  fallback:
-    string,
+  value: unknown,
+  dimensionKeys: string[],
+  fallback: string,
 ): AnalyticsDimension[] {
-  return getRows(
-    value,
-  )
-    .map(
-      (
-        row,
-      ) => {
-        const name =
-          firstString(
-            row,
-            [
-              ...dimensionKeys,
-              "name",
-              "key",
-              "value",
-            ],
-          ) ||
-          fallback;
+  const grouped =
+    new Map<
+      string,
+      AnalyticsDimension
+    >();
 
-        const visitors =
-          firstNumber(
-            row,
-            [
-              "visitors",
-              "uniqueVisitors",
-              "unique_visitors",
-              "visitorCount",
-            ],
-          );
-
-        const pageViews =
-          getAggregateValue(
-            row,
-          );
-
-        return {
-          name,
-          visitors,
-          pageViews,
-        };
-      },
+  for (
+    const row of getRows(
+      value,
     )
+  ) {
+    const name =
+      firstString(
+        row,
+        [
+          ...dimensionKeys,
+          "name",
+          "key",
+        ],
+      ) ||
+      fallback;
+
+    const pageViews =
+      getAggregateValue(
+        row,
+      );
+
+    const visitors =
+      firstNumber(
+        row,
+        [
+          "visitors",
+          "uniqueVisitors",
+          "unique_visitors",
+          "visitorCount",
+        ],
+      );
+
+    const existing =
+      grouped.get(
+        name,
+      );
+
+    if (
+      existing
+    ) {
+      existing.pageViews +=
+        pageViews;
+
+      existing.visitors +=
+        visitors;
+
+      continue;
+    }
+
+    grouped.set(
+      name,
+      {
+        name,
+        visitors,
+        pageViews,
+      },
+    );
+  }
+
+  return Array.from(
+    grouped.values(),
+  )
     .filter(
       (
         item,
@@ -1100,6 +924,24 @@ function parseDimension(
 
 /* =========================================================
    VERCEL REQUEST
+
+   "by" is an array.
+
+   Example:
+
+   by = ["day"]
+
+   becomes:
+
+   ?by=day
+
+   and:
+
+   by = ["day", "deviceType"]
+
+   becomes:
+
+   ?by=day&by=deviceType
    ========================================================= */
 
 async function queryVercel({
@@ -1109,30 +951,22 @@ async function queryVercel({
   until,
   by,
   limit,
-  silentError =
-    false,
+  silentError = false,
 }: {
   endpoint:
-    "visits/count"
+    | "visits/count"
     | "visits/aggregate";
 
-  site:
-    SiteRow;
+  site: SiteRow;
 
-  since:
-    string;
+  since: string;
+  until: string;
 
-  until:
-    string;
+  by?: string[];
 
-  by?:
-    string;
+  limit?: number;
 
-  limit?:
-    number;
-
-  silentError?:
-    boolean;
+  silentError?: boolean;
 }) {
   const token =
     process.env
@@ -1184,6 +1018,14 @@ async function queryVercel({
 
   /* =======================================================
      RANGE
+
+     IMPORTANT:
+
+     These are now full ISO timestamps, not date-only
+     strings.
+
+     Example:
+     2026-08-09T11:57:12.245Z
      ======================================================= */
 
   url.searchParams.set(
@@ -1197,16 +1039,21 @@ async function queryVercel({
   );
 
   /* =======================================================
-     GROUPING
+     GROUP BY
      ======================================================= */
 
   if (
-    by
+    by &&
+    by.length > 0
   ) {
-    url.searchParams.set(
-      "by",
-      by,
-    );
+    for (
+      const dimension of by
+    ) {
+      url.searchParams.append(
+        "by",
+        dimension,
+      );
+    }
   }
 
   /* =======================================================
@@ -1219,9 +1066,7 @@ async function queryVercel({
   ) {
     url.searchParams.set(
       "limit",
-      String(
-        limit,
-      ),
+      String(limit),
     );
   }
 
@@ -1233,8 +1078,7 @@ async function queryVercel({
     await fetch(
       url,
       {
-        method:
-          "GET",
+        method: "GET",
 
         headers: {
           Authorization:
@@ -1270,11 +1114,8 @@ async function queryVercel({
           responseText,
         ) as {
           error?: {
-            code?:
-              string;
-
-            message?:
-              string;
+            code?: string;
+            message?: string;
           };
         };
 
@@ -1287,7 +1128,7 @@ async function queryVercel({
         message;
     } catch {
       /*
-        Leave the original response text as the message.
+        Keep original response text.
       */
     }
 
@@ -1336,11 +1177,6 @@ async function queryVercel({
       responseText,
     ) as unknown;
   } catch {
-    /*
-      An empty object is safer than breaking analytics
-      because of an unexpected empty/malformed response.
-    */
-
     return {};
   }
 }
@@ -1348,35 +1184,33 @@ async function queryVercel({
 /* =========================================================
    RESOLVE EFFECTIVE RANGE
 
-   Example on the user's Hobby plan:
+   FIX:
 
-   7D:
-      7 days -> succeeds
+   The old code converted "now" into today's midnight before
+   making the request.
 
-   30D:
-      30 days -> succeeds
+   That meant breakdown requests could stop before today's
+   visits.
 
-   90D:
-      90 days -> rejected because history is unavailable
-      30 days -> succeeds
+   Now:
 
-   The expected failed attempt is silent.
+   since = beginning of requested period
+   until = REAL CURRENT TIME
    ========================================================= */
 
 async function resolveEffectiveRange({
   site,
   requestedDays,
-  today,
+  now,
 }: {
-  site:
-    SiteRow;
+  site: SiteRow;
 
-  requestedDays:
-    number;
+  requestedDays: number;
 
-  today:
-    Date;
-}): Promise<ResolvedAnalyticsRange> {
+  now: Date;
+}): Promise<
+  ResolvedAnalyticsRange
+> {
   const candidates =
     getCandidateRanges(
       requestedDays,
@@ -1386,42 +1220,44 @@ async function resolveEffectiveRange({
     unknown =
       null;
 
+  const currentDayStart =
+    startOfUtcDay(
+      now,
+    );
+
   for (
-    let index =
-      0;
+    let index = 0;
     index <
-    candidates.length;
-    index +=
-      1
+      candidates.length;
+    index += 1
   ) {
     const candidateDays =
-      candidates[
-        index
-      ];
+      candidates[index];
 
     const isLastCandidate =
       index ===
-      candidates.length -
-        1;
+      candidates.length - 1;
 
     const sinceDate =
       addUtcDays(
-        today,
+        currentDayStart,
         -(
           candidateDays -
           1
         ),
       );
 
+    /*
+      Full timestamps.
+
+      This is the important fix.
+    */
+
     const since =
-      formatDate(
-        sinceDate,
-      );
+      sinceDate.toISOString();
 
     const until =
-      formatDate(
-        today,
-      );
+      now.toISOString();
 
     const trendGranularity =
       getTimeGranularity(
@@ -1440,22 +1276,18 @@ async function resolveEffectiveRange({
 
           until,
 
-          by:
+          by: [
             trendGranularity,
+          ],
 
-          limit:
-            100,
+          limit: 100,
 
           /*
-            We expect some candidate ranges to fail while
-            discovering what Vercel permits.
-
-            Do not dump those expected failures into the
-            terminal.
+            Failed range probes are expected when checking
+            what history the Vercel account exposes.
           */
 
-          silentError:
-            !isLastCandidate,
+          silentError: true,
         });
 
       return {
@@ -1482,13 +1314,6 @@ async function resolveEffectiveRange({
       lastError =
         error;
 
-      /* ===================================================
-         ANALYTICS DISABLED
-
-         This is not a range problem.
-         Do not continue trying smaller ranges.
-         =================================================== */
-
       if (
         isAnalyticsNotEnabledError(
           error,
@@ -1496,12 +1321,6 @@ async function resolveEffectiveRange({
       ) {
         throw error;
       }
-
-      /* ===================================================
-         REPORTING WINDOW / GRANULARITY
-
-         Try the next smaller candidate.
-         =================================================== */
 
       if (
         isRangeLimitError(
@@ -1512,20 +1331,9 @@ async function resolveEffectiveRange({
         continue;
       }
 
-      /* ===================================================
-         UNEXPECTED ERROR
-
-         If the request was intentionally silent while
-         probing ranges, log it now because it wasn't an
-         expected range-limit failure.
-         =================================================== */
-
       if (
         error instanceof
-          VercelAnalyticsError &&
-        !isRangeLimitError(
-          error,
-        )
+          VercelAnalyticsError
       ) {
         logVercelError(
           error,
@@ -1547,10 +1355,14 @@ async function resolveEffectiveRange({
 /* =========================================================
    PREVIOUS PERIOD
 
-   If the plan cannot expose enough history for the previous
-   period, comparison simply becomes unavailable.
+   Uses the same exact duration as the current reporting
+   window.
 
-   Current analytics still succeed.
+   Current:
+   Aug 3 00:00 -> Aug 9 current time
+
+   Previous:
+   same duration immediately before Aug 3
    ========================================================= */
 
 async function getPreviousCount({
@@ -1558,14 +1370,10 @@ async function getPreviousCount({
   since,
   until,
 }: {
-  site:
-    SiteRow;
+  site: SiteRow;
 
-  since:
-    string;
-
-  until:
-    string;
+  since: string;
+  until: string;
 }): Promise<
   AnalyticsCount | null
 > {
@@ -1581,13 +1389,7 @@ async function getPreviousCount({
 
         until,
 
-        /*
-          Previous-period range limits are expected on
-          shorter-history plans, so keep them quiet.
-        */
-
-        silentError:
-          true,
+        silentError: true,
       });
 
     return parseCount(
@@ -1597,10 +1399,8 @@ async function getPreviousCount({
     error
   ) {
     /*
-      Hobby, or another shorter-history plan, may not
-      expose the previous period.
-
-      This is not fatal.
+      Limited-history plans may not expose the full
+      previous reporting period.
     */
 
     if (
@@ -1611,10 +1411,6 @@ async function getPreviousCount({
       return null;
     }
 
-    /*
-      Analytics disabled is handled by the main route.
-    */
-
     if (
       isAnalyticsNotEnabledError(
         error,
@@ -1622,11 +1418,6 @@ async function getPreviousCount({
     ) {
       throw error;
     }
-
-    /*
-      Authentication, permission or unexpected API problems
-      are real errors and should not be hidden.
-    */
 
     if (
       error instanceof
@@ -1642,34 +1433,38 @@ async function getPreviousCount({
 }
 
 /* =========================================================
-   SAFE DIMENSION AGGREGATE
+   SAFE BREAKDOWN
 
-   Top pages / countries / devices / referrers should never
-   destroy the whole analytics page merely because one
-   secondary Vercel dimension is temporarily unavailable.
+   Vercel supports:
+
+   time granularity + one extra dimension
+
+   Examples:
+
+   ["day", "requestPath"]
+   ["day", "country"]
+   ["day", "deviceType"]
+   ["day", "referrerHostname"]
+
+   parseDimension() merges the daily rows into final totals.
    ========================================================= */
 
 async function safeAggregate({
   site,
   since,
   until,
-  by,
-  limit,
+  dimension,
+  timeGranularity,
 }: {
-  site:
-    SiteRow;
+  site: SiteRow;
 
-  since:
-    string;
+  since: string;
+  until: string;
 
-  until:
-    string;
+  dimension: string;
 
-  by:
-    string;
-
-  limit:
-    number;
+  timeGranularity:
+    TimeGranularity;
 }) {
   try {
     return await queryVercel({
@@ -1682,45 +1477,24 @@ async function safeAggregate({
 
       until,
 
-      by,
-
-      limit,
+      by: [
+        timeGranularity,
+        dimension,
+      ],
 
       /*
-        We handle expected dimension/range failures below.
+        Because time + dimension can create many rows,
+        use a larger limit and slice the final merged
+        results later.
       */
 
-      silentError:
-        true,
+      limit: 100,
+
+      silentError: true,
     });
   } catch (
     error
   ) {
-    if (
-      isRangeLimitError(
-        error,
-      )
-    ) {
-      return {
-        data:
-          [],
-      };
-    }
-
-    if (
-      error instanceof
-        VercelAnalyticsError &&
-      error.status ===
-        400 &&
-      error.code ===
-        "invalid_group_by"
-    ) {
-      return {
-        data:
-          [],
-      };
-    }
-
     if (
       isAnalyticsNotEnabledError(
         error,
@@ -1738,7 +1512,14 @@ async function safeAggregate({
       );
     }
 
-    throw error;
+    /*
+      A secondary breakdown should not break the complete
+      analytics dashboard.
+    */
+
+    return {
+      data: [],
+    };
   }
 }
 
@@ -1762,7 +1543,7 @@ router.get(
     res,
   ) => {
     /* =====================================================
-       ID
+       VALIDATE ID
        ===================================================== */
 
     const parsedId =
@@ -1774,12 +1555,9 @@ router.get(
       !parsedId.success
     ) {
       res
-        .status(
-          400,
-        )
+        .status(400)
         .json({
-          success:
-            false,
+          success: false,
 
           message: {
             en:
@@ -1794,7 +1572,7 @@ router.get(
     }
 
     /* =====================================================
-       RANGE
+       VALIDATE RANGE
        ===================================================== */
 
     const parsedRange =
@@ -1807,19 +1585,16 @@ router.get(
       !parsedRange.success
     ) {
       res
-        .status(
-          400,
-        )
+        .status(400)
         .json({
-          success:
-            false,
+          success: false,
 
           message: {
             en:
               "Invalid analytics range.",
 
             am:
-              "የAnalytics ጊዜ ክሉ ትክክል አይደለም።",
+              "የAnalytics ጊዜ ክልሉ ትክክል አይደለም።",
           },
         });
 
@@ -1827,7 +1602,7 @@ router.get(
     }
 
     /* =====================================================
-       SITE
+       GET SITE
        ===================================================== */
 
     const siteResult =
@@ -1860,20 +1635,15 @@ router.get(
       );
 
     const site =
-      siteResult.rows[
-        0
-      ];
+      siteResult.rows[0];
 
     if (
       !site
     ) {
       res
-        .status(
-          404,
-        )
+        .status(404)
         .json({
-          success:
-            false,
+          success: false,
 
           message: {
             en:
@@ -1888,19 +1658,17 @@ router.get(
     }
 
     /* =====================================================
-       ANALYTICS TOGGLE
+       ANALYTICS DISABLED
        ===================================================== */
 
     if (
       !site.analytics_enabled
     ) {
       res.json({
-        success:
-          true,
+        success: true,
 
         analytics: {
-          available:
-            false,
+          available: false,
 
           reason:
             "ANALYTICS_DISABLED",
@@ -1919,19 +1687,17 @@ router.get(
     }
 
     /* =====================================================
-       VERCEL PROJECT
+       PROJECT ID
        ===================================================== */
 
     if (
       !site.vercel_project_id
     ) {
       res.json({
-        success:
-          true,
+        success: true,
 
         analytics: {
-          available:
-            false,
+          available: false,
 
           reason:
             "PROJECT_ID_MISSING",
@@ -1950,7 +1716,7 @@ router.get(
     }
 
     /* =====================================================
-       VERCEL TOKEN
+       ACCESS TOKEN
        ===================================================== */
 
     if (
@@ -1959,12 +1725,10 @@ router.get(
         ?.trim()
     ) {
       res.json({
-        success:
-          true,
+        success: true,
 
         analytics: {
-          available:
-            false,
+          available: false,
 
           reason:
             "TOKEN_MISSING",
@@ -1983,7 +1747,7 @@ router.get(
     }
 
     /* =====================================================
-       FETCH ANALYTICS
+       ANALYTICS
        ===================================================== */
 
     try {
@@ -1995,13 +1759,20 @@ router.get(
           range,
         );
 
-      const today =
-        startOfUtcDay(
-          new Date(),
-        );
+      /*
+        IMPORTANT FIX:
+
+        Do NOT convert this to startOfUtcDay().
+
+        We need the actual current time for the end of the
+        Vercel reporting window.
+      */
+
+      const now =
+        new Date();
 
       /* ===================================================
-         DETERMINE LARGEST AVAILABLE RANGE
+         RESOLVE AVAILABLE RANGE
          =================================================== */
 
       const resolved =
@@ -2010,7 +1781,7 @@ router.get(
 
           requestedDays,
 
-          today,
+          now,
         });
 
       const {
@@ -2025,7 +1796,7 @@ router.get(
         resolved;
 
       /* ===================================================
-         CURRENT COUNT
+         CURRENT TOTAL
          =================================================== */
 
       const currentCountRaw =
@@ -2048,33 +1819,28 @@ router.get(
       /* ===================================================
          PREVIOUS PERIOD
 
-         Example:
-
-         7D:
-           current 7
-           previous 7
-
-         30D on Hobby:
-           current succeeds
-           previous may be inaccessible
-           comparison becomes null
-
-         It NEVER destroys current analytics.
+         Use the exact duration of the current period.
          =================================================== */
 
+      const currentPeriodDurationMs =
+        Math.max(
+          1,
+          now.getTime() -
+            sinceDate.getTime() +
+            1,
+        );
+
       const previousUntilDate =
-        addUtcDays(
-          sinceDate,
-          -1,
+        new Date(
+          sinceDate.getTime() -
+            1,
         );
 
       const previousSinceDate =
-        addUtcDays(
-          previousUntilDate,
-          -(
-            effectiveDays -
-            1
-          ),
+        new Date(
+          previousUntilDate.getTime() -
+            currentPeriodDurationMs +
+            1,
         );
 
       const previous =
@@ -2082,21 +1848,20 @@ router.get(
           site,
 
           since:
-            formatDate(
-              previousSinceDate,
-            ),
+            previousSinceDate.toISOString(),
 
           until:
-            formatDate(
-              previousUntilDate,
-            ),
+            previousUntilDate.toISOString(),
         });
 
       /* ===================================================
          BREAKDOWNS
 
-         Supported Vercel dimensions include request path,
-         country, device type and referrer hostname.
+         Use the exact same current reporting window as the
+         totals and trend.
+
+         This is important because the old requests were
+         ending too early.
          =================================================== */
 
       const [
@@ -2113,11 +1878,11 @@ router.get(
 
             until,
 
-            by:
+            dimension:
               "requestPath",
 
-            limit:
-              10,
+            timeGranularity:
+              trendGranularity,
           }),
 
           safeAggregate({
@@ -2127,11 +1892,11 @@ router.get(
 
             until,
 
-            by:
+            dimension:
               "country",
 
-            limit:
-              10,
+            timeGranularity:
+              trendGranularity,
           }),
 
           safeAggregate({
@@ -2141,11 +1906,11 @@ router.get(
 
             until,
 
-            by:
+            dimension:
               "deviceType",
 
-            limit:
-              10,
+            timeGranularity:
+              trendGranularity,
           }),
 
           safeAggregate({
@@ -2155,16 +1920,16 @@ router.get(
 
             until,
 
-            by:
+            dimension:
               "referrerHostname",
 
-            limit:
-              10,
+            timeGranularity:
+              trendGranularity,
           }),
         ]);
 
       /* ===================================================
-         TREND
+         TRAFFIC TREND
          =================================================== */
 
       const trend =
@@ -2185,10 +1950,18 @@ router.get(
             "path",
           ],
           "/",
-        ).slice(
-          0,
-          8,
-        );
+        )
+          .filter(
+            (
+              item,
+            ) =>
+              item.pageViews >
+              0,
+          )
+          .slice(
+            0,
+            8,
+          );
 
       /* ===================================================
          COUNTRIES
@@ -2201,10 +1974,18 @@ router.get(
             "country",
           ],
           "Unknown",
-        ).slice(
-          0,
-          8,
-        );
+        )
+          .filter(
+            (
+              item,
+            ) =>
+              item.pageViews >
+              0,
+          )
+          .slice(
+            0,
+            8,
+          );
 
       /* ===================================================
          DEVICES
@@ -2219,13 +2000,20 @@ router.get(
           ],
           "Unknown",
         )
+          .filter(
+            (
+              item,
+            ) =>
+              item.pageViews >
+              0,
+          )
           .sort(
             (
               left,
               right,
             ) =>
-              right.visitors -
-              left.visitors,
+              right.pageViews -
+              left.pageViews,
           )
           .slice(
             0,
@@ -2244,39 +2032,40 @@ router.get(
             "referrer",
           ],
           "Direct",
-        ).slice(
-          0,
-          8,
-        );
+        )
+          .filter(
+            (
+              item,
+            ) =>
+              item.pageViews >
+              0,
+          )
+          .slice(
+            0,
+            8,
+          );
 
       /* ===================================================
          RESPONSE
          =================================================== */
 
       res.json({
-        success:
-          true,
+        success: true,
 
         analytics: {
-          available:
-            true,
+          available: true,
 
-          /*
-            What the user selected.
-          */
+          /* ===============================================
+             SELECTED RANGE
+             =============================================== */
 
           range,
 
           requestedDays,
 
-          /*
-            What Vercel actually allowed us to retrieve.
-
-            Example:
-            selected 90D
-            Hobby allows ~30D
-            effectiveDays = 30
-          */
+          /* ===============================================
+             ACTUAL RANGE VERCEL ALLOWED
+             =============================================== */
 
           effectiveDays,
 
@@ -2287,12 +2076,19 @@ router.get(
               ? effectiveDays
               : null,
 
-          /*
-            Useful later if the frontend wants to display
-            Daily / Weekly.
-          */
-
           trendGranularity,
+
+          /*
+            These now contain full ISO timestamps.
+
+            Example:
+
+            from:
+            2026-08-03T00:00:00.000Z
+
+            to:
+            2026-08-09T11:57:00.000Z
+          */
 
           from:
             since,
@@ -2301,8 +2097,11 @@ router.get(
             until,
 
           comparisonAvailable:
-            previous !==
-            null,
+            previous !== null,
+
+          /* ===============================================
+             TOTALS
+             =============================================== */
 
           totals: {
             visitors:
@@ -2312,8 +2111,7 @@ router.get(
               current.pageViews,
 
             viewsPerVisitor:
-              current.visitors >
-              0
+              current.visitors > 0
                 ? round(
                     current.pageViews /
                       current.visitors,
@@ -2334,6 +2132,10 @@ router.get(
                   null,
               ),
           },
+
+          /* ===============================================
+             DATA
+             =============================================== */
 
           trend,
 
@@ -2359,12 +2161,10 @@ router.get(
         )
       ) {
         res.json({
-          success:
-            true,
+          success: true,
 
           analytics: {
-            available:
-              false,
+            available: false,
 
             reason:
               "VERCEL_ANALYTICS_NOT_ENABLED",
@@ -2390,19 +2190,14 @@ router.get(
         error instanceof
           VercelAnalyticsError &&
         (
-          error.status ===
-            401 ||
-          error.status ===
-            403
+          error.status === 401 ||
+          error.status === 403
         )
       ) {
         res
-          .status(
-            502,
-          )
+          .status(502)
           .json({
-            success:
-              false,
+            success: false,
 
             message: {
               en:
@@ -2426,12 +2221,9 @@ router.get(
       );
 
       res
-        .status(
-          502,
-        )
+        .status(502)
         .json({
-          success:
-            false,
+          success: false,
 
           message: {
             en:
