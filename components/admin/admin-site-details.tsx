@@ -1333,37 +1333,37 @@ export default function AdminSiteDetails({
      DEVICE DATA
      ======================================================= */
 
-  const deviceData =
-    useMemo(
-      () =>
-        analyticsData?.devices
-          .slice(
-            0,
-            6,
-          )
-          .map(
-            (
-              item,
-              index,
-            ) => ({
-              device:
-                item.name,
+const deviceData =
+  useMemo(
+    () =>
+      analyticsData?.devices
+        .slice(
+          0,
+          6,
+        )
+        .map(
+          (
+            item,
+            index,
+          ) => ({
+            device:
+              item.name,
 
-              visitors:
-                item.visitors,
+            visitors:
+              item.pageViews,
 
-              fill:
-                DEVICE_COLORS[
-                  index %
-                    DEVICE_COLORS.length
-                ],
-            }),
-          ) ??
-        [],
-      [
-        analyticsData,
-      ],
-    );
+            fill:
+              DEVICE_COLORS[
+                index %
+                  DEVICE_COLORS.length
+              ],
+          }),
+        ) ??
+      [],
+    [
+      analyticsData,
+    ],
+  );
 
   const deviceVisitorsTotal =
     useMemo(
