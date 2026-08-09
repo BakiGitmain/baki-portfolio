@@ -38,7 +38,8 @@ export const siteCopy = {
           label: "Frontend and backend",
         },
         {
-          value: "EN / AM",
+          value: "EN / አማ",
+
           label: "Bilingual products",
         },
         {
@@ -111,7 +112,7 @@ export const siteCopy = {
           label: "Frontend እና Backend",
         },
         {
-          value: "EN / AM",
+          value: "EN / አማ",
           label: "ባለሁለት ቋንቋ ምርቶች",
         },
         {

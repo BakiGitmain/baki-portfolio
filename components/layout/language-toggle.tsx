@@ -12,7 +12,7 @@ const languageOptions: {
     value: "en",
   },
   {
-    label: "AM",
+    label: "አማ",
     value: "am",
   },
 ];
