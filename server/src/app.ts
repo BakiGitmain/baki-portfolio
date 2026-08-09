@@ -25,16 +25,25 @@ import adminRouter from "./routes/admin.routes.js";
 
 import adminProjectsRouter from "./routes/admin-projects.routes.js";
 
+import adminSitesRouter from "./routes/admin-sites.routes.js";
+
+import adminSiteAnalyticsRouter from "./routes/admin-site-analytics.routes.js";
+
 import healthRouter from "./routes/health.routes.js";
 
 import projectsRouter from "./routes/projects.routes.js";
 
 const app =
   express();
+
 const helmet =
   helmetModule as unknown as (
-    options?: Record<string, unknown>,
+    options?: Record<
+      string,
+      unknown
+    >,
   ) => RequestHandler;
+
 app.set(
   "trust proxy",
   1,
@@ -108,12 +117,14 @@ const authLimiter =
 
 app.get(
   "/",
+
   (
     _req,
     res,
   ) => {
     res.json({
-      success: true,
+      success:
+        true,
 
       message:
         "Baki Portfolio API",
@@ -146,13 +157,35 @@ app.use(
 );
 
 /* =========================================================
-   ADMIN
+   ADMIN PROJECTS
    ========================================================= */
 
 app.use(
   "/api/admin/projects",
   adminProjectsRouter,
 );
+
+/* =========================================================
+   ADMIN SITES ANALYTICS
+   ========================================================= */
+
+app.use(
+  "/api/admin/sites",
+  adminSiteAnalyticsRouter,
+);
+
+/* =========================================================
+   ADMIN SITES
+   ========================================================= */
+
+app.use(
+  "/api/admin/sites",
+  adminSitesRouter,
+);
+
+/* =========================================================
+   ADMIN
+   ========================================================= */
 
 app.use(
   "/api/admin",
@@ -168,19 +201,22 @@ app.use(
     _req,
     res,
   ) => {
-    res.status(
-      404,
-    ).json({
-      success: false,
+    res
+      .status(
+        404,
+      )
+      .json({
+        success:
+          false,
 
-      message: {
-        en:
-          "Route not found.",
+        message: {
+          en:
+            "Route not found.",
 
-        am:
-          "የተጠየቀው route አልተገኘም።",
-      },
-    });
+          am:
+            "የተጠየቀው route አልተገኘም።",
+        },
+      });
   },
 );
 
@@ -190,28 +226,38 @@ app.use(
 
 app.use(
   (
-    error: unknown,
-    _req: Request,
-    res: Response,
-    _next: NextFunction,
+    error:
+      unknown,
+
+    _req:
+      Request,
+
+    res:
+      Response,
+
+    _next:
+      NextFunction,
   ) => {
     console.error(
       error,
     );
 
-    res.status(
-      500,
-    ).json({
-      success: false,
+    res
+      .status(
+        500,
+      )
+      .json({
+        success:
+          false,
 
-      message: {
-        en:
-          "Internal server error.",
+        message: {
+          en:
+            "Internal server error.",
 
-        am:
-          "የServer ችግር ተፈጥሯል።",
-      },
-    });
+          am:
+            "የServer ችግር ተፈጥሯል።",
+        },
+      });
   },
 );
 

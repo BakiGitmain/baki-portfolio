@@ -37,6 +37,7 @@ type AdminShellProps = {
 type AdminPageKey =
   | "dashboard"
   | "projects"
+  | "sites"
   | "applications"
   | "programs"
   | "training"
@@ -127,6 +128,45 @@ function ProjectsIcon() {
         r="1.5"
         stroke="currentColor"
         strokeWidth="1.5"
+      />
+    </svg>
+  );
+}
+
+function SitesIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <circle
+        cx="12"
+        cy="12"
+        r="8.5"
+        stroke="currentColor"
+        strokeWidth="1.7"
+      />
+
+      <path
+        d="M3.8 12H20.2"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+
+      <path
+        d="M12 3.5C14.2 5.8 15.4 8.7 15.4 12C15.4 15.3 14.2 18.2 12 20.5"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+
+      <path
+        d="M12 3.5C9.8 5.8 8.6 8.7 8.6 12C8.6 15.3 9.8 18.2 12 20.5"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
       />
     </svg>
   );
@@ -413,6 +453,9 @@ export default function AdminShell({
           projects:
             "ፕሮጀክቶች",
 
+          sites:
+            "ድረ-ገጾች",
+
           applications:
             "ማመልከቻዎች",
 
@@ -466,6 +509,14 @@ export default function AdminShell({
                 "Portfolio projectsን create፣ edit፣ publish እና manage ያድርጉ።",
             },
 
+            sites: {
+              title:
+                "ድረ-ገጾች",
+
+              description:
+                "የሰራኸውን websites፣ analytics፣ performance እና health ከአንድ ቦታ ተከታተል።",
+            },
+
             applications: {
               title:
                 "ማመልከቻዎች",
@@ -508,6 +559,9 @@ export default function AdminShell({
 
           projects:
             "Projects",
+
+          sites:
+            "Sites",
 
           applications:
             "Applications",
@@ -560,6 +614,14 @@ export default function AdminShell({
 
               description:
                 "Create, edit, publish and manage your portfolio projects.",
+            },
+
+            sites: {
+              title:
+                "Sites",
+
+              description:
+                "Manage and monitor your deployed websites, analytics, performance and health.",
             },
 
             applications: {
@@ -625,6 +687,17 @@ export default function AdminShell({
 
     {
       label:
+        copy.sites,
+
+      href:
+        "/admin/sites",
+
+      icon:
+        <SitesIcon />,
+    },
+
+    {
+      label:
         copy.applications,
 
       href:
@@ -672,6 +745,13 @@ export default function AdminShell({
   ) {
     pageKey =
       "projects";
+  } else if (
+    pathname.startsWith(
+      "/admin/sites",
+    )
+  ) {
+    pageKey =
+      "sites";
   } else if (
     pathname.startsWith(
       "/admin/applications",

@@ -5,7 +5,7 @@ import ExperienceShell from "@/components/layout/experience-shell";
 import ExperienceModeProvider from "@/components/providers/experience-mode-provider";
 import LanguageProvider from "@/components/providers/language-provider";
 import LoadingProvider from "@/components/providers/loading-provider";
-
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 const geist = Geist({
@@ -42,6 +42,7 @@ export default function RootLayout({
             </LoadingProvider>
           </ExperienceModeProvider>
         </LanguageProvider>
+        <Analytics />
       </body>
     </html>
   );
