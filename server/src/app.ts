@@ -12,10 +12,6 @@ import helmetModule from "helmet";
 import cookieParser from "cookie-parser";
 
 import {
-  rateLimit,
-} from "express-rate-limit";
-
-import {
   env,
 } from "./config/env.js";
 
@@ -164,26 +160,8 @@ app.use(
   cookieParser(),
 );
 
-/* =========================================================
-   AUTH RATE LIMIT
-   ========================================================= */
 
-const authLimiter =
-  rateLimit({
-    windowMs:
-      15 *
-      60 *
-      1000,
 
-    limit:
-      20,
-
-    standardHeaders:
-      true,
-
-    legacyHeaders:
-      false,
-  });
 
 /* =========================================================
    ROOT
@@ -233,7 +211,7 @@ app.use(
 
 app.use(
   "/api/auth",
-  authLimiter,
+
   authRouter,
 );
 

@@ -4,7 +4,12 @@ import {
 } from "express";
 
 import bcrypt from "bcryptjs";
+
 import jwt from "jsonwebtoken";
+
+import {
+  rateLimit,
+} from "express-rate-limit";
 
 import {
   z,
@@ -22,8 +27,85 @@ import {
   requireAdmin,
 } from "../middleware/auth.middleware.js";
 
+/* =========================================================
+   ROUTER
+   ========================================================= */
+
 const router =
   Router();
+
+/* =========================================================
+   ADMIN SESSION CONFIGURATION
+
+   JWT and browser cookie use the SAME lifetime.
+   ========================================================= */
+
+const ADMIN_SESSION_MAX_AGE_MS =
+  7 *
+  24 *
+  60 *
+  60 *
+  1000;
+
+const ADMIN_SESSION_EXPIRES_IN =
+  "7d" as const;
+
+/* =========================================================
+   LOGIN RATE LIMIT
+
+   IMPORTANT:
+
+   Only POST /login uses this.
+
+   GET /me is NOT rate limited by this limiter.
+
+   POST /logout is NOT rate limited by this limiter.
+   ========================================================= */
+
+const loginLimiter =
+  rateLimit({
+    windowMs:
+      15 *
+      60 *
+      1000,
+
+    /*
+      Ten failed login requests in a 15-minute window
+      at the IP level.
+
+      The database also has its own account-level
+      5-failed-attempt lock below.
+    */
+
+    limit:
+      10,
+
+    standardHeaders:
+      true,
+
+    legacyHeaders:
+      false,
+
+    /*
+      Successful logins do not continue consuming
+      the IP login-attempt allowance.
+    */
+
+    skipSuccessfulRequests:
+      true,
+
+    message: {
+      success:
+        false,
+
+      message:
+        "Too many login attempts. Try again in a few minutes.",
+    },
+  });
+
+/* =========================================================
+   LOGIN VALIDATION
+   ========================================================= */
 
 const loginSchema =
   z.object({
@@ -39,29 +121,55 @@ const loginSchema =
       .max(128),
   });
 
-function getCookieOptions(): CookieOptions {
+/* =========================================================
+   COOKIE OPTIONS
+   ========================================================= */
+
+function getCookieOptions():
+  CookieOptions {
   const production =
     env.NODE_ENV ===
     "production";
 
   return {
-    httpOnly: true,
+    /*
+      Prevent browser JavaScript from reading the JWT.
+    */
+
+    httpOnly:
+      true,
+
+    /*
+      HTTPS-only in production.
+    */
 
     secure:
       production,
 
-    sameSite:
-      production
-        ? "none"
-        : "lax",
+    /*
+      Production browser requests should travel through
+      the same-origin /backend proxy.
 
-    path: "/",
+      Lax is therefore appropriate and safer than
+      SameSite=None for the normal admin flow.
+    */
+
+    sameSite:
+      "lax",
+
+    /*
+      Cookie is available throughout the application.
+    */
+
+    path:
+      "/",
+
+    /*
+      Match the JWT's 7-day lifetime.
+    */
 
     maxAge:
-      8 *
-      60 *
-      60 *
-      1000,
+      ADMIN_SESSION_MAX_AGE_MS,
   };
 }
 
@@ -71,10 +179,17 @@ function getCookieOptions(): CookieOptions {
 
 router.post(
   "/login",
+
+  loginLimiter,
+
   async (
     req,
     res,
   ) => {
+    /* =====================================================
+       VALIDATE REQUEST
+       ===================================================== */
+
     const parsed =
       loginSchema.safeParse(
         req.body,
@@ -83,14 +198,17 @@ router.post(
     if (
       !parsed.success
     ) {
-      res.status(
-        400,
-      ).json({
-        success: false,
+      res
+        .status(
+          400,
+        )
+        .json({
+          success:
+            false,
 
-        message:
-          "Invalid login information.",
-      });
+          message:
+            "Invalid login information.",
+        });
 
       return;
     }
@@ -98,7 +216,12 @@ router.post(
     const {
       username,
       password,
-    } = parsed.data;
+    } =
+      parsed.data;
+
+    /* =====================================================
+       FIND ADMIN
+       ===================================================== */
 
     const result =
       await db.query(
@@ -127,33 +250,56 @@ router.post(
     const admin =
       result.rows[0];
 
-    if (!admin) {
-      res.status(
-        401,
-      ).json({
-        success: false,
+    /* =====================================================
+       INVALID USERNAME
 
-        message:
-          "Invalid username or password.",
-      });
+       Keep message generic so the public API does not
+       reveal whether a username exists.
+       ===================================================== */
+
+    if (
+      !admin
+    ) {
+      res
+        .status(
+          401,
+        )
+        .json({
+          success:
+            false,
+
+          message:
+            "Invalid username or password.",
+        });
 
       return;
     }
+
+    /* =====================================================
+       DISABLED ADMIN
+       ===================================================== */
 
     if (
       !admin.is_active
     ) {
-      res.status(
-        403,
-      ).json({
-        success: false,
+      res
+        .status(
+          403,
+        )
+        .json({
+          success:
+            false,
 
-        message:
-          "Account is disabled.",
-      });
+          message:
+            "Account is disabled.",
+        });
 
       return;
     }
+
+    /* =====================================================
+       DATABASE ACCOUNT LOCK
+       ===================================================== */
 
     if (
       admin.locked_until &&
@@ -162,17 +308,24 @@ router.post(
       ).getTime() >
         Date.now()
     ) {
-      res.status(
-        429,
-      ).json({
-        success: false,
+      res
+        .status(
+          429,
+        )
+        .json({
+          success:
+            false,
 
-        message:
-          "Too many failed login attempts. Try again later.",
-      });
+          message:
+            "Too many failed login attempts. Try again later.",
+        });
 
       return;
     }
+
+    /* =====================================================
+       VERIFY PASSWORD
+       ===================================================== */
 
     const passwordMatches =
       await bcrypt.compare(
@@ -183,14 +336,29 @@ router.post(
     if (
       !passwordMatches
     ) {
-      const attempts =
+      const currentAttempts =
         Number(
           admin.failed_login_attempts ??
             0,
-        ) + 1;
+        );
+
+      const attempts =
+        currentAttempts +
+        1;
 
       const shouldLock =
-        attempts >= 5;
+        attempts >=
+        5;
+
+      /*
+        If the fifth attempt is reached:
+
+        - lock for 15 minutes
+        - reset stored attempts to 0
+
+        After the lock expires the next login cycle starts
+        from a clean attempt count.
+      */
 
       await db.query(
         `
@@ -202,7 +370,7 @@ router.post(
               CASE
                 WHEN $2 = TRUE
                 THEN NOW() + INTERVAL '15 minutes'
-                ELSE locked_until
+                ELSE NULL
               END,
 
             updated_at = NOW()
@@ -219,19 +387,30 @@ router.post(
         ],
       );
 
-      res.status(
-        401,
-      ).json({
-        success: false,
-
-        message:
+      res
+        .status(
           shouldLock
-            ? "Too many failed login attempts. Try again later."
-            : "Invalid username or password.",
-      });
+            ? 429
+            : 401,
+        )
+        .json({
+          success:
+            false,
+
+          message:
+            shouldLock
+              ? "Too many failed login attempts. Try again later."
+              : "Invalid username or password.",
+        });
 
       return;
     }
+
+    /* =====================================================
+       SUCCESSFUL LOGIN
+
+       Clear lock/failed attempts and record login time.
+       ===================================================== */
 
     await db.query(
       `
@@ -248,6 +427,10 @@ router.post(
       ],
     );
 
+    /* =====================================================
+       CREATE JWT
+       ===================================================== */
+
     const token =
       jwt.sign(
         {
@@ -257,18 +440,26 @@ router.post(
           username:
             admin.username,
         },
+
         env.JWT_SECRET,
+
         {
           algorithm:
             "HS256",
 
           subject:
-            admin.id,
+            String(
+              admin.id,
+            ),
 
           expiresIn:
-            "8h",
+            ADMIN_SESSION_EXPIRES_IN,
         },
       );
+
+    /* =====================================================
+       SET HTTP-ONLY AUTH COOKIE
+       ===================================================== */
 
     res.cookie(
       env.JWT_COOKIE_NAME,
@@ -276,8 +467,13 @@ router.post(
       getCookieOptions(),
     );
 
+    /* =====================================================
+       RESPONSE
+       ===================================================== */
+
     res.json({
-      success: true,
+      success:
+        true,
 
       user: {
         id:
@@ -304,17 +500,27 @@ router.post(
 
 /* =========================================================
    CURRENT ADMIN
+
+   IMPORTANT:
+
+   This route is intentionally NOT behind loginLimiter.
+
+   Admin pages can safely check the current session without
+   accidentally consuming login attempts.
    ========================================================= */
 
 router.get(
   "/me",
+
   requireAdmin,
+
   (
     req,
     res,
   ) => {
     res.json({
-      success: true,
+      success:
+        true,
 
       user:
         req.auth,
@@ -328,10 +534,16 @@ router.get(
 
 router.post(
   "/logout",
+
   (
     _req,
     res,
   ) => {
+    /*
+      clearCookie must use the same important cookie
+      attributes that were used when setting it.
+    */
+
     const options =
       getCookieOptions();
 
@@ -353,7 +565,8 @@ router.post(
     );
 
     res.json({
-      success: true,
+      success:
+        true,
 
       message:
         "Logged out successfully.",

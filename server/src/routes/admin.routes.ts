@@ -22,7 +22,61 @@ import {
 
 const router =
   Router();
+/* =========================================================
+   ADMIN SESSION
+   ========================================================= */
 
+const ADMIN_SESSION_MAX_AGE_MS =
+  7 *
+  24 *
+  60 *
+  60 *
+  1000;
+
+const ADMIN_SESSION_EXPIRES_IN =
+  "7d" as const;
+
+/* =========================================================
+   LOGIN RATE LIMIT
+
+   IMPORTANT:
+   Only LOGIN is rate-limited.
+
+   /me and /logout must not consume login attempts.
+   ========================================================= */
+
+const loginLimiter =
+  rateLimit({
+    windowMs:
+      15 *
+      60 *
+      1000,
+
+    limit:
+      10,
+
+    standardHeaders:
+      true,
+
+    legacyHeaders:
+      false,
+
+    /*
+      A successful login should not keep consuming
+      the visitor's login-attempt allowance.
+    */
+
+    skipSuccessfulRequests:
+      true,
+
+    message: {
+      success:
+        false,
+
+      message:
+        "Too many login attempts. Try again in a few minutes.",
+    },
+  });
 /* =========================================================
    RATE LIMIT
    ========================================================= */

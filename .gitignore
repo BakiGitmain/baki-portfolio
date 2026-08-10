@@ -78,3 +78,7 @@ yarn-error.log*
 
 *.tsbuildinfo
 next-env.d.ts
+
+# LOCAL AUTH / TEST FILES
+cookies.txt
+**/cookies.txt

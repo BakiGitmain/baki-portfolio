@@ -621,20 +621,225 @@ export async function sendBakiAiMessage({
     true,
   );
 
-  /* =======================================================
-     EMPTY RESPONSE
-     ======================================================= */
+/* =======================================================
+   EMPTY / ACTION-ONLY RESPONSE SAFETY
+
+   Sometimes the model may return only hidden navigation
+   markers without visible text.
+
+   That is NOT an error for the visitor.
+
+   Instead:
+   - preserve the safe navigation actions
+   - generate a small natural fallback
+   - never expose technical "empty response" wording
+   ======================================================= */
+
+if (
+  !fullText.trim()
+) {
+  const normalizedMessage =
+    message
+      .trim()
+      .toLowerCase();
+
+  /* =====================================================
+     PROJECT INTENT FALLBACK
+
+     If the model somehow returned absolutely nothing,
+     we can still safely understand common requests such as:
+
+     "show me his project"
+     "I wanna see websites he made"
+     "show his work"
+
+     Navigation remains hard-coded and safe.
+     ===================================================== */
+
+  const looksLikeProjectRequest =
+    (
+      /\b(project|projects|portfolio|work|website|websites)\b/
+        .test(
+          normalizedMessage,
+        )
+    ) &&
+    (
+      /\b(show|see|view|made|built|project|projects|portfolio|work)\b/
+        .test(
+          normalizedMessage,
+        )
+    );
 
   if (
-    !fullText.trim()
+    actions.length ===
+      0 &&
+    looksLikeProjectRequest
   ) {
-    throw new Error(
-      language ===
-        "am"
-        ? "Baki AI ባዶ መልስ መለሰ። እባክዎ እንደገና ይሞክሩ።"
-        : "Baki AI returned an empty response. Please try again.",
+    addAction(
+      "projects",
+    );
+
+    addAction(
+      "all-projects",
     );
   }
+
+  /* =====================================================
+     ACTION-AWARE FALLBACK TEXT
+
+     This means even an action-only model response becomes
+     a normal Baki AI message instead of a red error.
+     ===================================================== */
+
+  let fallbackMessage:
+    string;
+
+  if (
+    actions.includes(
+      "projects",
+    ) &&
+    actions.includes(
+      "all-projects",
+    )
+  ) {
+    fallbackMessage =
+      language ===
+      "am"
+        ? "አዎ 👀 የBakiን featured projects ወይም ሁሉንም public projects ከታች ማየት ይችላሉ።"
+        : "Yep 👀 You can check out Baki's featured projects or browse all of his public projects below.";
+  } else if (
+    actions.includes(
+      "projects",
+    )
+  ) {
+    fallbackMessage =
+      language ===
+      "am"
+        ? "አዎ 👀 የBakiን featured projects ከታች ማየት ይችላሉ።"
+        : "Yep 👀 You can check out Baki's featured projects below.";
+  } else if (
+    actions.includes(
+      "all-projects",
+    )
+  ) {
+    fallbackMessage =
+      language ===
+      "am"
+        ? "የBakiን public projects በሙሉ ከታች ማየት ይችላሉ 👀"
+        : "You can browse all of Baki's public projects below 👀.";
+  } else if (
+    actions.includes(
+      "skills",
+    )
+  ) {
+    fallbackMessage =
+      language ===
+      "am"
+        ? "የBakiን skills ከታች ማየት ይችላሉ 💻"
+        : "You can check out Baki's skills below 💻.";
+  } else if (
+    actions.includes(
+      "experience",
+    )
+  ) {
+    fallbackMessage =
+      language ===
+      "am"
+        ? "የBakiን experience ከታች ማየት ይችላሉ."
+        : "You can check out Baki's experience below.";
+  } else if (
+    actions.includes(
+      "about",
+    )
+  ) {
+    fallbackMessage =
+      language ===
+      "am"
+        ? "ስለ Baki ተጨማሪ መረጃ ከታች ማየት ይችላሉ."
+        : "You can learn more about Baki below.";
+  } else if (
+    actions.includes(
+      "contact",
+    )
+  ) {
+    fallbackMessage =
+      language ===
+      "am"
+        ? "Bakiን ለማግኘት Contact sectionን ከታች መጠቀም ይችላሉ."
+        : "You can use the Contact section below to get in touch with Baki.";
+  } else if (
+    actions.includes(
+      "job-info",
+    )
+  ) {
+    fallbackMessage =
+      language ===
+      "am"
+        ? "ስለ sales representative opportunity ሙሉ መረጃውን ከታች ማየት ይችላሉ."
+        : "You can check out the full sales representative information below.";
+  } else if (
+    actions.includes(
+      "job-apply",
+    )
+  ) {
+    fallbackMessage =
+      language ===
+      "am"
+        ? "Application systemው አሁንም development ላይ ነው 🚧፣ ግን prototype pageውን ከታች ማየት ይችላሉ።"
+        : "The application system is still under development 🚧, but you can preview the application page below.";
+  } else if (
+    actions.includes(
+      "home",
+    )
+  ) {
+    fallbackMessage =
+      language ===
+      "am"
+        ? "ወደ Home ከታች መሄድ ይችላሉ."
+        : "You can head back to the homepage below.";
+  } else {
+    /*
+      TRUE empty provider response.
+
+      Still don't show ugly technical wording like:
+      "returned an empty response".
+
+      The visitor only sees a normal, friendly message.
+    */
+
+    fallbackMessage =
+      language ===
+      "am"
+        ? "ትንሽ ችግኝ ተፈጠረ 😅። ጥያቄውን አንድ ጊዜ እንደገና ይላኩ።"
+        : "I hit a small hiccup there 😅. Try that one again.";
+  }
+
+  /*
+    IMPORTANT:
+
+    Use emitVisibleText instead of directly changing
+    fullText.
+
+    This triggers the normal streaming callback so the
+    assistant bubble is created correctly and any actions
+    already received are attached to it.
+  */
+
+  emitVisibleText(
+    fallbackMessage,
+  );
+}
+
+/* =======================================================
+   FINAL RESULT
+   ======================================================= */
+
+return {
+  message:
+    fullText.trim(),
+
+  actions,
+};
 
   return {
     message:

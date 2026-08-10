@@ -22,6 +22,7 @@ const sectionIds = [
   "projects",
   "skills",
   "experience",
+  "hire",
   "contact",
 ] as const;
 
@@ -703,15 +704,14 @@ export default function Navbar() {
 
           <LanguageToggle />
 
-          {/* DESKTOP CONTACT BUTTON */}
-
-          <button
-            type="button"
-            onClick={() => {
-              handleNavigation(
-                "contact",
-              );
-            }}
+{/* DESKTOP CONTACT BUTTON */}
+<button
+  type="button"
+  onClick={() => {
+    handleNavigation(
+      "contact",
+    );
+  }}
             className={`
               group
 
@@ -866,13 +866,14 @@ export default function Navbar() {
 
           {/* MOBILE CONTACT */}
 
-          <button
-            type="button"
-            onClick={() => {
-              handleNavigation(
-                "contact",
-              );
-            }}
+{/* MOBILE GET HIRED */}
+<button
+  type="button"
+  onClick={() => {
+    handleNavigation(
+      "hire",
+    );
+  }}
             className={`
               group
 

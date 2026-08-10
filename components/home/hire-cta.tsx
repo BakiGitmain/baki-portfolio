@@ -323,14 +323,15 @@ export default function HireCTA() {
   }
 
   return (
-    <section
-      className="hire-cta-section"
-      data-hire-mode={
-        performanceMode
-          ? "performance"
-          : "quality"
-      }
-    >
+<section
+  id="hire"
+  className="hire-cta-section"
+  data-hire-mode={
+    performanceMode
+      ? "performance"
+      : "quality"
+  }
+>
       <div className="hire-cta-shell">
         {/* =============================================
             BACKGROUND EFFECTS

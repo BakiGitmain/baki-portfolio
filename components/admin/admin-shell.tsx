@@ -421,7 +421,15 @@ export default function AdminShell({
     loading,
     setLoading,
   ] = useState(true);
+const [
+  authUnavailable,
+  setAuthUnavailable,
+] = useState(false);
 
+const [
+  authRetryKey,
+  setAuthRetryKey,
+] = useState(0);
   const [
     sidebarOpen,
     setSidebarOpen,
@@ -791,25 +799,46 @@ export default function AdminShell({
      AUTH
      ======================================================= */
 
-  useEffect(() => {
-    let cancelled =
-      false;
+ useEffect(() => {
+  let cancelled =
+    false;
 
-    async function loadAdmin() {
+  async function loadAdmin() {
+    setLoading(
+      true,
+    );
+
+    setAuthUnavailable(
+      false,
+    );
+
+    try {
       const currentAdmin =
         await getCurrentAdmin();
 
-      if (cancelled) {
+      if (
+        cancelled
+      ) {
         return;
       }
 
-      if (!currentAdmin) {
+      /* ===================================================
+         REAL UNAUTHENTICATED SESSION
+         =================================================== */
+
+      if (
+        !currentAdmin
+      ) {
         router.replace(
           "/admin/login",
         );
 
         return;
       }
+
+      /* ===================================================
+         VALID ADMIN
+         =================================================== */
 
       setAdmin(
         currentAdmin,
@@ -818,16 +847,46 @@ export default function AdminShell({
       setLoading(
         false,
       );
+    } catch (
+      error
+    ) {
+      /*
+        Backend/network failure is NOT logout.
+
+        Keep the user on the admin area and allow retry.
+      */
+
+      console.error(
+        "Unable to verify admin session:",
+        error,
+      );
+
+      if (
+        cancelled
+      ) {
+        return;
+      }
+
+      setAuthUnavailable(
+        true,
+      );
+
+      setLoading(
+        false,
+      );
     }
+  }
 
-    void loadAdmin();
+  void loadAdmin();
 
-    return () => {
-      cancelled =
-        true;
-    };
-  }, [router]);
-
+  return () => {
+    cancelled =
+      true;
+  };
+}, [
+  router,
+  authRetryKey,
+]);
   /* =======================================================
      ACCOUNT DROPDOWN OUTSIDE CLICK
      ======================================================= */
@@ -907,6 +966,61 @@ export default function AdminShell({
     loading ||
     !admin
   ) {
+    /* =========================================================
+   AUTH SERVICE TEMPORARILY UNAVAILABLE
+
+   Do NOT redirect to login.
+
+   The session may still be completely valid.
+   ========================================================= */
+
+if (
+  authUnavailable &&
+  !admin
+) {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-[#f7f8f3] px-5">
+      <div className="w-full max-w-[390px] rounded-[24px] border border-black/[0.06] bg-white p-7 text-center shadow-[0_20px_60px_rgba(38,52,29,0.07)]">
+        <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-[#eef6e7] text-lg">
+          ⚠️
+        </div>
+
+        <h1 className="mt-5 text-[18px] font-black tracking-[-0.04em] text-[#171b15]">
+          {language ===
+          "am"
+            ? "Sessionን ማረጋገጥ አልተቻለም"
+            : "Unable to verify session"}
+        </h1>
+
+        <p className="mt-2 text-[10px] leading-5 text-black/45">
+          {language ===
+          "am"
+            ? "Sessionዎ አልጠፋም። Backendን ለጊዜው ማግኘት አልተቻለም።"
+            : "Your session hasn't been treated as logged out. The server may just be temporarily unavailable."}
+        </p>
+
+        <button
+          type="button"
+          onClick={() => {
+            setAuthRetryKey(
+              (
+                current,
+              ) =>
+                current +
+                1,
+            );
+          }}
+          className="mt-5 h-10 rounded-xl bg-[#426c2b] px-6 text-[10px] font-bold text-white transition hover:bg-[#355923]"
+        >
+          {language ===
+          "am"
+            ? "እንደገና ሞክር"
+            : "Try Again"}
+        </button>
+      </div>
+    </main>
+  );
+}
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#f7f8f3]">
         <div className="flex flex-col items-center gap-4">

@@ -132,33 +132,72 @@ export async function loginAdmin(
    ========================================================= */
 
 export async function getCurrentAdmin(): Promise<AdminUser | null> {
-  try {
-    const response =
-      await fetch(
-        `${getApiUrl()}/api/auth/me`,
-        {
-          method: "GET",
+  const response =
+    await fetch(
+      `${getApiUrl()}/api/auth/me`,
+      {
+        method:
+          "GET",
 
-          credentials:
-            "include",
+        credentials:
+          "include",
 
-          cache:
-            "no-store",
+        cache:
+          "no-store",
+
+        headers: {
+          Accept:
+            "application/json",
         },
-      );
+      },
+    );
 
-    if (!response.ok) {
-      return null;
-    }
+  /* =======================================================
+     REAL LOGGED-OUT SESSION
 
-    const data:
-      CurrentAdminResponse =
-        await response.json();
+     Only authentication failure means:
+     "this visitor is not logged in".
+     ======================================================= */
 
-    return data.user;
-  } catch {
+  if (
+    response.status ===
+    401
+  ) {
     return null;
   }
+
+  /* =======================================================
+     TEMPORARY SERVER / NETWORK ERROR
+
+     IMPORTANT:
+
+     429
+     500
+     502
+     503
+     etc.
+
+     must NOT be treated as:
+     "the JWT disappeared".
+
+     Throw instead so AdminShell can show Retry.
+     ======================================================= */
+
+  if (
+    !response.ok
+  ) {
+    throw new Error(
+      await getErrorMessage(
+        response,
+      ),
+    );
+  }
+
+  const data:
+    CurrentAdminResponse =
+      await response.json();
+
+  return data.user;
 }
 
 /* =========================================================
