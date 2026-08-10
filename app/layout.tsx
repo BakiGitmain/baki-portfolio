@@ -1,7 +1,7 @@
 import type {
   Metadata,
 } from "next";
-
+import BakiAiGlobal from "@/components/ai/baki-ai-global";
 import {
   Geist,
 } from "next/font/google";
@@ -79,8 +79,10 @@ export default function RootLayout({
                   children
                 }
               </ExperienceShell>
+              <BakiAiGlobal />
             </LoadingProvider>
           </ExperienceModeProvider>
+          
         </LanguageProvider>
 
         {/* VERCEL WEB ANALYTICS */}
@@ -94,6 +96,7 @@ export default function RootLayout({
         {/* OUR CUSTOM PERFORMANCE DATABASE */}
 
         <WebVitalsReporter />
+        
       </body>
     </html>
   );

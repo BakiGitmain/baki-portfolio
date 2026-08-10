@@ -1,3 +1,4 @@
+
 import About from "@/components/home/about";
 
 import ContactSection from "@/components/home/contact";
@@ -38,6 +39,8 @@ export default function HomePage() {
       </main>
 
       <Footer />
+
+
     </>
   );
 }

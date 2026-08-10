@@ -6,7 +6,7 @@ import express, {
 } from "express";
 
 import cors from "cors";
-
+import aiRouter from "./routes/ai.routes.js";
 import helmetModule from "helmet";
 
 import cookieParser from "cookie-parser";
@@ -219,7 +219,14 @@ app.use(
   "/api/projects",
   projectsRouter,
 );
+/* =========================================================
+   BAKI AI
+   ========================================================= */
 
+app.use(
+  "/api/ai",
+  aiRouter,
+);
 /* =========================================================
    AUTH
    ========================================================= */

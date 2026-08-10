@@ -6,6 +6,10 @@ import {
 
 const envSchema =
   z.object({
+    /* =====================================================
+       SERVER
+       ===================================================== */
+
     PORT: z.coerce
       .number()
       .int()
@@ -26,9 +30,17 @@ const envSchema =
       .string()
       .min(1),
 
+    /* =====================================================
+       DATABASE
+       ===================================================== */
+
     DATABASE_URL: z
       .string()
       .min(1),
+
+    /* =====================================================
+       AUTH
+       ===================================================== */
 
     JWT_SECRET: z
       .string()
@@ -43,59 +55,84 @@ const envSchema =
         "baki_admin_token",
       ),
 
-    CLOUDINARY_CLOUD_NAME:
-      z
-        .string()
-        .min(1),
+    /* =====================================================
+       MISTRAL / BAKI AI
+       ===================================================== */
 
-    CLOUDINARY_API_KEY:
-      z
-        .string()
-        .min(1),
+    MISTRAL_API_KEY: z
+      .string()
+      .min(
+        1,
+        "MISTRAL_API_KEY is required.",
+      ),
 
-    CLOUDINARY_API_SECRET:
-      z
-        .string()
-        .min(1),
+    MISTRAL_MODEL: z
+      .string()
+      .min(1)
+      .default(
+        "mistral-small-latest",
+      ),
 
-    CLOUDINARY_PROJECT_FOLDER:
-      z
-        .string()
-        .min(1)
-        .default(
-          "baki-portfolio/projects",
-        ),
+    /* =====================================================
+       CLOUDINARY
+       ===================================================== */
 
-    ADMIN_SEED_NAME:
-      z
-        .string()
-        .optional(),
+    CLOUDINARY_CLOUD_NAME: z
+      .string()
+      .min(1),
 
-    ADMIN_SEED_USERNAME:
-      z
-        .string()
-        .optional(),
+    CLOUDINARY_API_KEY: z
+      .string()
+      .min(1),
 
-    ADMIN_SEED_EMAIL:
-      z
-        .string()
-        .optional(),
+    CLOUDINARY_API_SECRET: z
+      .string()
+      .min(1),
 
-    ADMIN_SEED_PASSWORD:
-      z
-        .string()
-        .optional(),
+    CLOUDINARY_PROJECT_FOLDER: z
+      .string()
+      .min(1)
+      .default(
+        "baki-portfolio/projects",
+      ),
+
+    /* =====================================================
+       ADMIN SEED
+       ===================================================== */
+
+    ADMIN_SEED_NAME: z
+      .string()
+      .optional(),
+
+    ADMIN_SEED_USERNAME: z
+      .string()
+      .optional(),
+
+    ADMIN_SEED_EMAIL: z
+      .string()
+      .optional(),
+
+    ADMIN_SEED_PASSWORD: z
+      .string()
+      .optional(),
   });
+
+/* =========================================================
+   VALIDATE ENVIRONMENT
+   ========================================================= */
 
 const parsed =
   envSchema.safeParse(
     process.env,
   );
 
-if (!parsed.success) {
+if (
+  !parsed.success
+) {
   console.error(
     "Invalid environment variables:",
-    parsed.error.flatten()
+    parsed.error
+      .flatten()
       .fieldErrors,
   );
 
@@ -103,6 +140,10 @@ if (!parsed.success) {
     "Invalid environment configuration.",
   );
 }
+
+/* =========================================================
+   EXPORT
+   ========================================================= */
 
 export const env =
   parsed.data;
