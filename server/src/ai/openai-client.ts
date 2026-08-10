@@ -1,4 +1,6 @@
-import OpenAI from "openai";
+import {
+  OpenAI,
+} from "openai";
 
 import {
   env,
@@ -7,11 +9,8 @@ import {
 /* =========================================================
    MISTRAL CLIENT
 
-   We keep using the OpenAI npm package because Mistral
-   provides an OpenAI-compatible API.
-
-   IMPORTANT:
-   This client is talking to Mistral, NOT OpenAI.
+   We use the OpenAI SDK as an OpenAI-compatible client,
+   but requests are sent to Mistral.
    ========================================================= */
 
 export const openai =
