@@ -47,10 +47,10 @@ const geist =
 export const metadata:
   Metadata = {
     title:
-      "Baki | Full-Stack Developer",
+      "Baki Digital | Modern Websites & Web Applications",
 
     description:
-      "Baki is a full-stack developer building modern, scalable and thoughtful digital products.",
+      "Baki Digital builds modern websites, full-stack web applications, management systems, ecommerce platforms, and custom digital solutions designed for real businesses.",
   };
 
 /* =========================================================
