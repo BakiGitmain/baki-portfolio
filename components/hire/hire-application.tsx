@@ -7,50 +7,91 @@ import {
   type ReactNode,
 } from "react";
 
-import { useRouter } from "next/navigation";
+import {
+  useRouter,
+} from "next/navigation";
 
-import { useLanguage } from "@/components/providers/language-provider";
+import HireApplicationSuccess from "@/components/hire/hire-application-success";
+
+import {
+  submitHireApplication,
+  type SubmittedHireApplication,
+} from "@/lib/hire-applications-api";
+
+import {
+  useLanguage,
+} from "@/components/providers/language-provider";
 
 /* =========================================================
    TYPES
    ========================================================= */
 
-type Step = 1 | 2 | 3 | 4;
+type Step =
+  | 1
+  | 2
+  | 3
+  | 4;
 
 type FileField =
   | "idFront"
   | "idBack";
 
 type ApplicationData = {
-  fullName: string;
-  fatherName: string;
+  fullName:
+    string;
 
-  email: string;
-  phone: string;
+  fatherName:
+    string;
 
-  city: string;
-  address: string;
+  email:
+    string;
 
-  telegram: string;
-  whatsapp: string;
+  phone:
+    string;
 
-  motivation: string;
+  city:
+    string;
 
-  idType: string;
+  address:
+    string;
 
-  idFront: File | null;
-  idBack: File | null;
+  telegram:
+    string;
 
-  acceptedRules: boolean;
+  whatsapp:
+    string;
+
+  motivation:
+    string;
+
+  idType:
+    string;
+
+  idFront:
+    File | null;
+
+  idBack:
+    File | null;
+
+  acceptedRules:
+    boolean;
 };
 
 type Errors =
-  Record<string, string>;
+  Record<
+    string,
+    string
+  >;
 
 type LocalizedOption = {
-  value: string;
-  en: string;
-  am: string;
+  value:
+    string;
+
+  en:
+    string;
+
+  am:
+    string;
 };
 
 /* =========================================================
@@ -58,143 +99,303 @@ type LocalizedOption = {
    ========================================================= */
 
 const MAX_FILE_SIZE =
-  8 * 1024 * 1024;
+  8 *
+  1024 *
+  1024;
 
-const cityOptions: LocalizedOption[] = [
-  {
-    value: "Addis Ababa",
-    en: "Addis Ababa",
-    am: "አዲስ አበባ",
-  },
-  {
-    value: "Adama (Nazret)",
-    en: "Adama (Nazret)",
-    am: "አዳማ (ናዝሬት)",
-  },
-  {
-    value: "Dire Dawa",
-    en: "Dire Dawa",
-    am: "ድሬዳዋ",
-  },
-  {
-    value: "Hawassa",
-    en: "Hawassa",
-    am: "ሀዋሳ",
-  },
-  {
-    value: "Bahir Dar",
-    en: "Bahir Dar",
-    am: "ባሕር ዳር",
-  },
-  {
-    value: "Gondar",
-    en: "Gondar",
-    am: "ጎንደር",
-  },
-  {
-    value: "Mekelle",
-    en: "Mekelle",
-    am: "መቀሌ",
-  },
-  {
-    value: "Dessie",
-    en: "Dessie",
-    am: "ደሴ",
-  },
-  {
-    value: "Jimma",
-    en: "Jimma",
-    am: "ጅማ",
-  },
-  {
-    value: "Bishoftu (Debre Zeyit)",
-    en: "Bishoftu (Debre Zeyit)",
-    am: "ቢሾፍቱ (ደብረ ዘይት)",
-  },
-  {
-    value: "Jigjiga",
-    en: "Jigjiga",
-    am: "ጅግጅጋ",
-  },
-  {
-    value: "Harar",
-    en: "Harar",
-    am: "ሐረር",
-  },
-  {
-    value: "Shashamane",
-    en: "Shashamane",
-    am: "ሻሸመኔ",
-  },
-  {
-    value: "Arba Minch",
-    en: "Arba Minch",
-    am: "አርባ ምንጭ",
-  },
-  {
-    value: "Debre Birhan",
-    en: "Debre Birhan",
-    am: "ደብረ ብርሃን",
-  },
-  {
-    value: "Nekemte",
-    en: "Nekemte",
-    am: "ነቀምት",
-  },
-  {
-    value: "Debre Markos",
-    en: "Debre Markos",
-    am: "ደብረ ማርቆስ",
-  },
-  {
-    value: "Dilla",
-    en: "Dilla",
-    am: "ዲላ",
-  },
-  {
-    value: "Wolaita Sodo",
-    en: "Wolaita Sodo",
-    am: "ወላይታ ሶዶ",
-  },
-  {
-    value: "Hosaena",
-    en: "Hosaena",
-    am: "ሆሳዕና",
-  },
-  {
-    value: "Other",
-    en: "Other",
-    am: "ሌላ",
-  },
-];
+const cityOptions:
+  LocalizedOption[] =
+    [
+      {
+        value:
+          "Addis Ababa",
 
-const idTypeOptions: LocalizedOption[] = [
-  {
-    value: "Fayda ID",
-    en: "Fayda ID",
-    am: "ፋይዳ መታወቂያ",
-  },
-  {
-    value: "Passport",
-    en: "Passport",
-    am: "ፓስፖርት",
-  },
-  {
-    value: "Driver's License",
-    en: "Driver's License",
-    am: "የመንጃ ፈቃድ",
-  },
-  {
-    value: "Kebele / Government ID",
-    en: "Kebele / Government ID",
-    am: "የቀበሌ / የመንግስት መታወቂያ",
-  },
-  {
-    value: "Other Government-Issued ID",
-    en: "Other Government-Issued ID",
-    am: "ሌላ በመንግስት የተሰጠ መታወቂያ",
-  },
-];
+        en:
+          "Addis Ababa",
+
+        am:
+          "አዲስ አበባ",
+      },
+
+      {
+        value:
+          "Adama (Nazret)",
+
+        en:
+          "Adama (Nazret)",
+
+        am:
+          "አዳማ (ናዝሬት)",
+      },
+
+      {
+        value:
+          "Dire Dawa",
+
+        en:
+          "Dire Dawa",
+
+        am:
+          "ድሬዳዋ",
+      },
+
+      {
+        value:
+          "Hawassa",
+
+        en:
+          "Hawassa",
+
+        am:
+          "ሀዋሳ",
+      },
+
+      {
+        value:
+          "Bahir Dar",
+
+        en:
+          "Bahir Dar",
+
+        am:
+          "ባሕር ዳር",
+      },
+
+      {
+        value:
+          "Gondar",
+
+        en:
+          "Gondar",
+
+        am:
+          "ጎንደር",
+      },
+
+      {
+        value:
+          "Mekelle",
+
+        en:
+          "Mekelle",
+
+        am:
+          "መቀሌ",
+      },
+
+      {
+        value:
+          "Dessie",
+
+        en:
+          "Dessie",
+
+        am:
+          "ደሴ",
+      },
+
+      {
+        value:
+          "Jimma",
+
+        en:
+          "Jimma",
+
+        am:
+          "ጅማ",
+      },
+
+      {
+        value:
+          "Bishoftu (Debre Zeyit)",
+
+        en:
+          "Bishoftu (Debre Zeyit)",
+
+        am:
+          "ቢሾፍቱ (ደብረ ዘይት)",
+      },
+
+      {
+        value:
+          "Jigjiga",
+
+        en:
+          "Jigjiga",
+
+        am:
+          "ጅጅጋ",
+      },
+
+      {
+        value:
+          "Harar",
+
+        en:
+          "Harar",
+
+        am:
+          "ሐረር",
+      },
+
+      {
+        value:
+          "Shashamane",
+
+        en:
+          "Shashamane",
+
+        am:
+          "ሻሸመኔ",
+      },
+
+      {
+        value:
+          "Arba Minch",
+
+        en:
+          "Arba Minch",
+
+        am:
+          "አርባ ምንጭ",
+      },
+
+      {
+        value:
+          "Debre Birhan",
+
+        en:
+          "Debre Birhan",
+
+        am:
+          "ደብረ ብርሃን",
+      },
+
+      {
+        value:
+          "Nekemte",
+
+        en:
+          "Nekemte",
+
+        am:
+          "ነቀምት",
+      },
+
+      {
+        value:
+          "Debre Markos",
+
+        en:
+          "Debre Markos",
+
+        am:
+          "ደብረ ማርቆስ",
+      },
+
+      {
+        value:
+          "Dilla",
+
+        en:
+          "Dilla",
+
+        am:
+          "ዲላ",
+      },
+
+      {
+        value:
+          "Wolaita Sodo",
+
+        en:
+          "Wolaita Sodo",
+
+        am:
+          "ወላይታ ሶዶ",
+      },
+
+      {
+        value:
+          "Hosaena",
+
+        en:
+          "Hosaena",
+
+        am:
+          "ሆሳዕና",
+      },
+
+      {
+        value:
+          "Other",
+
+        en:
+          "Other",
+
+        am:
+          "ሌላ",
+      },
+    ];
+
+const idTypeOptions:
+  LocalizedOption[] =
+    [
+      {
+        value:
+          "Fayda ID",
+
+        en:
+          "Fayda ID",
+
+        am:
+          "ፋይዳ መታወቂያ",
+      },
+
+      {
+        value:
+          "Passport",
+
+        en:
+          "Passport",
+
+        am:
+          "ፓስፖርት",
+      },
+
+      {
+        value:
+          "Driver's License",
+
+        en:
+          "Driver's License",
+
+        am:
+          "የመንጃ ፈቃድ",
+      },
+
+      {
+        value:
+          "Kebele / Government ID",
+
+        en:
+          "Kebele / Government ID",
+
+        am:
+          "የቀበሌ / የመንግስት መታወቂያ",
+      },
+
+      {
+        value:
+          "Other Government-Issued ID",
+
+        en:
+          "Other Government-Issued ID",
+
+        am:
+          "ሌላ በመንግስት የተሰጠ መታወቂያ",
+      },
+    ];
 
 /* =========================================================
    ENGLISH COPY
@@ -349,10 +550,10 @@ const englishCopy = {
     "Replace",
 
   privacyTitle:
-    "Prototype privacy notice",
+    "Identity document privacy",
 
   privacy:
-    "The application backend is not connected yet. The selected files remain inside your browser and are not uploaded or stored anywhere.",
+    "Your identification images are securely uploaded as protected application documents and are only intended for authorized application review.",
 
   step4Title:
     "Rules & Final Review",
@@ -408,20 +609,14 @@ const englishCopy = {
   submit:
     "Submit Application",
 
+  submitting:
+    "Submitting Application...",
+
+  submitFailed:
+    "Unable to submit your application. Please try again.",
+
   backToPortfolio:
     "Back to Portfolio",
-
-  successEyebrow:
-    "APPLICATION COMPLETE",
-
-  successTitle:
-    "Application Ready",
-
-  successDescription:
-    "The application interface is complete, but the backend is not connected yet. No personal information or identification documents were actually sent or stored.",
-
-  successButton:
-    "Return to Portfolio",
 
   required:
     "This field is required.",
@@ -742,10 +937,10 @@ const amharicCopy = {
     "ቀይር",
 
   privacyTitle:
-    "የግላዊነት ማስታወቂያ",
+    "የመታወቂያ መረጃ ጥበቃ",
 
   privacy:
-    "የማመልከቻው የኋላ ስርዓት ገና አልተገናኘም። የመረጡት ፋይሎች በአሳሽዎ ውስጥ ብቻ ይቆያሉ፤ ወደ ምንም ቦታ አይላኩም ወይም አይቀመጡም።",
+    "የመታወቂያዎ ምስሎች እንደ protected application documents በደህንነት upload ይደረጋሉ፣ እና ለተፈቀደ የapplication review ብቻ ይጠቀማሉ።",
 
   step4Title:
     "ደንቦች እና የመጨረሻ ማረጋገጫ",
@@ -801,19 +996,13 @@ const amharicCopy = {
   submit:
     "ማመልከቻውን አስገባ",
 
+  submitting:
+    "ማመልከቻው በመላክ ላይ...",
+
+  submitFailed:
+    "ማመልከቻዎን መላክ አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
+
   backToPortfolio:
-    "ወደ ፖርትፎሊዮ ተመለስ",
-
-  successEyebrow:
-    "ማመልከቻው ተጠናቋል",
-
-  successTitle:
-    "ማመልከቻዎ ዝግጁ ነው",
-
-  successDescription:
-    "የማመልከቻ ገጹ ተጠናቋል፣ ነገር ግን የኋላ ስርዓቱ ገና አልተገናኘም። ምንም የግል መረጃ ወይም የመታወቂያ ሰነድ አልተላከም ወይም አልተቀመጠም።",
-
-  successButton:
     "ወደ ፖርትፎሊዮ ተመለስ",
 
   required:
@@ -897,7 +1086,7 @@ const amharicCopy = {
         "ሙያዊ ግንኙነት",
 
       text:
-        "የስልክ ጥሪዎች፣ መልዕክቶች እና ስብሰባዎች ሁሉ በሙያዊ መንገድ መካሄድ አለባቸው። በግልጽ፣ በአክብሮት እና በእርግጠኝነት ይናገሩ። ጫና የሚፈጥር ሽያጭ፣ ክርክር ወይም ተገቢ ያልሆነ ንግግር አይፈቀድም።",
+        "የስልክ ጥሪዎች፣ መልዕክቶች እና ስብሰባዎች ሁሉ በሙያዊ መንገድ መካሄድ አለባቸው። በግልጽ፣ በአክብሮት እና በእርጠኝነት ይናገሩ። ጫና የሚፈጥር ሽያጭ፣ ክርክር ወይም ተገቢ ያልሆነ ንግግር አይፈቀድም።",
     },
 
     {
@@ -1193,15 +1382,19 @@ function MoneyIcon() {
 }
 
 function ArrowIcon({
-  direction = "right",
+  direction =
+    "right",
 }: {
-  direction?: "left" | "right";
+  direction?:
+    | "left"
+    | "right";
 }) {
   return (
     <span
       aria-hidden="true"
       className={
-        direction === "left"
+        direction ===
+        "left"
           ? "hire-arrow hire-arrow--left"
           : "hire-arrow"
       }
@@ -1214,21 +1407,39 @@ function ArrowIcon({
 function StepIcon({
   step,
 }: {
-  step: Step;
+  step:
+    Step;
 }) {
-  if (step === 1) {
-    return <UserIcon />;
+  if (
+    step ===
+    1
+  ) {
+    return (
+      <UserIcon />
+    );
   }
 
-  if (step === 2) {
-    return <ChatIcon />;
+  if (
+    step ===
+    2
+  ) {
+    return (
+      <ChatIcon />
+    );
   }
 
-  if (step === 3) {
-    return <IdentityIcon />;
+  if (
+    step ===
+    3
+  ) {
+    return (
+      <IdentityIcon />
+    );
   }
 
-  return <ReviewIcon />;
+  return (
+    <ReviewIcon />
+  );
 }
 
 /* =========================================================
@@ -1238,39 +1449,59 @@ function StepIcon({
 function ErrorMessage({
   children,
 }: {
-  children?: ReactNode;
+  children?:
+    ReactNode;
 }) {
-  if (!children) {
+  if (
+    !children
+  ) {
     return null;
   }
 
   return (
     <span className="hire-field-error">
-      {children}
+      {
+        children
+      }
     </span>
   );
 }
 
 /* =========================================================
-   UPLOAD
+   UPLOAD FIELD
    ========================================================= */
 
 type UploadFieldProps = {
-  title: string;
-  description: string;
+  title:
+    string;
 
-  file: File | null;
+  description:
+    string;
 
-  accept: string;
+  file:
+    File | null;
 
-  chooseLabel: string;
-  replaceLabel: string;
+  accept:
+    string;
 
-  error?: string;
+  chooseLabel:
+    string;
 
-  onChange: (
-    event: ChangeEvent<HTMLInputElement>,
-  ) => void;
+  replaceLabel:
+    string;
+
+  error?:
+    string;
+
+  disabled?:
+    boolean;
+
+  onChange:
+    (
+      event:
+        ChangeEvent<HTMLInputElement>,
+    ) =>
+      void;
 };
 
 function UploadField({
@@ -1281,6 +1512,8 @@ function UploadField({
   chooseLabel,
   replaceLabel,
   error,
+  disabled =
+    false,
   onChange,
 }: UploadFieldProps) {
   return (
@@ -1289,12 +1522,23 @@ function UploadField({
         error
           ? "hire-upload--error"
           : ""
+      } ${
+        disabled
+          ? "pointer-events-none opacity-60"
+          : ""
       }`}
     >
       <input
         type="file"
-        accept={accept}
-        onChange={onChange}
+        accept={
+          accept
+        }
+        disabled={
+          disabled
+        }
+        onChange={
+          onChange
+        }
       />
 
       <span className="hire-upload-icon">
@@ -1303,9 +1547,13 @@ function UploadField({
 
       <span className="hire-upload-content">
         <strong>
-          {title}
+          {
+            title
+          }
 
-          <em>*</em>
+          <em>
+            *
+          </em>
         </strong>
 
         <span>
@@ -1322,7 +1570,9 @@ function UploadField({
       </span>
 
       <ErrorMessage>
-        {error}
+        {
+          error
+        }
       </ErrorMessage>
     </label>
   );
@@ -1336,91 +1586,172 @@ export default function HireApplication() {
   const router =
     useRouter();
 
-  const { language } =
+  const {
+    language,
+  } =
     useLanguage();
 
   const copy =
-    language === "am"
+    language ===
+    "am"
       ? amharicCopy
       : englishCopy;
 
   const sectionRef =
-    useRef<HTMLElement | null>(
+    useRef<
+      HTMLElement |
+      null
+    >(
       null,
     );
 
   const [
     step,
     setStep,
-  ] = useState<Step>(1);
+  ] =
+    useState<Step>(
+      1,
+    );
 
   const [
     errors,
     setErrors,
-  ] = useState<Errors>({});
+  ] =
+    useState<Errors>(
+      {},
+    );
 
   const [
-    submitted,
-    setSubmitted,
-  ] = useState(false);
+    submitting,
+    setSubmitting,
+  ] =
+    useState(
+      false,
+    );
+
+  const [
+    submitError,
+    setSubmitError,
+  ] =
+    useState(
+      "",
+    );
+
+  const [
+    submittedApplication,
+    setSubmittedApplication,
+  ] =
+    useState<
+      SubmittedHireApplication |
+      null
+    >(
+      null,
+    );
 
   const [
     data,
     setData,
   ] =
     useState<ApplicationData>({
-      fullName: "",
-      fatherName: "",
+      fullName:
+        "",
 
-      email: "",
-      phone: "",
+      fatherName:
+        "",
 
-      city: "",
-      address: "",
+      email:
+        "",
 
-      telegram: "",
-      whatsapp: "",
+      phone:
+        "",
 
-      motivation: "",
+      city:
+        "",
 
-      idType: "",
+      address:
+        "",
 
-      idFront: null,
-      idBack: null,
+      telegram:
+        "",
 
-      acceptedRules: false,
+      whatsapp:
+        "",
+
+      motivation:
+        "",
+
+      idType:
+        "",
+
+      idFront:
+        null,
+
+      idBack:
+        null,
+
+      acceptedRules:
+        false,
     });
+
+  /* =======================================================
+     STEPS
+     ======================================================= */
 
   const stepItems = [
     {
-      step: 1 as const,
-      label: copy.step1,
+      step:
+        1 as const,
+
+      label:
+        copy.step1,
     },
+
     {
-      step: 2 as const,
-      label: copy.step2,
+      step:
+        2 as const,
+
+      label:
+        copy.step2,
     },
+
     {
-      step: 3 as const,
-      label: copy.step3,
+      step:
+        3 as const,
+
+      label:
+        copy.step3,
     },
+
     {
-      step: 4 as const,
-      label: copy.step4,
+      step:
+        4 as const,
+
+      label:
+        copy.step4,
     },
   ];
 
   const selectedCity =
     cityOptions.find(
-      (city) =>
-        city.value === data.city,
+      (
+        city,
+      ) =>
+        city.value ===
+        data.city,
     );
 
   const selectedIdType =
     idTypeOptions.find(
-      (type) =>
-        type.value === data.idType,
+      (
+        type,
+      ) =>
+        type.value ===
+        data.idType,
     );
+
+  /* =======================================================
+     UPDATE FIELD
+     ======================================================= */
 
   function updateField(
     field:
@@ -1434,25 +1765,44 @@ export default function HireApplication() {
       | "whatsapp"
       | "motivation"
       | "idType",
-    value: string,
+
+    value:
+      string,
   ) {
     setData(
-      (current) => ({
+      (
+        current,
+      ) => ({
         ...current,
-        [field]: value,
+
+        [field]:
+          value,
       }),
     );
 
     setErrors(
-      (current) => ({
+      (
+        current,
+      ) => ({
         ...current,
-        [field]: "",
+
+        [field]:
+          "",
       }),
+    );
+
+    setSubmitError(
+      "",
     );
   }
 
+  /* =======================================================
+     VALIDATORS
+     ======================================================= */
+
   function validEmail(
-    email: string,
+    email:
+      string,
   ) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
       email,
@@ -1460,7 +1810,8 @@ export default function HireApplication() {
   }
 
   function validPhone(
-    phone: string,
+    phone:
+      string,
   ) {
     const compact =
       phone.replace(
@@ -1473,157 +1824,300 @@ export default function HireApplication() {
     );
   }
 
-  function validateStep() {
-    const nextErrors: Errors =
-      {};
+  /* =======================================================
+     VALIDATE CURRENT STEP
+     ======================================================= */
 
-    if (step === 1) {
-      if (!data.fullName.trim()) {
+  function validateStep() {
+    const nextErrors:
+      Errors =
+        {};
+
+    /* =====================================================
+       STEP 1
+       ===================================================== */
+
+    if (
+      step ===
+      1
+    ) {
+      if (
+        !data
+          .fullName
+          .trim()
+      ) {
         nextErrors.fullName =
           copy.required;
       }
 
-      if (!data.fatherName.trim()) {
+      if (
+        !data
+          .fatherName
+          .trim()
+      ) {
         nextErrors.fatherName =
           copy.required;
       }
 
-      if (!data.email.trim()) {
+      if (
+        !data
+          .email
+          .trim()
+      ) {
         nextErrors.email =
           copy.required;
       } else if (
-        !validEmail(data.email)
+        !validEmail(
+          data.email,
+        )
       ) {
         nextErrors.email =
           copy.invalidEmail;
       }
 
-      if (!data.phone.trim()) {
+      if (
+        !data
+          .phone
+          .trim()
+      ) {
         nextErrors.phone =
           copy.required;
       } else if (
-        !validPhone(data.phone)
+        !validPhone(
+          data.phone,
+        )
       ) {
         nextErrors.phone =
           copy.invalidPhone;
       }
 
-      if (!data.city) {
+      if (
+        !data.city
+      ) {
         nextErrors.city =
           copy.required;
       }
 
-      if (!data.address.trim()) {
+      if (
+        !data
+          .address
+          .trim()
+      ) {
         nextErrors.address =
           copy.required;
       }
     }
 
-    if (step === 2) {
+    /* =====================================================
+       STEP 2
+       ===================================================== */
+
+    if (
+      step ===
+      2
+    ) {
       if (
-        !data.telegram.trim() &&
-        !data.whatsapp.trim()
+        !data
+          .telegram
+          .trim() &&
+        !data
+          .whatsapp
+          .trim()
       ) {
         nextErrors.social =
           copy.socialRequired;
       }
 
+      if (
+        data
+          .whatsapp
+          .trim() &&
+        !validPhone(
+          data.whatsapp,
+        )
+      ) {
+        nextErrors.whatsapp =
+          copy.invalidPhone;
+      }
+
       const length =
-        data.motivation
+        data
+          .motivation
           .trim()
           .length;
 
       if (
-        length < 20 ||
-        length > 200
+        length <
+          20 ||
+        length >
+          200
       ) {
         nextErrors.motivation =
           copy.motivationLength;
       }
     }
 
-    if (step === 3) {
-      if (!data.idType) {
+    /* =====================================================
+       STEP 3
+       ===================================================== */
+
+    if (
+      step ===
+      3
+    ) {
+      if (
+        !data.idType
+      ) {
         nextErrors.idType =
           copy.required;
       }
 
-      if (!data.idFront) {
+      if (
+        !data.idFront
+      ) {
         nextErrors.idFront =
           copy.required;
       }
 
-      if (!data.idBack) {
+      if (
+        !data.idBack
+      ) {
         nextErrors.idBack =
           copy.required;
       }
     }
 
-    if (step === 4) {
-      if (!data.acceptedRules) {
+    /* =====================================================
+       STEP 4
+       ===================================================== */
+
+    if (
+      step ===
+      4
+    ) {
+      if (
+        !data
+          .acceptedRules
+      ) {
         nextErrors.rules =
           copy.rulesRequired;
       }
     }
 
-    setErrors(nextErrors);
+    setErrors(
+      nextErrors,
+    );
 
     return (
-      Object.keys(nextErrors)
-        .length === 0
+      Object.keys(
+        nextErrors,
+      ).length ===
+      0
     );
   }
 
+  /* =======================================================
+     SCROLL / MOVE STEP
+     ======================================================= */
+
   function moveToStep(
-    nextStep: Step,
+    nextStep:
+      Step,
   ) {
-    setStep(nextStep);
+    setStep(
+      nextStep,
+    );
+
+    setSubmitError(
+      "",
+    );
 
     window.requestAnimationFrame(
       () => {
-        sectionRef.current?.scrollIntoView(
-          {
-            behavior: "smooth",
-            block: "start",
-          },
-        );
+        sectionRef
+          .current
+          ?.scrollIntoView({
+            behavior:
+              "smooth",
+
+            block:
+              "start",
+          });
       },
     );
   }
 
   function nextStep() {
-    if (!validateStep()) {
+    if (
+      submitting
+    ) {
       return;
     }
 
-    if (step < 4) {
+    if (
+      !validateStep()
+    ) {
+      return;
+    }
+
+    if (
+      step <
+      4
+    ) {
       moveToStep(
-        (step + 1) as Step,
+        (
+          step +
+          1
+        ) as Step,
       );
     }
   }
 
   function previousStep() {
-    if (step === 1) {
-      router.push("/");
+    if (
+      submitting
+    ) {
+      return;
+    }
+
+    if (
+      step ===
+      1
+    ) {
+      router.push(
+        "/",
+      );
 
       return;
     }
 
     moveToStep(
-      (step - 1) as Step,
+      (
+        step -
+        1
+      ) as Step,
     );
   }
 
+  /* =======================================================
+     FILE VALIDATION
+     ======================================================= */
+
   function handleFile(
-    field: FileField,
-    event: ChangeEvent<HTMLInputElement>,
+    field:
+      FileField,
+
+    event:
+      ChangeEvent<HTMLInputElement>,
   ) {
     const file =
-      event.currentTarget
+      event
+        .currentTarget
         .files?.[0];
 
-    if (!file) {
+    if (
+      !file
+    ) {
       return;
     }
 
@@ -1641,8 +2135,11 @@ export default function HireApplication() {
         MAX_FILE_SIZE
     ) {
       setErrors(
-        (current) => ({
+        (
+          current,
+        ) => ({
           ...current,
+
           [field]:
             copy.invalidFile,
         }),
@@ -1655,110 +2152,215 @@ export default function HireApplication() {
     }
 
     setData(
-      (current) => ({
+      (
+        current,
+      ) => ({
         ...current,
-        [field]: file,
+
+        [field]:
+          file,
       }),
     );
 
     setErrors(
-      (current) => ({
+      (
+        current,
+      ) => ({
         ...current,
-        [field]: "",
+
+        [field]:
+          "",
       }),
+    );
+
+    setSubmitError(
+      "",
     );
   }
 
-  function submitApplication() {
-    if (!validateStep()) {
+  /* =======================================================
+     REAL APPLICATION SUBMISSION
+     ======================================================= */
+
+  async function submitApplication() {
+    if (
+      submitting
+    ) {
       return;
     }
 
-    /*
-     * FRONTEND PROTOTYPE ONLY.
-     * No data is sent anywhere yet.
-     */
+    if (
+      !validateStep()
+    ) {
+      return;
+    }
 
-    setSubmitted(true);
+    /* =====================================================
+       EXTRA FILE SAFETY
+       ===================================================== */
 
-    window.requestAnimationFrame(
-      () => {
-        sectionRef.current?.scrollIntoView(
-          {
-            behavior: "smooth",
-            block: "start",
-          },
-        );
-      },
+    if (
+      !data.idFront ||
+      !data.idBack
+    ) {
+      setErrors({
+        idFront:
+          !data.idFront
+            ? copy.required
+            : "",
+
+        idBack:
+          !data.idBack
+            ? copy.required
+            : "",
+      });
+
+      moveToStep(
+        3,
+      );
+
+      return;
+    }
+
+    setSubmitting(
+      true,
     );
+
+    setSubmitError(
+      "",
+    );
+
+    try {
+      const application =
+        await submitHireApplication(
+          {
+            fullName:
+              data.fullName,
+
+            fatherName:
+              data.fatherName,
+
+            email:
+              data.email,
+
+            phone:
+              data.phone,
+
+            city:
+              data.city,
+
+            address:
+              data.address,
+
+            telegram:
+              data.telegram,
+
+            whatsapp:
+              data.whatsapp,
+
+            motivation:
+              data.motivation,
+
+            idType:
+              data.idType,
+
+            idFront:
+              data.idFront,
+
+            idBack:
+              data.idBack,
+
+            acceptedRules:
+              true,
+          },
+
+          language,
+        );
+
+      setSubmittedApplication(
+        application,
+      );
+
+      window.requestAnimationFrame(
+        () => {
+          window.scrollTo({
+            top:
+              0,
+
+            behavior:
+              "smooth",
+          });
+        },
+      );
+    } catch (
+      submitApplicationError
+    ) {
+      setSubmitError(
+        submitApplicationError instanceof
+          Error
+          ? submitApplicationError.message
+          : copy.submitFailed,
+      );
+    } finally {
+      setSubmitting(
+        false,
+      );
+    }
   }
 
   /* =========================================================
      SUCCESS
+
+     IMPORTANT:
+     The application reference is intentionally NOT displayed
+     on the website anymore.
+
+     The applicant is directed to check the email address
+     they submitted. Their application ID is delivered there.
      ========================================================= */
 
-  if (submitted) {
+  if (
+    submittedApplication
+  ) {
     return (
-      <section
-        ref={sectionRef}
-        className="hire-application hire-application--success"
-      >
-        <div className="hire-success-card">
-          <span className="hire-success-icon">
-            <ShieldIcon />
-          </span>
-
-          <span className="hire-success-eyebrow">
-            {copy.successEyebrow}
-          </span>
-
-          <h1>
-            {copy.successTitle}
-          </h1>
-
-          <p>
-            {
-              copy.successDescription
-            }
-          </p>
-
-          <button
-            type="button"
-            onClick={() =>
-              router.push("/")
-            }
-          >
-            {
-              copy.successButton
-            }
-
-            <ArrowIcon />
-          </button>
-        </div>
-      </section>
+      <HireApplicationSuccess
+        email={
+          data.email.trim()
+        }
+      />
     );
   }
 
+  /* =========================================================
+     MAIN
+     ========================================================= */
+
   return (
     <section
-      ref={sectionRef}
+      ref={
+        sectionRef
+      }
       className="hire-application"
     >
       <div className="hire-page-container">
         {/* =================================================
             HERO
-           ================================================= */}
+            ================================================= */}
 
         <div className="hire-page-hero">
           <div className="hire-page-hero-copy">
             <span className="hire-page-eyebrow">
               <i />
 
-              {copy.eyebrow}
+              {
+                copy.eyebrow
+              }
             </span>
 
             <h1>
-              {copy.titleStart}{" "}
+              {
+                copy.titleStart
+              }{" "}
 
               <span>
                 {
@@ -1768,7 +2370,9 @@ export default function HireApplication() {
             </h1>
 
             <p>
-              {copy.intro}
+              {
+                copy.intro
+              }
             </p>
 
             <div className="hire-role-note">
@@ -1782,6 +2386,8 @@ export default function HireApplication() {
             </div>
           </div>
 
+          {/* COMMISSION */}
+
           <div className="hire-commission-card">
             <div className="hire-commission-head">
               <span className="hire-commission-icon">
@@ -1789,14 +2395,18 @@ export default function HireApplication() {
               </span>
 
               <span>
-                {copy.commission}
+                {
+                  copy.commission
+                }
               </span>
             </div>
 
             <div className="hire-commission-tiers">
               <div>
                 <span>
-                  {copy.tierOne}
+                  {
+                    copy.tierOne
+                  }
                 </span>
 
                 <strong>
@@ -1808,7 +2418,9 @@ export default function HireApplication() {
 
               <div>
                 <span>
-                  {copy.tierTwo}
+                  {
+                    copy.tierTwo
+                  }
                 </span>
 
                 <strong>
@@ -1820,14 +2432,16 @@ export default function HireApplication() {
             </div>
 
             <p>
-              {copy.paymentNote}
+              {
+                copy.paymentNote
+              }
             </p>
           </div>
         </div>
 
         {/* =================================================
             PROGRESS
-           ================================================= */}
+            ================================================= */}
 
         <div className="hire-progress">
           {stepItems.map(
@@ -1859,19 +2473,21 @@ export default function HireApplication() {
                   }`}
                 >
                   <div className="hire-progress-node">
-                    {completed ? (
-                      "✓"
-                    ) : (
-                      <StepIcon
-                        step={
-                          item.step
-                        }
-                      />
-                    )}
+                    {completed
+                      ? "✓"
+                      : (
+                        <StepIcon
+                          step={
+                            item.step
+                          }
+                        />
+                      )}
                   </div>
 
                   <span>
-                    {item.label}
+                    {
+                      item.label
+                    }
                   </span>
 
                   {index <
@@ -1889,7 +2505,7 @@ export default function HireApplication() {
 
         {/* =================================================
             CONTENT
-           ================================================= */}
+            ================================================= */}
 
         <div className="hire-form-layout">
           <div className="hire-form-card">
@@ -1899,9 +2515,10 @@ export default function HireApplication() {
             >
               {/* ===========================================
                   STEP 1
-                 =========================================== */}
+                  =========================================== */}
 
-              {step === 1 && (
+              {step ===
+                1 && (
                 <>
                   <header className="hire-step-header">
                     <span>
@@ -1924,11 +2541,17 @@ export default function HireApplication() {
                   </header>
 
                   <div className="hire-fields-grid">
+                    {/* FULL NAME */}
+
                     <label className="hire-field">
                       <span>
-                        {copy.fullName}{" "}
+                        {
+                          copy.fullName
+                        }{" "}
 
-                        <em>*</em>
+                        <em>
+                          *
+                        </em>
                       </span>
 
                       <input
@@ -1940,7 +2563,9 @@ export default function HireApplication() {
                         ) =>
                           updateField(
                             "fullName",
-                            event.target
+
+                            event
+                              .target
                               .value,
                           )
                         }
@@ -1948,6 +2573,9 @@ export default function HireApplication() {
                           copy.fullNamePlaceholder
                         }
                         autoComplete="name"
+                        disabled={
+                          submitting
+                        }
                       />
 
                       <ErrorMessage>
@@ -1957,13 +2585,17 @@ export default function HireApplication() {
                       </ErrorMessage>
                     </label>
 
+                    {/* FATHER NAME */}
+
                     <label className="hire-field">
                       <span>
                         {
                           copy.fatherName
                         }{" "}
 
-                        <em>*</em>
+                        <em>
+                          *
+                        </em>
                       </span>
 
                       <input
@@ -1975,12 +2607,17 @@ export default function HireApplication() {
                         ) =>
                           updateField(
                             "fatherName",
-                            event.target
+
+                            event
+                              .target
                               .value,
                           )
                         }
                         placeholder={
                           copy.fatherPlaceholder
+                        }
+                        disabled={
+                          submitting
                         }
                       />
 
@@ -1991,11 +2628,17 @@ export default function HireApplication() {
                       </ErrorMessage>
                     </label>
 
+                    {/* EMAIL */}
+
                     <label className="hire-field">
                       <span>
-                        {copy.email}{" "}
+                        {
+                          copy.email
+                        }{" "}
 
-                        <em>*</em>
+                        <em>
+                          *
+                        </em>
                       </span>
 
                       <input
@@ -2008,7 +2651,9 @@ export default function HireApplication() {
                         ) =>
                           updateField(
                             "email",
-                            event.target
+
+                            event
+                              .target
                               .value,
                           )
                         }
@@ -2016,6 +2661,9 @@ export default function HireApplication() {
                           copy.emailPlaceholder
                         }
                         autoComplete="email"
+                        disabled={
+                          submitting
+                        }
                       />
 
                       <ErrorMessage>
@@ -2025,11 +2673,17 @@ export default function HireApplication() {
                       </ErrorMessage>
                     </label>
 
+                    {/* PHONE */}
+
                     <label className="hire-field">
                       <span>
-                        {copy.phone}{" "}
+                        {
+                          copy.phone
+                        }{" "}
 
-                        <em>*</em>
+                        <em>
+                          *
+                        </em>
                       </span>
 
                       <input
@@ -2042,7 +2696,9 @@ export default function HireApplication() {
                         ) =>
                           updateField(
                             "phone",
-                            event.target
+
+                            event
+                              .target
                               .value,
                           )
                         }
@@ -2050,6 +2706,9 @@ export default function HireApplication() {
                           copy.phonePlaceholder
                         }
                         autoComplete="tel"
+                        disabled={
+                          submitting
+                        }
                       />
 
                       <ErrorMessage>
@@ -2059,11 +2718,17 @@ export default function HireApplication() {
                       </ErrorMessage>
                     </label>
 
+                    {/* CITY */}
+
                     <label className="hire-field">
                       <span>
-                        {copy.city}{" "}
+                        {
+                          copy.city
+                        }{" "}
 
-                        <em>*</em>
+                        <em>
+                          *
+                        </em>
                       </span>
 
                       <select
@@ -2075,9 +2740,14 @@ export default function HireApplication() {
                         ) =>
                           updateField(
                             "city",
-                            event.target
+
+                            event
+                              .target
                               .value,
                           )
+                        }
+                        disabled={
+                          submitting
                         }
                       >
                         <option value="">
@@ -2087,7 +2757,9 @@ export default function HireApplication() {
                         </option>
 
                         {cityOptions.map(
-                          (city) => (
+                          (
+                            city,
+                          ) => (
                             <option
                               key={
                                 city.value
@@ -2096,12 +2768,10 @@ export default function HireApplication() {
                                 city.value
                               }
                             >
-                              {
-                                language ===
-                                "am"
-                                  ? city.am
-                                  : city.en
-                              }
+                              {language ===
+                              "am"
+                                ? city.am
+                                : city.en}
                             </option>
                           ),
                         )}
@@ -2114,11 +2784,17 @@ export default function HireApplication() {
                       </ErrorMessage>
                     </label>
 
+                    {/* ADDRESS */}
+
                     <label className="hire-field">
                       <span>
-                        {copy.address}{" "}
+                        {
+                          copy.address
+                        }{" "}
 
-                        <em>*</em>
+                        <em>
+                          *
+                        </em>
                       </span>
 
                       <input
@@ -2130,7 +2806,9 @@ export default function HireApplication() {
                         ) =>
                           updateField(
                             "address",
-                            event.target
+
+                            event
+                              .target
                               .value,
                           )
                         }
@@ -2138,6 +2816,9 @@ export default function HireApplication() {
                           copy.addressPlaceholder
                         }
                         autoComplete="street-address"
+                        disabled={
+                          submitting
+                        }
                       />
 
                       <ErrorMessage>
@@ -2152,9 +2833,10 @@ export default function HireApplication() {
 
               {/* ===========================================
                   STEP 2
-                 =========================================== */}
+                  =========================================== */}
 
-              {step === 2 && (
+              {step ===
+                2 && (
                 <>
                   <header className="hire-step-header">
                     <span>
@@ -2177,9 +2859,13 @@ export default function HireApplication() {
                   </header>
 
                   <div className="hire-fields-grid">
+                    {/* TELEGRAM */}
+
                     <label className="hire-field">
                       <span>
-                        {copy.telegram}
+                        {
+                          copy.telegram
+                        }
                       </span>
 
                       <input
@@ -2191,7 +2877,9 @@ export default function HireApplication() {
                         ) => {
                           updateField(
                             "telegram",
-                            event.target
+
+                            event
+                              .target
                               .value,
                           );
 
@@ -2200,22 +2888,32 @@ export default function HireApplication() {
                               current,
                             ) => ({
                               ...current,
-                              social: "",
+
+                              social:
+                                "",
                             }),
                           );
                         }}
                         placeholder={
                           copy.telegramPlaceholder
                         }
+                        disabled={
+                          submitting
+                        }
                       />
                     </label>
 
+                    {/* WHATSAPP */}
+
                     <label className="hire-field">
                       <span>
-                        {copy.whatsapp}
+                        {
+                          copy.whatsapp
+                        }
                       </span>
 
                       <input
+                        type="tel"
                         value={
                           data.whatsapp
                         }
@@ -2224,7 +2922,9 @@ export default function HireApplication() {
                         ) => {
                           updateField(
                             "whatsapp",
-                            event.target
+
+                            event
+                              .target
                               .value,
                           );
 
@@ -2233,20 +2933,38 @@ export default function HireApplication() {
                               current,
                             ) => ({
                               ...current,
-                              social: "",
+
+                              social:
+                                "",
+
+                              whatsapp:
+                                "",
                             }),
                           );
                         }}
                         placeholder={
                           copy.whatsappPlaceholder
                         }
+                        disabled={
+                          submitting
+                        }
                       />
+
+                      <ErrorMessage>
+                        {
+                          errors.whatsapp
+                        }
+                      </ErrorMessage>
                     </label>
                   </div>
 
                   <ErrorMessage>
-                    {errors.social}
+                    {
+                      errors.social
+                    }
                   </ErrorMessage>
+
+                  {/* MOTIVATION */}
 
                   <label className="hire-field hire-field--textarea">
                     <span>
@@ -2254,12 +2972,13 @@ export default function HireApplication() {
                         copy.motivation
                       }{" "}
 
-                      <em>*</em>
+                      <em>
+                        *
+                      </em>
 
                       <small>
                         {
-                          data.motivation
-                            .length
+                          data.motivation.length
                         }
                         /200{" "}
                         {
@@ -2269,8 +2988,12 @@ export default function HireApplication() {
                     </span>
 
                     <textarea
-                      rows={7}
-                      maxLength={200}
+                      rows={
+                        7
+                      }
+                      maxLength={
+                        200
+                      }
                       value={
                         data.motivation
                       }
@@ -2279,12 +3002,17 @@ export default function HireApplication() {
                       ) =>
                         updateField(
                           "motivation",
-                          event.target
+
+                          event
+                            .target
                             .value,
                         )
                       }
                       placeholder={
                         copy.motivationPlaceholder
+                      }
+                      disabled={
+                        submitting
                       }
                     />
 
@@ -2299,9 +3027,10 @@ export default function HireApplication() {
 
               {/* ===========================================
                   STEP 3
-                 =========================================== */}
+                  =========================================== */}
 
-              {step === 3 && (
+              {step ===
+                3 && (
                 <>
                   <header className="hire-step-header">
                     <span>
@@ -2323,11 +3052,17 @@ export default function HireApplication() {
                     </div>
                   </header>
 
+                  {/* ID TYPE */}
+
                   <label className="hire-field">
                     <span>
-                      {copy.idType}{" "}
+                      {
+                        copy.idType
+                      }{" "}
 
-                      <em>*</em>
+                      <em>
+                        *
+                      </em>
                     </span>
 
                     <select
@@ -2339,9 +3074,14 @@ export default function HireApplication() {
                       ) =>
                         updateField(
                           "idType",
-                          event.target
+
+                          event
+                            .target
                             .value,
                         )
+                      }
+                      disabled={
+                        submitting
                       }
                     >
                       <option value="">
@@ -2362,12 +3102,10 @@ export default function HireApplication() {
                               type.value
                             }
                           >
-                            {
-                              language ===
-                              "am"
-                                ? type.am
-                                : type.en
-                            }
+                            {language ===
+                            "am"
+                              ? type.am
+                              : type.en}
                           </option>
                         ),
                       )}
@@ -2379,6 +3117,8 @@ export default function HireApplication() {
                       }
                     </ErrorMessage>
                   </label>
+
+                  {/* ID FILES */}
 
                   <div className="hire-upload-grid">
                     <UploadField
@@ -2401,11 +3141,15 @@ export default function HireApplication() {
                       error={
                         errors.idFront
                       }
+                      disabled={
+                        submitting
+                      }
                       onChange={(
                         event,
                       ) =>
                         handleFile(
                           "idFront",
+
                           event,
                         )
                       }
@@ -2431,16 +3175,22 @@ export default function HireApplication() {
                       error={
                         errors.idBack
                       }
+                      disabled={
+                        submitting
+                      }
                       onChange={(
                         event,
                       ) =>
                         handleFile(
                           "idBack",
+
                           event,
                         )
                       }
                     />
                   </div>
+
+                  {/* PRIVACY */}
 
                   <div className="hire-privacy-note">
                     <span>
@@ -2455,7 +3205,9 @@ export default function HireApplication() {
                       </strong>
 
                       <p>
-                        {copy.privacy}
+                        {
+                          copy.privacy
+                        }
                       </p>
                     </div>
                   </div>
@@ -2464,9 +3216,10 @@ export default function HireApplication() {
 
               {/* ===========================================
                   STEP 4
-                 =========================================== */}
+                  =========================================== */}
 
-              {step === 4 && (
+              {step ===
+                4 && (
                 <>
                   <header className="hire-step-header">
                     <span>
@@ -2487,6 +3240,8 @@ export default function HireApplication() {
                       </p>
                     </div>
                   </header>
+
+                  {/* REVIEW */}
 
                   <div className="hire-review-summary">
                     <h3>
@@ -2532,7 +3287,9 @@ export default function HireApplication() {
                         </span>
 
                         <strong>
-                          {data.phone}
+                          {
+                            data.phone
+                          }
                         </strong>
                       </div>
 
@@ -2544,7 +3301,9 @@ export default function HireApplication() {
                         </span>
 
                         <strong>
-                          {data.email}
+                          {
+                            data.email
+                          }
                         </strong>
                       </div>
 
@@ -2573,8 +3332,10 @@ export default function HireApplication() {
                         </span>
 
                         <strong>
-                          {data.telegram ||
-                            data.whatsapp}
+                          {
+                            data.telegram ||
+                            data.whatsapp
+                          }
                         </strong>
                       </div>
 
@@ -2624,6 +3385,8 @@ export default function HireApplication() {
                       </div>
                     </div>
                   </div>
+
+                  {/* RULES */}
 
                   <div className="hire-rules">
                     <div className="hire-rules-header">
@@ -2679,11 +3442,22 @@ export default function HireApplication() {
                     </div>
                   </div>
 
-                  <label className="hire-agreement">
+                  {/* AGREEMENT */}
+
+                  <label
+                    className={`hire-agreement ${
+                      submitting
+                        ? "pointer-events-none opacity-60"
+                        : ""
+                    }`}
+                  >
                     <input
                       type="checkbox"
                       checked={
                         data.acceptedRules
+                      }
+                      disabled={
+                        submitting
                       }
                       onChange={(
                         event,
@@ -2693,8 +3467,10 @@ export default function HireApplication() {
                             current,
                           ) => ({
                             ...current,
+
                             acceptedRules:
-                              event.target
+                              event
+                                .target
                                 .checked,
                           }),
                         );
@@ -2704,8 +3480,14 @@ export default function HireApplication() {
                             current,
                           ) => ({
                             ...current,
-                            rules: "",
+
+                            rules:
+                              "",
                           }),
+                        );
+
+                        setSubmitError(
+                          "",
                         );
                       }}
                     />
@@ -2713,20 +3495,39 @@ export default function HireApplication() {
                     <span className="hire-checkbox" />
 
                     <span>
-                      {copy.accept}
+                      {
+                        copy.accept
+                      }
                     </span>
                   </label>
 
                   <ErrorMessage>
-                    {errors.rules}
+                    {
+                      errors.rules
+                    }
                   </ErrorMessage>
                 </>
               )}
             </div>
 
             {/* =================================================
+                SUBMISSION ERROR
+                ================================================= */}
+
+            {submitError && (
+              <div
+                role="alert"
+                className="mx-5 mb-1 rounded-[14px] border border-red-200 bg-red-50 px-4 py-3 text-[9px] font-medium leading-5 text-red-600 sm:mx-0"
+              >
+                {
+                  submitError
+                }
+              </div>
+            )}
+
+            {/* =================================================
                 NAVIGATION
-               ================================================= */}
+                ================================================= */}
 
             <div className="hire-form-navigation">
               <button
@@ -2734,38 +3535,55 @@ export default function HireApplication() {
                 onClick={
                   previousStep
                 }
-                className="hire-form-back"
+                disabled={
+                  submitting
+                }
+                className="hire-form-back disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <ArrowIcon direction="left" />
 
-                {step === 1
+                {step ===
+                1
                   ? copy.backToPortfolio
                   : copy.previous}
               </button>
 
-              {step < 4 ? (
+              {step <
+              4 ? (
                 <button
                   type="button"
                   onClick={
                     nextStep
                   }
-                  className="hire-form-next"
+                  disabled={
+                    submitting
+                  }
+                  className="hire-form-next disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {copy.next}
+                  {
+                    copy.next
+                  }
 
                   <ArrowIcon />
                 </button>
               ) : (
                 <button
                   type="button"
-                  onClick={
-                    submitApplication
+                  onClick={() =>
+                    void submitApplication()
                   }
-                  className="hire-form-submit"
+                  disabled={
+                    submitting
+                  }
+                  className="hire-form-submit disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {copy.submit}
+                  {submitting
+                    ? copy.submitting
+                    : copy.submit}
 
-                  <ArrowIcon />
+                  {!submitting && (
+                    <ArrowIcon />
+                  )}
                 </button>
               )}
             </div>
@@ -2773,15 +3591,19 @@ export default function HireApplication() {
 
           {/* =================================================
               ROLE OVERVIEW
-             ================================================= */}
+              ================================================= */}
 
           <aside className="hire-side-panel">
             <span className="hire-side-label">
-              {copy.roleOverview}
+              {
+                copy.roleOverview
+              }
             </span>
 
             <h3>
-              {copy.roleTitle}
+              {
+                copy.roleTitle
+              }
 
               <br />
 
@@ -2805,11 +3627,14 @@ export default function HireApplication() {
                   index,
                 ) => (
                   <div
-                    key={text}
+                    key={
+                      text
+                    }
                   >
                     <span>
                       {String(
-                        index + 1,
+                        index +
+                          1,
                       ).padStart(
                         2,
                         "0",
@@ -2817,7 +3642,9 @@ export default function HireApplication() {
                     </span>
 
                     <p>
-                      {text}
+                      {
+                        text
+                      }
                     </p>
                   </div>
                 ),
@@ -2828,7 +3655,9 @@ export default function HireApplication() {
               <ShieldIcon />
 
               <p>
-                {copy.warning}
+                {
+                  copy.warning
+                }
               </p>
             </div>
           </aside>

@@ -14,7 +14,9 @@ const envSchema =
       .number()
       .int()
       .positive()
-      .default(5000),
+      .default(
+        5000,
+      ),
 
     NODE_ENV: z
       .enum([
@@ -48,7 +50,11 @@ const envSchema =
         32,
         "JWT_SECRET must be at least 32 characters.",
       ),
-
+REP_JWT_COOKIE_NAME: z
+  .string()
+  .default(
+    "baki_rep_token",
+  ),
     JWT_COOKIE_NAME: z
       .string()
       .default(
@@ -56,22 +62,19 @@ const envSchema =
       ),
 
     /* =====================================================
-       MISTRAL / BAKI AI
-       ===================================================== */
+   OPENAI / BAKI AI
+   ===================================================== */
 
-    MISTRAL_API_KEY: z
-      .string()
-      .min(
-        1,
-        "MISTRAL_API_KEY is required.",
-      ),
+OPENAI_API_KEY: z
+  .string()
+  .min(
+    1,
+    "OPENAI_API_KEY is required.",
+  ),
 
-    MISTRAL_MODEL: z
-      .string()
-      .min(1)
-      .default(
-        "mistral-small-latest",
-      ),
+OPENAI_MODEL: z
+  .string()
+  .min(1),
 
     /* =====================================================
        CLOUDINARY
@@ -95,6 +98,20 @@ const envSchema =
       .default(
         "baki-portfolio/projects",
       ),
+
+    /*
+      Private / authenticated government ID images.
+
+      Keep these separate from normal portfolio images.
+    */
+
+    CLOUDINARY_APPLICATION_ID_FOLDER:
+      z
+        .string()
+        .min(1)
+        .default(
+          "baki-portfolio/private/hire-ids",
+        ),
 
     /* =====================================================
        ADMIN SEED

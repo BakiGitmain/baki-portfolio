@@ -13,6 +13,9 @@ import {
 } from "next/navigation";
 
 import ExperienceModeToggle from "@/components/layout/experience-mode-toggle";
+
+import HeaderAccountMenu from "@/components/layout/header-account-menu";
+
 import LanguageToggle from "@/components/layout/language-toggle";
 import { useLanguage } from "@/components/providers/language-provider";
 
@@ -536,7 +539,7 @@ export default function Navbar() {
       }`}
     >
       <nav
-        className={`mx-auto flex w-full max-w-[1500px] items-center justify-between overflow-hidden px-2 transition-all duration-500 sm:px-6 lg:px-8 xl:overflow-visible xl:px-12 ${
+  className={`mx-auto flex w-full max-w-[1500px] items-center justify-between overflow-visible px-2 transition-all duration-500 sm:px-6 lg:px-8 xl:px-12 ${
           isScrolled
             ? "h-[68px]"
             : "h-[82px]"
@@ -700,9 +703,29 @@ export default function Navbar() {
             xl:gap-3
           `}
         >
-          <ExperienceModeToggle />
+{/* ==========================================
+    EXPERIENCE
+   ========================================== */}
 
-          <LanguageToggle />
+<ExperienceModeToggle />
+
+{/* ==========================================
+    LANGUAGE
+   ========================================== */}
+
+<LanguageToggle />
+
+{/* ==========================================
+    ACCOUNT
+
+    Mobile:
+    performance → language → account → hamburger
+
+    Desktop:
+    performance → language → account → CTA
+   ========================================== */}
+
+<HeaderAccountMenu />
 
 {/* DESKTOP CONTACT BUTTON */}
 <button

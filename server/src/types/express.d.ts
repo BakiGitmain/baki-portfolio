@@ -11,7 +11,15 @@ declare module "express-serve-static-core" {
 
       email: string;
 
-      role: "admin";
+      role:
+        | "admin"
+        | "representative";
+
+      mustChangePassword?:
+        boolean;
+
+      sessionVersion?:
+        number;
     };
   }
 }

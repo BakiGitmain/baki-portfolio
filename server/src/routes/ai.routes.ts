@@ -488,7 +488,7 @@ ${relevantContext}`,
           .completions
           .create({
             model:
-              env.MISTRAL_MODEL,
+              env.OPENAI_MODEL,
 
             messages:
               conversation,

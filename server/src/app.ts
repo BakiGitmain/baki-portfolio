@@ -6,18 +6,36 @@ import express, {
 } from "express";
 
 import cors from "cors";
-import aiRouter from "./routes/ai.routes.js";
+import accountAuthRouter from "./routes/account-auth.routes.js";
 import helmetModule from "helmet";
 
 import cookieParser from "cookie-parser";
+import representativeAuthRouter from "./routes/representative-auth.routes.js";
+
+import representativeRouter from "./routes/representative.routes.js";
+
+import representativeOnboardingRouter from "./routes/representative-onboarding.routes.js";
+/* =========================================================
+   CONFIG
+   ========================================================= */
 
 import {
   env,
 } from "./config/env.js";
 
+/* =========================================================
+   ROUTES
+   ========================================================= */
+
+import aiRouter from "./routes/ai.routes.js";
+
 import authRouter from "./routes/auth.routes.js";
 
 import adminRouter from "./routes/admin.routes.js";
+
+import applicationsRouter from "./routes/applications.routes.js";
+
+import adminApplicationsRouter from "./routes/admin-applications.routes.js";
 
 import adminProjectsRouter from "./routes/admin-projects.routes.js";
 
@@ -88,6 +106,7 @@ app.use(
 
 app.use(
   "/api/internal/health-checks",
+
   siteHealthRunnerRouter,
 );
 
@@ -160,9 +179,6 @@ app.use(
   cookieParser(),
 );
 
-
-
-
 /* =========================================================
    ROOT
    ========================================================= */
@@ -190,21 +206,40 @@ app.get(
 
 app.use(
   "/api/health",
+
   healthRouter,
 );
 
 app.use(
   "/api/projects",
+
   projectsRouter,
 );
+
+/* =========================================================
+   SALES REPRESENTATIVE APPLICATIONS
+
+   PUBLIC submission endpoints.
+
+   The admin review API is mounted separately below.
+   ========================================================= */
+
+app.use(
+  "/api/applications",
+
+  applicationsRouter,
+);
+
 /* =========================================================
    BAKI AI
    ========================================================= */
 
 app.use(
   "/api/ai",
+
   aiRouter,
 );
+
 /* =========================================================
    AUTH
    ========================================================= */
@@ -214,6 +249,43 @@ app.use(
 
   authRouter,
 );
+/* =========================================================
+   REPRESENTATIVE AUTH
+   ========================================================= */
+
+app.use(
+  "/api/representative-auth",
+  representativeAuthRouter,
+);
+
+/* =========================================================
+   REPRESENTATIVE PORTAL
+   ========================================================= */
+
+app.use(
+  "/api/representative",
+  representativeRouter,
+);
+
+/* =========================================================
+   REPRESENTATIVE ONBOARDING
+
+   Keep this BEFORE the normal admin applications router.
+   ========================================================= */
+
+app.use(
+  "/api/admin/applications",
+  representativeOnboardingRouter,
+);
+/* =========================================================
+   ADMIN APPLICATIONS
+   ========================================================= */
+
+app.use(
+  "/api/admin/applications",
+
+  adminApplicationsRouter,
+);
 
 /* =========================================================
    ADMIN PROJECTS
@@ -221,6 +293,7 @@ app.use(
 
 app.use(
   "/api/admin/projects",
+
   adminProjectsRouter,
 );
 
@@ -230,6 +303,7 @@ app.use(
 
 app.use(
   "/api/admin/sites",
+
   adminSiteAnalyticsRouter,
 );
 
@@ -239,6 +313,7 @@ app.use(
 
 app.use(
   "/api/admin/sites",
+
   adminSitePerformanceRouter,
 );
 
@@ -248,6 +323,7 @@ app.use(
 
 app.use(
   "/api/admin/sites",
+
   adminSiteHealthRouter,
 );
 
@@ -257,6 +333,7 @@ app.use(
 
 app.use(
   "/api/admin/sites",
+
   adminSitesRouter,
 );
 
@@ -266,9 +343,17 @@ app.use(
 
 app.use(
   "/api/admin",
+
   adminRouter,
 );
+/* =========================================================
+   UNIFIED ACCOUNT LOGIN
+   ========================================================= */
 
+app.use(
+  "/api/account-auth",
+  accountAuthRouter,
+);
 /* =========================================================
    404
    ========================================================= */
@@ -279,7 +364,9 @@ app.use(
     res,
   ) => {
     res
-      .status(404)
+      .status(
+        404,
+      )
       .json({
         success:
           false,
@@ -318,7 +405,9 @@ app.use(
     );
 
     res
-      .status(500)
+      .status(
+        500,
+      )
       .json({
         success:
           false,
