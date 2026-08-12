@@ -1,0 +1,51 @@
+name: Partner Chat Retention
+
+on:
+  schedule:
+    # Daily at 02:23 UTC. Database time decides exact eligibility.
+    - cron: "23 2 * * *"
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: partner-chat-retention
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    name: Delete expired Partner Chat messages
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Trigger Partner Chat retention
+        env:
+          CHAT_RETENTION_URL: ${{ secrets.CHAT_RETENTION_URL }}
+          CHAT_RETENTION_SECRET: ${{ secrets.CHAT_RETENTION_SECRET }}
+
+        run: |
+          if [ -z "$CHAT_RETENTION_URL" ]; then
+            echo "CHAT_RETENTION_URL secret is missing."
+            exit 1
+          fi
+
+          if [ -z "$CHAT_RETENTION_SECRET" ]; then
+            echo "CHAT_RETENTION_SECRET secret is missing."
+            exit 1
+          fi
+
+          curl \
+            --fail-with-body \
+            --show-error \
+            --silent \
+            --retry 2 \
+            --retry-all-errors \
+            --connect-timeout 10 \
+            --max-time 240 \
+            -X POST \
+            -H "Accept: application/json" \
+            -H "X-Chat-Retention-Secret: $CHAT_RETENTION_SECRET" \
+            "${CHAT_RETENTION_URL%/}/api/internal/partner-chat-retention/run"

@@ -20,6 +20,14 @@ import {
 } from "../middleware/auth.middleware.js";
 
 import {
+  listRepresentativePrograms,
+} from "../services/partner-program.service.js";
+
+import {
+  recordPartnerActivity,
+} from "../services/partner-activity.service.js";
+
+import {
   sendApplicationRejectedEmail,
   sendApplicationUnderReviewEmail,
 } from "../services/application-email.service.js";
@@ -653,6 +661,784 @@ router.get(
 );
 
 /* =========================================================
+   APPLICATION / PARTNER OPERATIONAL DETAIL
+   ========================================================= */
+
+router.get(
+  "/:id/insight",
+
+  async (
+    req,
+    res,
+    next,
+  ) => {
+    const parsedId =
+      idSchema.safeParse(
+        req.params.id,
+      );
+
+    if (
+      !parsedId.success
+    ) {
+      errorResponse(
+        res,
+        400,
+        "INVALID_APPLICATION_ID",
+        "Invalid application id.",
+        "á‹¨application id á‰µáŠ­áŠ­áˆ áŠ á‹­á‹°áˆˆáˆá¢",
+      );
+
+      return;
+    }
+
+    try {
+      const representativeResult =
+        await db.query(
+          `
+            SELECT
+              representative.id,
+              representative.username,
+              representative.name,
+              representative.display_name,
+              representative.email,
+              representative.phone,
+              representative.city,
+              representative.preferred_language,
+              representative.is_active,
+              representative.last_login_at,
+              representative.created_at,
+              representative.avatar_public_id,
+              representative.avatar_format,
+              representative.avatar_version
+            FROM sales_representatives representative
+            WHERE representative.application_id = $1::uuid
+            LIMIT 1
+          `,
+          [
+            parsedId.data,
+          ],
+        );
+
+      const representative =
+        representativeResult.rows[0];
+
+      if (
+        !representative
+      ) {
+        res.json({
+          success:
+            true,
+
+          insight: {
+            representative:
+              null,
+
+            summary:
+              null,
+
+            reports: [],
+
+            training: [],
+
+            programs: [],
+
+            activity: [],
+
+            leads: {
+              available:
+                false,
+
+              reason:
+                "No dedicated lead-management entity exists in this system.",
+            },
+          },
+        });
+
+        return;
+      }
+
+      const [
+        reportResult,
+        trainingResult,
+        activityResult,
+        programs,
+      ] =
+        await Promise.all([
+          db.query(
+            `
+              SELECT
+                report.id,
+                report.message,
+                report.admin_read_at,
+                report.created_at,
+                report.updated_at,
+                (
+                  SELECT COUNT(*)::int
+                  FROM representative_report_replies reply
+                  WHERE reply.report_id = report.id
+                ) AS reply_count,
+                (
+                  SELECT MAX(reply.created_at)
+                  FROM representative_report_replies reply
+                  WHERE reply.report_id = report.id
+                ) AS latest_reply_at,
+                (
+                  SELECT COALESCE(
+                    JSON_AGG(
+                      JSON_BUILD_OBJECT(
+                        'id', reply.id,
+                        'message', reply.message,
+                        'representativeReadAt', reply.representative_read_at,
+                        'createdAt', reply.created_at
+                      )
+                      ORDER BY reply.created_at ASC
+                    ),
+                    '[]'::json
+                  )
+                  FROM representative_report_replies reply
+                  WHERE reply.report_id = report.id
+                ) AS replies,
+                COUNT(*) OVER()::int AS total_reports,
+                COUNT(*) FILTER (
+                  WHERE report.admin_read_at IS NULL
+                ) OVER()::int AS total_unread_reports
+              FROM representative_reports report
+              WHERE report.representative_id = $1::uuid
+              ORDER BY report.created_at DESC
+              LIMIT 100
+            `,
+            [
+              representative.id,
+            ],
+          ),
+
+          db.query(
+            `
+              SELECT
+                course.id AS course_id,
+                course.title_en AS course_title_en,
+                course.title_am AS course_title_am,
+                course.status AS course_status,
+                course.sort_order AS course_sort_order,
+                section.id AS section_id,
+                section.title_en AS section_title_en,
+                section.title_am AS section_title_am,
+                section.sort_order AS section_sort_order,
+                lesson.id AS lesson_id,
+                lesson.title_en AS lesson_title_en,
+                lesson.title_am AS lesson_title_am,
+                lesson.sort_order AS lesson_sort_order,
+                lesson.duration_seconds,
+                COALESCE(progress.last_position_seconds, 0)::int AS watched_seconds,
+                COALESCE(progress.completed, FALSE) AS completed,
+                progress.completed_at,
+                progress.updated_at AS progress_updated_at
+              FROM training_courses course
+              LEFT JOIN training_sections section
+                ON section.course_id = course.id
+              LEFT JOIN training_lessons lesson
+                ON lesson.section_id = section.id
+              LEFT JOIN representative_training_lesson_progress progress
+                ON
+                  progress.lesson_id = lesson.id
+                  AND progress.representative_id = $1::uuid
+              ORDER BY
+                course.sort_order ASC,
+                course.created_at ASC,
+                section.sort_order ASC,
+                section.created_at ASC,
+                lesson.sort_order ASC,
+                lesson.created_at ASC
+            `,
+            [
+              representative.id,
+            ],
+          ),
+
+          db.query(
+            `
+              SELECT *
+              FROM (
+                SELECT
+                  'report_created'::text AS type,
+                  report.id::text AS entity_id,
+                  LEFT(report.message, 160) AS label,
+                  report.created_at
+                FROM representative_reports report
+                WHERE report.representative_id = $1::uuid
+
+                UNION ALL
+
+                SELECT
+                  'report_replied'::text,
+                  report.id::text,
+                  LEFT(reply.message, 160),
+                  reply.created_at
+                FROM representative_report_replies reply
+                INNER JOIN representative_reports report
+                  ON report.id = reply.report_id
+                WHERE report.representative_id = $1::uuid
+
+                UNION ALL
+
+                SELECT
+                  'lesson_completed'::text,
+                  lesson.id::text,
+                  lesson.title_en,
+                  progress.completed_at
+                FROM representative_training_lesson_progress progress
+                INNER JOIN training_lessons lesson
+                  ON lesson.id = progress.lesson_id
+                WHERE
+                  progress.representative_id = $1::uuid
+                  AND progress.completed = TRUE
+                  AND progress.completed_at IS NOT NULL
+
+                UNION ALL
+
+                SELECT
+                  event.event_type::text,
+                  event.id::text,
+                  COALESCE(
+                    event.metadata ->> 'label',
+                    event.metadata ->> 'status',
+                    event.event_type
+                  ),
+                  event.created_at
+                FROM partner_activity_events event
+                WHERE
+                  (
+                    event.representative_id = $1::uuid
+                    OR event.application_id = $2::uuid
+                  )
+                  AND event.event_type <> 'lesson_completed'
+              ) activity
+              WHERE activity.created_at IS NOT NULL
+              ORDER BY activity.created_at DESC
+              LIMIT 100
+            `,
+            [
+              representative.id,
+              parsedId.data,
+            ],
+          ),
+
+          listRepresentativePrograms(
+            representative.id,
+            {
+              activeOnly:
+                false,
+            },
+          ),
+        ]);
+
+      type TrainingSection = {
+        id:
+          string;
+
+        titleEn:
+          string;
+
+        titleAm:
+          string;
+
+        lessons:
+          Array<
+            Record<
+              string,
+              unknown
+            >
+          >;
+      };
+
+      type TrainingCourse = {
+        id:
+          string;
+
+        titleEn:
+          string;
+
+        titleAm:
+          string;
+
+        status:
+          string;
+
+        sections:
+          TrainingSection[];
+      };
+
+      const courses =
+        new Map<
+          string,
+          TrainingCourse
+        >();
+
+      const sections =
+        new Map<
+          string,
+          TrainingSection
+        >();
+
+      for (
+        const row of
+        trainingResult.rows
+      ) {
+        let course =
+          courses.get(
+            row.course_id,
+          );
+
+        if (
+          !course
+        ) {
+          course = {
+            id:
+              row.course_id,
+
+            titleEn:
+              row.course_title_en,
+
+            titleAm:
+              row.course_title_am,
+
+            status:
+              row.course_status,
+
+            sections: [],
+          };
+
+          courses.set(
+            row.course_id,
+            course,
+          );
+        }
+
+        if (
+          !row.section_id
+        ) {
+          continue;
+        }
+
+        let section =
+          sections.get(
+            row.section_id,
+          );
+
+        if (
+          !section
+        ) {
+          section = {
+            id:
+              row.section_id,
+
+            titleEn:
+              row.section_title_en,
+
+            titleAm:
+              row.section_title_am,
+
+            lessons: [],
+          };
+
+          sections.set(
+            row.section_id,
+            section,
+          );
+
+          course.sections.push(
+            section,
+          );
+        }
+
+        if (
+          row.lesson_id
+        ) {
+          section.lessons.push({
+            id:
+              row.lesson_id,
+
+            titleEn:
+              row.lesson_title_en,
+
+            titleAm:
+              row.lesson_title_am,
+
+            durationSeconds:
+              Number(
+                row.duration_seconds,
+              ),
+
+            watchedSeconds:
+              Number(
+                row.watched_seconds,
+              ),
+
+            completed:
+              Boolean(
+                row.completed,
+              ),
+
+            completedAt:
+              row.completed_at ??
+              null,
+
+            updatedAt:
+              row.progress_updated_at ??
+              null,
+          });
+        }
+      }
+
+      const training =
+        Array.from(
+          courses.values(),
+        ).map(
+          (
+            course,
+          ) => {
+            const lessons =
+              course.sections.flatMap(
+                (
+                  section,
+                ) =>
+                  section.lessons,
+              );
+
+            const completed =
+              lessons.filter(
+                (
+                  lesson,
+                ) =>
+                  lesson.completed ===
+                  true,
+              ).length;
+
+            return {
+              ...course,
+
+              progress: {
+                totalLessons:
+                  lessons.length,
+
+                completedLessons:
+                  completed,
+
+                percent:
+                  lessons.length >
+                  0
+                    ? Math.round(
+                        100 *
+                          completed /
+                          lessons.length,
+                      )
+                    : 0,
+              },
+            };
+          },
+        );
+
+      const allLessons =
+        training.flatMap(
+          (
+            course,
+          ) =>
+            course.sections.flatMap(
+              (
+                section,
+              ) =>
+                section.lessons,
+            ),
+        );
+
+      const completedLessons =
+        allLessons.filter(
+          (
+            lesson,
+          ) =>
+            lesson.completed ===
+            true,
+        ).length;
+
+      const avatarUrl =
+        representative
+          .avatar_public_id
+          ? cloudinary.url(
+              representative
+                .avatar_public_id,
+              {
+                secure:
+                  true,
+
+                version:
+                  representative
+                    .avatar_version ??
+                  undefined,
+
+                format:
+                  representative
+                    .avatar_format ??
+                  undefined,
+
+                transformation: [
+                  {
+                    width:
+                      512,
+
+                    height:
+                      512,
+
+                    crop:
+                      "fill",
+
+                    gravity:
+                      "auto",
+                  },
+                ],
+              },
+            )
+          : null;
+
+      const lastReportAt =
+        reportResult.rows[0]
+          ?.created_at ??
+        null;
+
+      const lastTrainingAt =
+        trainingResult.rows.reduce<
+          Date |
+          null
+        >(
+          (
+            latest,
+            row,
+          ) => {
+            if (
+              !row.progress_updated_at
+            ) {
+              return latest;
+            }
+
+            const value =
+              new Date(
+                row.progress_updated_at,
+              );
+
+            return !latest ||
+              value >
+                latest
+              ? value
+              : latest;
+          },
+          null,
+        );
+
+      const lastActivityAt = [
+        representative
+          .last_login_at,
+        lastReportAt,
+        lastTrainingAt,
+      ]
+        .filter(
+          Boolean,
+        )
+        .map(
+          (
+            value,
+          ) =>
+            new Date(
+              value,
+            ),
+        )
+        .sort(
+          (
+            left,
+            right,
+          ) =>
+            right.getTime() -
+            left.getTime(),
+        )[0] ??
+        null;
+
+      res.json({
+        success:
+          true,
+
+        insight: {
+          representative: {
+            id:
+              representative.id,
+
+            partnerId:
+              representative.username,
+
+            legalName:
+              representative.name,
+
+            displayName:
+              representative.display_name ??
+              "",
+
+            effectiveName:
+              representative.display_name ||
+              representative.name,
+
+            email:
+              representative.email,
+
+            phone:
+              representative.phone,
+
+            city:
+              representative.city,
+
+            preferredLanguage:
+              representative.preferred_language,
+
+            active:
+              Boolean(
+                representative.is_active,
+              ),
+
+            avatarUrl,
+
+            createdAt:
+              representative.created_at,
+
+            lastLoginAt:
+              representative.last_login_at ??
+              null,
+
+            lastActivityAt,
+          },
+
+          summary: {
+            reports:
+              Number(
+                reportResult.rows[0]
+                  ?.total_reports ??
+                  0,
+              ),
+
+            unreadReports:
+              Number(
+                reportResult.rows[0]
+                  ?.total_unread_reports ??
+                  0,
+              ),
+
+            lastReportAt,
+
+            trainingPercent:
+              allLessons.length >
+              0
+                ? Math.round(
+                    100 *
+                      completedLessons /
+                      allLessons.length,
+                  )
+                : 0,
+
+            completedLessons,
+
+            totalLessons:
+              allLessons.length,
+
+            programs:
+              programs.length,
+
+            activePrograms:
+              programs.filter(
+                (
+                  program,
+                ) =>
+                  program.effectiveStatus ===
+                  "active",
+              ).length,
+          },
+
+          reports:
+            reportResult.rows.map(
+              (
+                report,
+              ) => ({
+                id:
+                  report.id,
+
+                message:
+                  report.message,
+
+                adminReadAt:
+                  report.admin_read_at ??
+                  null,
+
+                replyCount:
+                  Number(
+                    report.reply_count,
+                  ),
+
+                latestReplyAt:
+                  report.latest_reply_at ??
+                  null,
+
+                replies:
+                  Array.isArray(
+                    report.replies,
+                  )
+                    ? report.replies
+                    : [],
+
+                createdAt:
+                  report.created_at,
+
+                updatedAt:
+                  report.updated_at,
+              }),
+            ),
+
+          training,
+
+          programs,
+
+          activity:
+            activityResult.rows.map(
+              (
+                activity,
+              ) => ({
+                type:
+                  activity.type,
+
+                entityId:
+                  activity.entity_id,
+
+                label:
+                  activity.label,
+
+                createdAt:
+                  activity.created_at,
+              }),
+            ),
+
+          leads: {
+            available:
+              false,
+
+            reason:
+              "No dedicated lead-management entity exists in this system. Legacy report categories are not presented as a lead pipeline.",
+          },
+        },
+      });
+    } catch (
+      error
+    ) {
+      next(
+        error,
+      );
+    }
+  },
+);
+
+/* =========================================================
    GET ONE
    ========================================================= */
 
@@ -1208,6 +1994,25 @@ router.patch(
       if (
         statusChanged
       ) {
+        await recordPartnerActivity({
+          eventType:
+            "application_status_changed",
+
+          actorType:
+            "admin",
+
+          adminUserId:
+            adminId,
+
+          applicationId:
+            row.id,
+
+          metadata: {
+            status:
+              row.status,
+          },
+        });
+
         const applicationCode =
           formatApplicationCode(
             row.application_number,

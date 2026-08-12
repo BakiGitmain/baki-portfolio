@@ -16,6 +16,10 @@ import {
   sendApplicationAcceptedEmail,
 } from "../services/application-email.service.js";
 
+import {
+  recordPartnerActivity,
+} from "../services/partner-activity.service.js";
+
 /* =========================================================
    ROUTER
    ========================================================= */
@@ -485,6 +489,28 @@ router.post(
 
       transactionOpen =
         false;
+
+      await recordPartnerActivity({
+        eventType:
+          "representative_accepted",
+
+        actorType:
+          "admin",
+
+        representativeId:
+          representative.id,
+
+        adminUserId:
+          adminId,
+
+        applicationId:
+          application.id,
+
+        metadata: {
+          label:
+            representative.username,
+        },
+      });
 
       /* ===================================================
          SEND ACCEPTANCE EMAIL

@@ -1,10 +1,27 @@
+import {
+  createServer,
+} from "node:http";
+
 import app from "./app.js";
 
 import {
   env,
 } from "./config/env.js";
 
-app.listen(
+import {
+  createPartnerChatSocketServer,
+} from "./socket/partner-chat.socket.js";
+
+const httpServer =
+  createServer(
+    app,
+  );
+
+await createPartnerChatSocketServer(
+  httpServer,
+);
+
+httpServer.listen(
   env.PORT,
   () => {
     console.log(

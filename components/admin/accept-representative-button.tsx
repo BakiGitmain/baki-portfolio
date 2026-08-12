@@ -202,6 +202,7 @@ export default function AcceptRepresentativeButton({
   applicationId,
   disabled,
   label,
+  onAccepted,
 }: {
   applicationId:
     string;
@@ -211,6 +212,11 @@ export default function AcceptRepresentativeButton({
 
   label:
     string;
+
+  onAccepted?:
+    () =>
+      void |
+      Promise<void>;
 }) {
   const [
     confirmOpen,
@@ -276,6 +282,19 @@ export default function AcceptRepresentativeButton({
 
       setCredentials(
         result.credentials,
+      );
+
+      void Promise.resolve(
+        onAccepted?.(),
+      ).catch(
+        (
+          refreshError,
+        ) => {
+          console.error(
+            "Application accepted, but the admin view could not refresh:",
+            refreshError,
+          );
+        },
       );
     } catch (
       acceptError

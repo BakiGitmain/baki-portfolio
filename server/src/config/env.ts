@@ -40,6 +40,16 @@ const envSchema =
       .string()
       .min(1),
 
+    REDIS_URL: z
+      .string()
+      .min(1)
+      .optional(),
+
+    CHAT_RETENTION_SECRET: z
+      .string()
+      .min(32)
+      .optional(),
+
     /* =====================================================
        AUTH
        ===================================================== */
@@ -111,6 +121,14 @@ OPENAI_MODEL: z
         .min(1)
         .default(
           "baki-portfolio/private/hire-ids",
+        ),
+
+    CLOUDINARY_REPRESENTATIVE_AVATAR_FOLDER:
+      z
+        .string()
+        .min(1)
+        .default(
+          "baki-portfolio/representative-avatars",
         ),
 
     /* =====================================================

@@ -22,58 +22,66 @@ export type RepresentativeUser = {
     boolean;
 };
 
-export type RepresentativeReportCategory =
-  | "lead"
-  | "follow_up"
-  | "meeting"
-  | "issue"
-  | "other";
-
-export type RepresentativeReportStatus =
-  | "submitted"
-  | "reviewing"
-  | "contacted"
-  | "qualified"
-  | "won"
-  | "lost"
-  | "closed";
-
-export type RepresentativeReport = {
+export type RepresentativeReportReply = {
   id:
     string;
 
-  category:
-    RepresentativeReportCategory;
-
-  title:
+  message:
     string;
 
-  businessName:
-    string;
-
-  contactName:
+  readAt:
     string | null;
-
-  clientPhone:
-    string | null;
-
-  clientEmail:
-    string | null;
-
-  estimatedBudget:
-    number | null;
-
-  details:
-    string;
-
-  status:
-    RepresentativeReportStatus;
 
   createdAt:
     string;
 
   updatedAt:
     string;
+};
+
+export type RepresentativeReport = {
+  id:
+    string;
+
+  message:
+    string;
+
+  adminReadAt:
+    string | null;
+
+  replies:
+    RepresentativeReportReply[];
+
+  createdAt:
+    string;
+
+  updatedAt:
+    string;
+};
+
+export type RepresentativeReportCooldown = {
+  canSubmit:
+    boolean;
+
+  lastReportAt:
+    string | null;
+
+  nextReportAt:
+    string | null;
+
+  remainingSeconds:
+    number;
+};
+
+export type RepresentativeReportsResult = {
+  reports:
+    RepresentativeReport[];
+
+  cooldown:
+    RepresentativeReportCooldown;
+
+  unreadReplyCount:
+    number;
 };
 
 export type RepresentativeTrainingModule = {
@@ -139,10 +147,10 @@ export type RepresentativeDashboardData = {
     total:
       number;
 
-    active:
+    replies:
       number;
 
-    won:
+    unreadReplies:
       number;
   };
 
@@ -158,48 +166,73 @@ export type RepresentativeDashboardData = {
     id:
       string;
 
-    category:
-      RepresentativeReportCategory;
-
-    title:
+    message:
       string;
-
-    businessName:
-      string;
-
-    status:
-      RepresentativeReportStatus;
 
     createdAt:
       string;
+
+    latestReply: {
+      message:
+        string;
+
+      createdAt:
+        string;
+
+      readAt:
+        string | null;
+    } | null;
   }>;
 };
 
 export type CreateRepresentativeReportInput = {
-  category:
-    RepresentativeReportCategory;
-
-  title:
-    string;
-
-  businessName:
-    string;
-
-  contactName:
-    string;
-
-  clientPhone:
-    string;
-
-  clientEmail:
-    string;
-
-  estimatedBudget:
-    number | null;
-
-  details:
+  message:
     string;
 };
+
+export class RepresentativeApiError extends Error {
+  code?:
+    string;
+
+  retryAfterSeconds?:
+    number;
+
+  nextReportAt?:
+    string;
+
+  constructor(
+    message:
+      string,
+
+    options?: {
+      code?:
+        string;
+
+      retryAfterSeconds?:
+        number;
+
+      nextReportAt?:
+        string;
+    },
+  ) {
+    super(
+      message,
+    );
+
+    this.name =
+      "RepresentativeApiError";
+
+    this.code =
+      options?.code;
+
+    this.retryAfterSeconds =
+      options
+        ?.retryAfterSeconds;
+
+    this.nextReportAt =
+      options?.nextReportAt;
+  }
+}
 
 /* =========================================================
    API URL
@@ -228,7 +261,7 @@ function getApiUrl() {
    ERRORS
    ========================================================= */
 
-async function getErrorMessage(
+async function getApiError(
   response:
     Response,
 ) {
@@ -236,29 +269,77 @@ async function getErrorMessage(
     const body =
       await response.json();
 
+    const language =
+      typeof document !==
+        "undefined" &&
+      document.documentElement
+        .lang ===
+        "am"
+        ? "am"
+        : "en";
+
+    let message =
+      "Something went wrong.";
+
     if (
       typeof body
         ?.message ===
       "string"
     ) {
-      return body.message;
-    }
-
-    if (
+      message =
+        body.message;
+    } else if (
+      typeof body
+        ?.message?.[
+          language
+        ] ===
+      "string"
+    ) {
+      message =
+        body.message[
+          language
+        ];
+    } else if (
       typeof body
         ?.message
         ?.en ===
       "string"
     ) {
-      return body
-        .message
-        .en;
+      message =
+        body.message.en;
     }
-  } catch {
-    //
-  }
 
-  return "Something went wrong.";
+    return new RepresentativeApiError(
+      message,
+
+      {
+        code:
+          typeof body?.code ===
+          "string"
+            ? body.code
+            : undefined,
+
+        retryAfterSeconds:
+          typeof body
+            ?.retryAfterSeconds ===
+          "number"
+            ? body
+                .retryAfterSeconds
+            : undefined,
+
+        nextReportAt:
+          typeof body
+            ?.nextReportAt ===
+          "string"
+            ? body.nextReportAt
+            : undefined,
+      },
+    );
+  } catch {
+    return new RepresentativeApiError(
+      "Something went wrong.",
+    );
+  }
 }
 
 /* =========================================================
@@ -299,10 +380,8 @@ async function apiRequest<T>(
   if (
     !response.ok
   ) {
-    throw new Error(
-      await getErrorMessage(
-        response,
-      ),
+    throw await getApiError(
+      response,
     );
   }
 
@@ -389,10 +468,8 @@ export async function getCurrentRepresentative():
   if (
     !response.ok
   ) {
-    throw new Error(
-      await getErrorMessage(
-        response,
-      ),
+    throw await getApiError(
+      response,
     );
   }
 
@@ -507,11 +584,26 @@ export async function getRepresentativeReports() {
 
       reports:
         RepresentativeReport[];
+
+      cooldown:
+        RepresentativeReportCooldown;
+
+      unreadReplyCount:
+        number;
     }>(
       "/api/representative/reports",
     );
 
-  return result.reports;
+  return {
+    reports:
+      result.reports,
+
+    cooldown:
+      result.cooldown,
+
+    unreadReplyCount:
+      result.unreadReplyCount,
+  } satisfies RepresentativeReportsResult;
 }
 
 export async function createRepresentativeReport(
@@ -545,6 +637,26 @@ export async function createRepresentativeReport(
     );
 
   return result.report;
+}
+
+export async function markRepresentativeRepliesRead() {
+  return apiRequest<{
+    success:
+      true;
+
+    markedRead:
+      number;
+
+    unreadReplyCount:
+      number;
+  }>(
+    "/api/representative/reports/mark-replies-read",
+
+    {
+      method:
+        "POST",
+    },
+  );
 }
 
 /* =========================================================

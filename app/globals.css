@@ -8593,3 +8593,87 @@ a.contact-method-card:hover {
     @apply font-sans;
   }
 }
+/* =========================================================
+   REPRESENTATIVE PORTAL — TEXT READABILITY
+   ========================================================= */
+
+.representative-portal {
+  /* Keep secondary copy distinct without letting it fade into the surfaces. */
+  --portal-muted: color-mix(
+    in srgb,
+    var(--portal-text) 72%,
+    transparent
+  ) !important;
+  --portal-faint: color-mix(
+    in srgb,
+    var(--portal-text) 60%,
+    transparent
+  ) !important;
+
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/*
+  Raise only the portal's sub-10px utility sizes. The tiers preserve the
+  distinction between eyebrow labels, helper copy, and secondary descriptions.
+  Existing font weights and explicit line heights remain untouched.
+*/
+.representative-portal .text-\[5\.5px\],
+.representative-portal .text-\[6px\] {
+  font-size: 9.5px;
+}
+
+.representative-portal .text-\[6\.5px\],
+.representative-portal .text-\[7px\] {
+  font-size: 10px;
+}
+
+.representative-portal .text-\[7\.5px\],
+.representative-portal .text-\[8px\] {
+  font-size: 11px;
+}
+
+.representative-portal .text-\[8\.5px\],
+.representative-portal .text-\[9px\] {
+  font-size: 12px;
+}
+
+/* Ethiopic-capable fallbacks are limited to representative-facing screens. */
+html[lang="am"] .representative-portal,
+html[lang="am"] .representative-training-portal {
+  font-family:
+    "Noto Sans Ethiopic",
+    "Abyssinica SIL",
+    Nyala,
+    "Segoe UI",
+    sans-serif;
+}
+
+.representative-training-portal {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+.representative-training-portal .text-\[8px\] {
+  font-size: 10px;
+}
+
+.representative-training-portal .text-\[9px\] {
+  font-size: 11px;
+}
+
+.representative-training-portal .text-black\/35 {
+  color: rgb(0 0 0 / 55%);
+}
+
+.representative-training-portal .text-black\/38,
+.representative-training-portal .text-black\/40 {
+  color: rgb(0 0 0 / 60%);
+}
+
+.representative-training-portal .text-black\/45 {
+  color: rgb(0 0 0 / 66%);
+}

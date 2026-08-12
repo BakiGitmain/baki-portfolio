@@ -27,6 +27,10 @@ import {
   requireRepresentative,
 } from "../middleware/representative-auth.middleware.js";
 
+import {
+  recordPartnerActivity,
+} from "../services/partner-activity.service.js";
+
 /* =========================================================
    ROUTER
    ========================================================= */
@@ -258,7 +262,10 @@ router.post(
             SELECT
               id,
               username,
-              name,
+              COALESCE(
+                NULLIF(TRIM(display_name), ''),
+                name
+              ) AS name,
               email,
               password_hash,
               is_active,
@@ -466,6 +473,22 @@ router.post(
           representative.id,
         ],
       );
+
+      await recordPartnerActivity({
+        eventType:
+          "representative_login",
+
+        actorType:
+          "representative",
+
+        representativeId:
+          representative.id,
+
+        metadata: {
+          label:
+            "Partner signed in",
+        },
+      });
 
       const sessionVersion =
         Number(

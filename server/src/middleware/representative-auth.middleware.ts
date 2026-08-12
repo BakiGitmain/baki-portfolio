@@ -133,7 +133,10 @@ export async function requireRepresentative(
           SELECT
             id,
             username,
-            name,
+            COALESCE(
+              NULLIF(TRIM(display_name), ''),
+              name
+            ) AS name,
             email,
             role,
             is_active,

@@ -6,7 +6,6 @@ import {
   useState,
   useSyncExternalStore,
   type CSSProperties,
-  type FormEvent,
   type ReactNode,
 } from "react";
 
@@ -14,22 +13,48 @@ import {
   useRouter,
 } from "next/navigation";
 
+import Image from "next/image";
+
 import {
   completeRepresentativeTraining,
-  createRepresentativeReport,
   getCurrentRepresentative,
   getRepresentativeDashboard,
   getRepresentativeReports,
   getRepresentativeResources,
   getRepresentativeTraining,
   logoutRepresentative,
+  markRepresentativeRepliesRead,
   type RepresentativeDashboardData,
-  type RepresentativeReport,
-  type RepresentativeReportCategory,
+  type RepresentativeReportsResult,
   type RepresentativeResource,
   type RepresentativeTrainingModule,
   type RepresentativeUser,
 } from "@/lib/representative-api";
+
+import RepresentativeReportCenter from "@/components/representative/representative-report-center";
+
+import RepresentativeProfileSettings from "@/components/representative/representative-profile-settings";
+
+import {
+  getRepresentativeProfile,
+  getRepresentativePrograms,
+  type RepresentativeProfile,
+  type RepresentativeProgram,
+} from "@/lib/representative-profile-api";
+
+import PartnerChat from "@/components/chat/partner-chat";
+
+import {
+  usePartnerChatUnread,
+} from "@/components/chat/use-partner-chat-unread";
+
+import {
+  disconnectPartnerChat,
+} from "@/lib/partner-chat-socket";
+
+import {
+  useLanguage,
+} from "@/components/providers/language-provider";
 
 /* =========================================================
    TYPES
@@ -38,7 +63,9 @@ import {
 type PortalTab =
   | "dashboard"
   | "reports"
+  | "programs"
   | "training"
+  | "chat"
   | "resources"
   | "account";
 
@@ -52,6 +79,257 @@ type PortalStyle =
       `--portal-${string}`,
       string
     >;
+
+const REPRESENTATIVE_PORTAL_COPY = {
+  en: {
+    opening: "Opening Sales Hub",
+    partnerHub: "Partner Hub",
+    salesPartnerHub: "Sales Partner Hub",
+    switchLight: "Switch to light mode",
+    switchDark: "Switch to dark mode",
+    openNavigation: "Open navigation",
+    closeNavigation: "Close navigation",
+    partnerId: "Partner ID",
+    workspace: "Your workspace",
+    commission: "Your commission",
+    perSale: "per sale",
+    commissionHelper: "Earn after a qualifying customer payment is confirmed.",
+    logout: "Log out",
+    greeting: (name: string) => `Hey ${name},`,
+    lightMode: "Light mode",
+    darkMode: "Dark mode",
+    sendReport: "Send Report",
+    nav: {
+      home: "Home",
+      homeDescription: "Sales overview",
+      reports: "Reports",
+      reportsDescription: "Updates & replies",
+      programs: "Programs",
+      programsDescription: "Active goals",
+      training: "Learn",
+      trainingDescription: "Training modules",
+      chat: "Chat",
+      chatDescription: "Partner group messages",
+      resources: "Sales Kit",
+      resourcesDescription: "Rules & resources",
+      profile: "Profile",
+      profileDescription: "Account & security",
+    },
+    pages: {
+      dashboard: "Everything you need to find prospects, build confidence and move qualified leads forward.",
+      reports: "Send a short work report and review replies from the admin.",
+      programs: "Track the active goals assigned to you using real report and training progress.",
+      training: "Sharpen your sales knowledge and learn how to represent Baki Digital professionally.",
+      chat: "Talk with Baki Digital partners and admins in real time.",
+      resources: "Quick access to sales rules, pricing guidance and useful material while speaking with prospects.",
+      account: "Manage your partner profile and keep your account secure.",
+    },
+    salesWorkspace: "Your Sales Workspace",
+    findClient: "Find the right client.",
+    technicalSide: "We handle the technical side.",
+    heroHelper: "Focus on finding qualified businesses and starting the conversation. When they become serious, hand the lead over and keep everything organized here.",
+    continueTraining: "Continue Training",
+    trainingProgress: "Training progress",
+    complete: "complete",
+    modules: "modules",
+    activeProgram: "Active program",
+    goals: "goals",
+    noProgramDescription: "No program description was provided.",
+    overallProgress: "Overall progress",
+    reportsSubmitted: "Reports submitted",
+    lessonsCompleted: "Lessons completed",
+    courseCompletion: "Course completion",
+    noActiveProgram: "No active program right now",
+    noActiveProgramHelper: "Assigned time-bound goals will appear here automatically.",
+    openResource: "Open resource",
+    partnerPrinciple: "Partner principle",
+    protectTrust: "Protect the customer's trust.",
+    principleHelper: "Never collect customer money, invent features, promise unapproved prices or guarantee delivery dates.",
+    openSalesKit: "Open Sales Kit",
+    yourProgress: "Your progress",
+    buildConfidence: "Build confidence before you sell.",
+    completedWord: "completed",
+    minuteLesson: "min lesson",
+    completeLabel: "Complete",
+    saving: "Saving…",
+    markComplete: "Mark as Complete",
+    salesPartner: "Sales Partner",
+    accountSecurity: "Account security",
+    securityHelper: "Keep your password private and update it immediately if you believe another person may know it.",
+    changePassword: "Change Password",
+    appearance: "Appearance",
+    portalTheme: "Portal theme",
+    light: "Light",
+    dark: "Dark",
+    status: {
+      draft: "Draft",
+      scheduled: "Upcoming",
+      active: "Active",
+      completed: "Completed",
+      archived: "Archived",
+    },
+    endsToday: "Ends today",
+    ended: "Ended",
+    endsIn: (days: number) => `Ends in ${days} day${days === 1 ? "" : "s"}`,
+  },
+  am: {
+    opening: "የሽያጭ ማዕከሉን በመክፈት ላይ",
+    partnerHub: "የአጋሮች ማዕከል",
+    salesPartnerHub: "የሽያጭ አጋሮች ማዕከል",
+    switchLight: "ወደ ብርሃን ገጽታ ቀይር",
+    switchDark: "ወደ ጨለማ ገጽታ ቀይር",
+    openNavigation: "የገጽ መምረጫውን ክፈት",
+    closeNavigation: "የገጽ መምረጫውን ዝጋ",
+    partnerId: "የአጋር መለያ",
+    workspace: "የሥራ ቦታዎ",
+    commission: "ኮሚሽንዎ",
+    perSale: "በእያንዳንዱ ሽያጭ",
+    commissionHelper: "ብቁ የደንበኛ ክፍያ ከተረጋገጠ በኋላ ገቢ ያግኙ።",
+    logout: "ውጣ",
+    greeting: (name: string) => `ሰላም ${name}፣`,
+    lightMode: "ብርሃን ገጽታ",
+    darkMode: "ጨለማ ገጽታ",
+    sendReport: "ሪፖርት ላክ",
+    nav: {
+      home: "መነሻ",
+      homeDescription: "የሽያጭ አጠቃላይ እይታ",
+      reports: "ሪፖርቶች",
+      reportsDescription: "መልዕክቶች እና ምላሾች",
+      programs: "ፕሮግራሞች",
+      programsDescription: "ንቁ ግቦች",
+      training: "ትምህርት",
+      trainingDescription: "የሥልጠና ክፍሎች",
+      chat: "ውይይት",
+      chatDescription: "የአጋሮች የጋራ መልዕክቶች",
+      resources: "የሽያጭ መሣሪያዎች",
+      resourcesDescription: "ደንቦች እና ማጣቀሻዎች",
+      profile: "መገለጫ",
+      profileDescription: "መለያ እና ደህንነት",
+    },
+    pages: {
+      dashboard: "ተስማሚ ደንበኞችን ለማግኘት፣ እምነትዎን ለማጠናከር እና ብቁ ፍላጎቶችን ወደፊት ለማራመድ የሚያስፈልግዎ ሁሉ።",
+      reports: "አጭር የሥራ ሪፖርት ይላኩ እና የአስተዳዳሪ ምላሾችን ይመልከቱ።",
+      programs: "የተመደቡልዎትን ንቁ የፕሮግራም ግቦች በሪፖርትና በሥልጠና እድገትዎ ይከታተሉ።",
+      training: "የሽያጭ እውቀትዎን ያጠናክሩ እና Baki Digitalን በሙያዊ መንገድ መወከል ይማሩ።",
+      chat: "ከBaki Digital አጋሮች እና አስተዳዳሪዎች ጋር በቀጥታ ይወያዩ።",
+      resources: "ከደንበኞች ጋር ሲነጋገሩ የሽያጭ ደንቦችን፣ የዋጋ መመሪያን እና ጠቃሚ ማጣቀሻዎችን በፍጥነት ያግኙ።",
+      account: "የአጋር መገለጫዎን ያስተዳድሩ እና መለያዎን ደህንነቱ የተጠበቀ ያድርጉ።",
+    },
+    salesWorkspace: "የሽያጭ ሥራ ቦታዎ",
+    findClient: "ተስማሚውን ደንበኛ ያግኙ።",
+    technicalSide: "ቴክኒካዊውን ሥራ እኛ እንይዛለን።",
+    heroHelper: "ብቁ ድርጅቶችን በማግኘትና ውይይት በመጀመር ላይ ያተኩሩ። ፍላጎታቸው በጠና ሲሆን ወደ ባኪ ያስተላልፉ እና ሥራዎን በፖርታሉ ያደራጁ።",
+    continueTraining: "ሥልጠናውን ቀጥል",
+    trainingProgress: "የሥልጠና እድገት",
+    complete: "ተጠናቋል",
+    modules: "ክፍሎች",
+    activeProgram: "ንቁ ፕሮግራም",
+    goals: "ግቦች",
+    noProgramDescription: "የፕሮግራሙ መግለጫ አልተጨመረም።",
+    overallProgress: "አጠቃላይ እድገት",
+    reportsSubmitted: "የተላኩ ሪፖርቶች",
+    lessonsCompleted: "የተጠናቀቁ ትምህርቶች",
+    courseCompletion: "የኮርስ ማጠናቀቅ",
+    noActiveProgram: "በአሁኑ ጊዜ ንቁ ፕሮግራም የለም",
+    noActiveProgramHelper: "ጊዜ የተወሰነላቸው የተመደቡ ግቦች እዚህ ይታያሉ።",
+    openResource: "ማጣቀሻውን ክፈት",
+    partnerPrinciple: "የአጋር መርህ",
+    protectTrust: "የደንበኛውን እምነት ይጠብቁ።",
+    principleHelper: "ከደንበኛ ገንዘብ አይቀበሉ፣ ያልተረጋገጠ ባህሪ ወይም ዋጋ አይፍጠሩ እና የማስረከቢያ ቀን ቃል አይግቡ።",
+    openSalesKit: "የሽያጭ መሣሪያዎችን ክፈት",
+    yourProgress: "እድገትዎ",
+    buildConfidence: "ከመሸጥዎ በፊት እምነትዎን ያጠናክሩ።",
+    completedWord: "ተጠናቋል",
+    minuteLesson: "ደቂቃ ትምህርት",
+    completeLabel: "ተጠናቋል",
+    saving: "በማስቀመጥ ላይ…",
+    markComplete: "እንደተጠናቀቀ አስቀምጥ",
+    salesPartner: "የሽያጭ አጋር",
+    accountSecurity: "የመለያ ደህንነት",
+    securityHelper: "የይለፍ ቃልዎን በሚስጥር ይያዙ፤ ሌላ ሰው እንደሚያውቀው ካሰቡ ወዲያውኑ ይቀይሩት።",
+    changePassword: "የይለፍ ቃል ይቀይሩ",
+    appearance: "ገጽታ",
+    portalTheme: "የፖርታሉ ገጽታ",
+    light: "ብርሃን",
+    dark: "ጨለማ",
+    status: {
+      draft: "ረቂቅ",
+      scheduled: "በቅርቡ",
+      active: "ንቁ",
+      completed: "ተጠናቋል",
+      archived: "ተመዝግቧል",
+    },
+    endsToday: "ዛሬ ያበቃል",
+    ended: "አብቅቷል",
+    endsIn: (days: number) => days === 1
+      ? "በ1 ቀን ያበቃል"
+      : `በ${days} ቀናት ያበቃል`,
+  },
+} as const;
+
+const AMHARIC_RESOURCE_COPY: Record<
+  string,
+  Pick<RepresentativeResource, "category" | "title" | "description" | "content">
+> = {
+  "pricing-reference": {
+    category: "ዋጋ",
+    title: "የዋጋ ማጣቀሻ",
+    description: "ለተለመዱ የድረ ገጽ ሥራዎች የዋጋ ክልሎችን በፍጥነት ይመልከቱ።",
+    content: "የፊት ገጽ ሥራ ብቻ ያላቸውና ቀላል ድረ ገጾች በተለምዶ ከETB 35,000 ይጀምራሉ። የበለጠ የላቀ የፊት ገጽ ሥራ ETB 45,000 ሊደርስ ይችላል። ቀላል የጀርባ ሥርዓቶችና የምርት ማውጫ ድረ ገጾች ከETB 50,000 እስከ 60,000 ሊሆኑ ይችላሉ። የላቁ የሪፖርት፣ የሽያጭና የትንታኔ ሥርዓቶች ETB 70,000 ወይም ከዚያ በላይ ሊደርሱ ይችላሉ። የኢኮሜርስ ሥራዎች ብዙውን ጊዜ ከETB 80,000 እስከ 90,000 ይጀምራሉ፤ የላቁ የዴሊቨሪና የሥራ ሂደት ሥርዓቶች ETB 100,000 ሊያልፉ ይችላሉ። የመጨረሻው ዋጋ ፍላጎቶቹ ከተገመገሙ በኋላ ይረጋገጣል።",
+  },
+  "commission-reference": {
+    category: "ኮሚሽን",
+    title: "የኮሚሽን ማጣቀሻ",
+    description: "ኮሚሽን መቼና እንዴት እንደሚገኝ ይረዱ።",
+    content: "ከETB 35,000 እስከ ETB 50,000 ያሉ ብቁና የተጠናቀቁ ሽያጮች 20 በመቶ ኮሚሽን ያስገኛሉ። ከETB 50,000 በላይ የሆኑ ሽያጮች 25 በመቶ ያስገኛሉ። ኮሚሽኑ የሚከፈለው ብቁ የደንበኛ ክፍያ በትክክል ከጸደቀና ሽያጩ ከተረጋገጠ በኋላ ብቻ ነው። የተሰረዙ፣ ገንዘብ የተመለሰባቸው ወይም የተቀለበሱ ግብይቶች ኮሚሽን አያስገኙም።",
+  },
+  "sales-conduct": {
+    category: "ደንቦች",
+    title: "ሙያዊ አሠራር",
+    description: "አገልግሎቱን በሙያዊ መንገድ ለመወከል አስፈላጊ ደንቦች።",
+    content: "ከደንበኛ ገንዘብ ፈጽሞ አይቀበሉ። ያልተረጋገጠ ዋጋ፣ ቅናሽ፣ ባህሪ ወይም የማስረከቢያ ጊዜ አይፍጠሩ። አያስጨንቁ፣ ሌላ ሰው መስለው አይቅረቡ እና አሳሳች መረጃ አይጠቀሙ። የደንበኛ መረጃን ይጠብቁ እና በሙያዊ መንገድ ይነጋገሩ። ከፍተኛ ፍላጎት ያላቸው ደንበኞች ለፍላጎት ግምገማ፣ ለቴክኒክ ውይይትና ለመጨረሻ ስምምነት በቀጥታ ወደ ባኪ መተላለፍ አለባቸው።",
+  },
+};
+
+function localizeResource(
+  resource: RepresentativeResource,
+  language: "en" | "am",
+) {
+  if (language !== "am") {
+    return resource;
+  }
+
+  return {
+    ...resource,
+    ...(AMHARIC_RESOURCE_COPY[resource.slug] ?? {}),
+  };
+}
+
+function programDeadline(
+  endDate: string,
+  language: "en" | "am",
+) {
+  const copy = REPRESENTATIVE_PORTAL_COPY[language];
+  const end = new Date(`${endDate}T00:00:00`);
+
+  if (Number.isNaN(end.getTime())) {
+    return endDate;
+  }
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const days = Math.ceil((end.getTime() - today.getTime()) / 86_400_000);
+
+  if (days < 0) {
+    return copy.ended;
+  }
+
+  if (days === 0) {
+    return copy.endsToday;
+  }
+
+  return copy.endsIn(days);
+}
 
 /* =========================================================
    THEME
@@ -273,6 +551,26 @@ function ReportIcon() {
 
       <path
         d="M9 12H16M9 16H14"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+    </Icon>
+  );
+}
+
+function ChatIcon() {
+  return (
+    <Icon>
+      <path
+        d="M4 5.5C4 4.7 4.7 4 5.5 4H18.5C19.3 4 20 4.7 20 5.5V15.5C20 16.3 19.3 17 18.5 17H10L5 21V17H5.5C4.7 17 4 16.3 4 15.5V5.5Z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+
+      <path
+        d="M8 9H16M8 13H13"
         stroke="currentColor"
         strokeWidth="1.7"
         strokeLinecap="round"
@@ -658,56 +956,6 @@ function formatDate(
   );
 }
 
-function reportStatusClass(
-  status:
-    string,
-
-  dark:
-    boolean,
-) {
-  if (
-    dark
-  ) {
-    switch (
-      status
-    ) {
-      case "won":
-        return "bg-emerald-400/10 text-emerald-300";
-
-      case "lost":
-        return "bg-red-400/10 text-red-300";
-
-      case "qualified":
-        return "bg-blue-400/10 text-blue-300";
-
-      case "reviewing":
-        return "bg-violet-400/10 text-violet-300";
-
-      default:
-        return "bg-amber-400/10 text-amber-300";
-    }
-  }
-
-  switch (
-    status
-  ) {
-    case "won":
-      return "bg-[#eaf5e4] text-[#426c2b]";
-
-    case "lost":
-      return "bg-red-50 text-red-500";
-
-    case "qualified":
-      return "bg-[#edf4ff] text-[#426da9]";
-
-    case "reviewing":
-      return "bg-[#f1edff] text-[#7153a8]";
-
-    default:
-      return "bg-[#fff8e8] text-[#916b1c]";
-  }
-}
-
 function getYouTubeEmbedUrl(
   value:
     string | null,
@@ -768,6 +1016,16 @@ export default function RepresentativePortal() {
   const router =
     useRouter();
 
+  const {
+    language,
+    setLanguage,
+  } = useLanguage();
+
+  const text =
+    REPRESENTATIVE_PORTAL_COPY[
+      language
+    ];
+
   const theme =
     usePortalTheme();
 
@@ -786,6 +1044,17 @@ export default function RepresentativePortal() {
       null,
     );
 
+  const chatUnreadCount =
+    usePartnerChatUnread({
+      role:
+        "representative",
+      language,
+      enabled:
+        Boolean(
+          user,
+        ),
+    });
+
   const [
     dashboard,
     setDashboard,
@@ -798,14 +1067,30 @@ export default function RepresentativePortal() {
     );
 
   const [
-    reports,
-    setReports,
+    reportData,
+    setReportData,
   ] =
-    useState<
-      RepresentativeReport[]
-    >(
-      [],
-    );
+    useState<RepresentativeReportsResult>({
+      reports:
+        [],
+
+      cooldown: {
+        canSubmit:
+          true,
+
+        lastReportAt:
+          null,
+
+        nextReportAt:
+          null,
+
+        remainingSeconds:
+          0,
+      },
+
+      unreadReplyCount:
+        0,
+    });
 
   const [
     training,
@@ -824,6 +1109,22 @@ export default function RepresentativePortal() {
     useState<
       RepresentativeResource[]
     >(
+      [],
+    );
+
+  const [
+    profile,
+    setProfile,
+  ] =
+    useState<RepresentativeProfile | null>(
+      null,
+    );
+
+  const [
+    programs,
+    setPrograms,
+  ] =
+    useState<RepresentativeProgram[]>(
       [],
     );
 
@@ -860,22 +1161,6 @@ export default function RepresentativePortal() {
     );
 
   const [
-    reportOpen,
-    setReportOpen,
-  ] =
-    useState(
-      false,
-    );
-
-  const [
-    reportSaving,
-    setReportSaving,
-  ] =
-    useState(
-      false,
-    );
-
-  const [
     completingTraining,
     setCompletingTraining,
   ] =
@@ -885,37 +1170,6 @@ export default function RepresentativePortal() {
     >(
       null,
     );
-
-  const [
-    reportForm,
-    setReportForm,
-  ] =
-    useState({
-      category:
-        "lead" as
-          RepresentativeReportCategory,
-
-      title:
-        "",
-
-      businessName:
-        "",
-
-      contactName:
-        "",
-
-      clientPhone:
-        "",
-
-      clientEmail:
-        "",
-
-      estimatedBudget:
-        "",
-
-      details:
-        "",
-    });
 
   /* =======================================================
      THEME TOKENS
@@ -1009,6 +1263,7 @@ export default function RepresentativePortal() {
       reportsResult,
       trainingResult,
       resourcesResult,
+      programsResult,
     ] =
       await Promise.all([
         getRepresentativeDashboard(),
@@ -1018,13 +1273,15 @@ export default function RepresentativePortal() {
         getRepresentativeTraining(),
 
         getRepresentativeResources(),
+
+        getRepresentativePrograms(),
       ]);
 
     setDashboard(
       dashboardResult,
     );
 
-    setReports(
+    setReportData(
       reportsResult,
     );
 
@@ -1034,6 +1291,10 @@ export default function RepresentativePortal() {
 
     setResources(
       resourcesResult,
+    );
+
+    setPrograms(
+      programsResult,
     );
   }
 
@@ -1079,6 +1340,8 @@ export default function RepresentativePortal() {
               reportsResult,
               trainingResult,
               resourcesResult,
+              profileResult,
+              programsResult,
             ] =
               await Promise.all([
                 getRepresentativeDashboard(),
@@ -1088,6 +1351,10 @@ export default function RepresentativePortal() {
                 getRepresentativeTraining(),
 
                 getRepresentativeResources(),
+
+                getRepresentativeProfile(),
+
+                getRepresentativePrograms(),
               ]);
 
             if (
@@ -1097,14 +1364,27 @@ export default function RepresentativePortal() {
             }
 
             setUser(
-              currentUser,
+              {
+                ...currentUser,
+
+                name:
+                  profileResult.effectiveName,
+              },
+            );
+
+            setProfile(
+              profileResult,
+            );
+
+            setLanguage(
+              profileResult.preferredLanguage,
             );
 
             setDashboard(
               dashboardResult,
             );
 
-            setReports(
+            setReportData(
               reportsResult,
             );
 
@@ -1114,6 +1394,10 @@ export default function RepresentativePortal() {
 
             setResources(
               resourcesResult,
+            );
+
+            setPrograms(
+              programsResult,
             );
 
             setLoading(
@@ -1151,6 +1435,7 @@ export default function RepresentativePortal() {
     },
     [
       router,
+      setLanguage,
     ],
   );
 
@@ -1166,10 +1451,10 @@ export default function RepresentativePortal() {
             "dashboard" as const,
 
           label:
-            "Home",
+            text.nav.home,
 
           description:
-            "Sales overview",
+            text.nav.homeDescription,
 
           icon:
             <DashboardIcon />,
@@ -1180,10 +1465,10 @@ export default function RepresentativePortal() {
             "reports" as const,
 
           label:
-            "My Leads",
+            text.nav.reports,
 
           description:
-            "Reports & prospects",
+            text.nav.reportsDescription,
 
           icon:
             <ReportIcon />,
@@ -1191,13 +1476,27 @@ export default function RepresentativePortal() {
 
         {
           key:
+            "programs" as const,
+
+          label:
+            text.nav.programs,
+
+          description:
+            text.nav.programsDescription,
+
+          icon:
+            <TargetIcon />,
+        },
+
+        {
+          key:
             "training" as const,
 
           label:
-            "Learn",
+            text.nav.training,
 
           description:
-            "Training modules",
+            text.nav.trainingDescription,
 
           icon:
             <TrainingIcon />,
@@ -1205,13 +1504,27 @@ export default function RepresentativePortal() {
 
         {
           key:
+            "chat" as const,
+
+          label:
+            text.nav.chat,
+
+          description:
+            text.nav.chatDescription,
+
+          icon:
+            <ChatIcon />,
+        },
+
+        {
+          key:
             "resources" as const,
 
           label:
-            "Sales Kit",
+            text.nav.resources,
 
           description:
-            "Rules & resources",
+            text.nav.resourcesDescription,
 
           icon:
             <ResourceIcon />,
@@ -1222,22 +1535,43 @@ export default function RepresentativePortal() {
             "account" as const,
 
           label:
-            "Profile",
+            text.nav.profile,
 
           description:
-            "Account & security",
+            text.nav.profileDescription,
 
           icon:
             <UserIcon />,
         },
       ],
-      [],
+      [
+        text,
+      ],
     );
 
   function navigate(
     tab:
       PortalTab,
   ) {
+    if (
+      tab ===
+      "training"
+    ) {
+      setMenuOpen(
+        false,
+      );
+
+      setError(
+        "",
+      );
+
+      router.push(
+        "/representative/training",
+      );
+
+      return;
+    }
+
     setActiveTab(
       tab,
     );
@@ -1257,15 +1591,40 @@ export default function RepresentativePortal() {
       behavior:
         "smooth",
     });
+
+    if (
+      tab ===
+        "reports" &&
+      reportData
+        .unreadReplyCount >
+        0
+    ) {
+      void markRepresentativeRepliesRead()
+        .then(
+          () =>
+            loadPortalData(),
+        )
+        .catch(
+          (
+            readError,
+          ) => {
+            setError(
+              readError instanceof
+                Error
+                ? readError.message
+                : language ===
+                    "am"
+                  ? "ምላሾቹን እንደተነበቡ ማስቀመጥ አልተቻለም።"
+                  : "Unable to mark replies as read.",
+            );
+          },
+        );
+    }
   }
 
   function openReport() {
-    setError(
-      "",
-    );
-
-    setReportOpen(
-      true,
+    navigate(
+      "reports",
     );
   }
 
@@ -1275,168 +1634,6 @@ export default function RepresentativePortal() {
         ? "light"
         : "dark",
     );
-  }
-
-  /* =======================================================
-     REPORT
-     ======================================================= */
-
-  async function submitReport(
-    event:
-      FormEvent<HTMLFormElement>,
-  ) {
-    event.preventDefault();
-
-    if (
-      reportSaving
-    ) {
-      return;
-    }
-
-    if (
-      reportForm.title
-        .trim()
-        .length <
-        3 ||
-      reportForm
-        .businessName
-        .trim()
-        .length <
-        2 ||
-      reportForm.details
-        .trim()
-        .length <
-        20
-    ) {
-      setError(
-        "Enter a title, business name and at least 20 characters of report details.",
-      );
-
-      return;
-    }
-
-    const budgetText =
-      reportForm
-        .estimatedBudget
-        .trim();
-
-    const budget =
-      budgetText
-        ? Number(
-            budgetText,
-          )
-        : null;
-
-    if (
-      budget !==
-        null &&
-      (
-        !Number.isFinite(
-          budget,
-        ) ||
-        budget <
-          0
-      )
-    ) {
-      setError(
-        "Enter a valid estimated budget.",
-      );
-
-      return;
-    }
-
-    setReportSaving(
-      true,
-    );
-
-    setError(
-      "",
-    );
-
-    try {
-      await createRepresentativeReport({
-        category:
-          reportForm.category,
-
-        title:
-          reportForm.title.trim(),
-
-        businessName:
-          reportForm
-            .businessName
-            .trim(),
-
-        contactName:
-          reportForm
-            .contactName
-            .trim(),
-
-        clientPhone:
-          reportForm
-            .clientPhone
-            .trim(),
-
-        clientEmail:
-          reportForm
-            .clientEmail
-            .trim(),
-
-        estimatedBudget:
-          budget,
-
-        details:
-          reportForm.details.trim(),
-      });
-
-      setReportForm({
-        category:
-          "lead",
-
-        title:
-          "",
-
-        businessName:
-          "",
-
-        contactName:
-          "",
-
-        clientPhone:
-          "",
-
-        clientEmail:
-          "",
-
-        estimatedBudget:
-          "",
-
-        details:
-          "",
-      });
-
-      setReportOpen(
-        false,
-      );
-
-      await loadPortalData();
-
-      setActiveTab(
-        "reports",
-      );
-    } catch (
-      submitError
-    ) {
-      setError(
-        submitError instanceof
-          Error
-          ? submitError.message
-          : "Unable to submit report.",
-      );
-    } finally {
-      setReportSaving(
-        false,
-      );
-    }
   }
 
   /* =======================================================
@@ -1491,6 +1688,10 @@ export default function RepresentativePortal() {
     try {
       await logoutRepresentative();
     } finally {
+      disconnectPartnerChat(
+        "representative",
+      );
+
       router.replace(
         "/representative/login",
       );
@@ -1538,7 +1739,7 @@ export default function RepresentativePortal() {
         style={
           portalStyle
         }
-        className="flex min-h-screen items-center justify-center bg-[var(--portal-bg)] text-[var(--portal-text)] transition-colors duration-300"
+        className="representative-portal flex min-h-screen items-center justify-center bg-[var(--portal-bg)] text-[var(--portal-text)] transition-colors duration-300"
       >
         <div className="text-center">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-[20px] border border-[var(--portal-border)] bg-[var(--portal-surface)] shadow-[0_18px_45px_var(--portal-shadow)]">
@@ -1546,7 +1747,7 @@ export default function RepresentativePortal() {
           </div>
 
           <span className="mt-5 block text-[7px] font-black uppercase tracking-[0.2em] text-[var(--portal-faint)]">
-            Opening Sales Hub
+            {text.opening}
           </span>
         </div>
       </main>
@@ -1566,17 +1767,23 @@ export default function RepresentativePortal() {
   const pageDescription =
     activeTab ===
     "dashboard"
-      ? "Everything you need to find prospects, build confidence and move qualified leads forward."
+      ? text.pages.dashboard
       : activeTab ===
           "reports"
-        ? "Keep your prospects organized and send qualified opportunities directly for review."
+        ? text.pages.reports
         : activeTab ===
-            "training"
-          ? "Sharpen your sales knowledge and learn how to represent Baki Digital professionally."
+            "programs"
+          ? text.pages.programs
+          : activeTab ===
+              "training"
+            ? text.pages.training
+          : activeTab ===
+              "chat"
+            ? text.pages.chat
           : activeTab ===
               "resources"
-            ? "Quick access to sales rules, pricing guidance and useful material while speaking with prospects."
-            : "Manage your partner profile and keep your account secure.";
+            ? text.pages.resources
+            : text.pages.account;
 
   /* =======================================================
      RENDER
@@ -1587,7 +1794,7 @@ export default function RepresentativePortal() {
       style={
         portalStyle
       }
-      className="min-h-screen bg-[var(--portal-bg)] text-[var(--portal-text)] transition-colors duration-300"
+      className="representative-portal min-h-screen bg-[var(--portal-bg)] text-[var(--portal-text)] transition-colors duration-300"
     >
       {/* ===================================================
           MOBILE TOP BAR
@@ -1613,7 +1820,7 @@ export default function RepresentativePortal() {
             </strong>
 
             <span className="block text-[6px] font-bold uppercase tracking-[0.15em] text-[var(--portal-faint)]">
-              Partner Hub
+              {text.partnerHub}
             </span>
           </div>
         </button>
@@ -1623,8 +1830,8 @@ export default function RepresentativePortal() {
             type="button"
             aria-label={
               dark
-                ? "Switch to light mode"
-                : "Switch to dark mode"
+                ? text.switchLight
+                : text.switchDark
             }
             onClick={
               toggleTheme
@@ -1640,7 +1847,7 @@ export default function RepresentativePortal() {
 
           <button
             type="button"
-            aria-label="Open navigation"
+            aria-label={text.openNavigation}
             onClick={() =>
               setMenuOpen(
                 (
@@ -1690,7 +1897,7 @@ export default function RepresentativePortal() {
                 </strong>
 
                 <span className="mt-0.5 block text-[6.5px] font-black uppercase tracking-[0.16em] text-[var(--portal-faint)]">
-                  Sales Partner Hub
+                  {text.salesPartnerHub}
                 </span>
               </div>
             </div>
@@ -1707,7 +1914,7 @@ export default function RepresentativePortal() {
 
                 <div className="min-w-0">
                   <span className="block text-[6px] font-black uppercase tracking-[0.14em] text-[var(--portal-faint)]">
-                    Partner ID
+                    {text.partnerId}
                   </span>
 
                   <strong className="mt-1 block truncate text-[10px] font-black text-[var(--portal-green)]">
@@ -1723,7 +1930,7 @@ export default function RepresentativePortal() {
 
             <div className="mt-8 px-2">
               <span className="text-[6px] font-black uppercase tracking-[0.19em] text-[var(--portal-faint)]">
-                Your workspace
+                {text.workspace}
               </span>
             </div>
 
@@ -1781,9 +1988,42 @@ export default function RepresentativePortal() {
                         </span>
                       </span>
 
-                      {active && (
+                      {(
+                        item.key ===
+                          "reports" &&
+                        reportData
+                          .unreadReplyCount >
+                          0
+                      ) ||
+                      (
+                        item.key ===
+                          "chat" &&
+                        chatUnreadCount >
+                          0
+                      ) ? (
+                        <span
+                          role="status"
+                          aria-label={`${
+                            item.key ===
+                            "chat"
+                              ? chatUnreadCount
+                              : reportData
+                                  .unreadReplyCount
+                          } unread ${item.label.toLowerCase()} items`}
+                          className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 py-1 text-[9px] font-black leading-none text-white shadow-[0_0_0_4px_rgba(239,68,68,0.1)]"
+                        >
+                          {Math.min(
+                            item.key ===
+                              "chat"
+                              ? chatUnreadCount
+                              : reportData
+                                  .unreadReplyCount,
+                            99,
+                          )}
+                        </span>
+                      ) : active ? (
                         <span className="ml-auto h-1.5 w-1.5 rounded-full bg-[var(--portal-green)]" />
-                      )}
+                      ) : null}
                     </button>
                   );
                 },
@@ -1794,7 +2034,7 @@ export default function RepresentativePortal() {
 
             <div className="mt-7 rounded-[18px] border border-[var(--portal-border)] bg-[var(--portal-surface-2)] p-4">
               <span className="text-[6px] font-black uppercase tracking-[0.16em] text-[var(--portal-faint)]">
-                Your commission
+                {text.commission}
               </span>
 
               <div className="mt-3 flex items-end justify-between gap-2">
@@ -1803,12 +2043,12 @@ export default function RepresentativePortal() {
                 </strong>
 
                 <span className="mb-1 text-[6px] font-bold text-[var(--portal-muted)]">
-                  per sale
+                  {text.perSale}
                 </span>
               </div>
 
               <p className="mt-2 text-[6.5px] leading-4 text-[var(--portal-muted)]">
-                Earn after a qualifying customer payment is confirmed.
+                {text.commissionHelper}
               </p>
             </div>
 
@@ -1824,10 +2064,22 @@ export default function RepresentativePortal() {
                 }
                 className="flex w-full items-center gap-3 rounded-[16px] border border-[var(--portal-border)] bg-[var(--portal-surface)] p-3 text-left transition hover:border-[var(--portal-border-strong)]"
               >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--portal-green-soft)] text-[var(--portal-green)]">
-                  <span className="h-4 w-4">
-                    <UserIcon />
-                  </span>
+                <span className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[var(--portal-green-soft)] text-[var(--portal-green)]">
+                  {profile?.avatarUrl ? (
+                    <Image
+                      src={
+                        profile.avatarUrl
+                      }
+                      alt={`${user.name} ${language === "am" ? "መገለጫ ምስል" : "avatar"}`}
+                      fill
+                      sizes="36px"
+                      className="object-cover"
+                    />
+                  ) : (
+                    <span className="h-4 w-4">
+                      <UserIcon />
+                    </span>
+                  )}
                 </span>
 
                 <span className="min-w-0">
@@ -1856,7 +2108,7 @@ export default function RepresentativePortal() {
                   <LogoutIcon />
                 </span>
 
-                Log out
+                {text.logout}
               </button>
             </div>
           </div>
@@ -1865,7 +2117,7 @@ export default function RepresentativePortal() {
         {menuOpen && (
           <button
             type="button"
-            aria-label="Close navigation"
+            aria-label={text.closeNavigation}
             onClick={() =>
               setMenuOpen(
                 false,
@@ -1900,7 +2152,7 @@ export default function RepresentativePortal() {
                 <h1 className="mt-2.5 text-[30px] font-black tracking-[-0.055em] sm:text-[38px] lg:text-[42px]">
                   {activeTab ===
                   "dashboard"
-                    ? `Hey ${firstName},`
+                    ? text.greeting(firstName)
                     : navItems.find(
                         (
                           item,
@@ -1932,8 +2184,8 @@ export default function RepresentativePortal() {
                   </span>
 
                   {dark
-                    ? "Light mode"
-                    : "Dark mode"}
+                    ? text.lightMode
+                    : text.darkMode}
                 </button>
 
                 {(activeTab ===
@@ -1951,7 +2203,7 @@ export default function RepresentativePortal() {
                       <PlusIcon />
                     </span>
 
-                    Report a Lead
+                    {text.sendReport}
                   </button>
                 )}
               </div>
@@ -1974,7 +2226,7 @@ export default function RepresentativePortal() {
                   <PlusIcon />
                 </span>
 
-                Report a Lead
+                {text.sendReport}
               </button>
             )}
 
@@ -2019,20 +2271,20 @@ export default function RepresentativePortal() {
                             <SparkIcon />
                           </span>
 
-                          Your Sales Workspace
+                          {text.salesWorkspace}
                         </span>
 
                         <h2 className="mt-5 max-w-[560px] text-[27px] font-black leading-[1.04] tracking-[-0.055em] sm:text-[34px] lg:text-[40px]">
-                          Find the right client.
+                          {text.findClient}
                           <br />
 
                           <span className="text-[var(--portal-green)]">
-                            We handle the technical side.
+                            {text.technicalSide}
                           </span>
                         </h2>
 
                         <p className="mt-4 max-w-[550px] text-[8.5px] leading-5 text-[var(--portal-muted)] sm:text-[9px]">
-                          Focus on finding qualified businesses and starting the conversation. When they become serious, hand the lead over and keep everything organized here.
+                          {text.heroHelper}
                         </p>
 
                         <div className="mt-6 flex flex-wrap gap-2.5">
@@ -2047,7 +2299,7 @@ export default function RepresentativePortal() {
                               <PlusIcon />
                             </span>
 
-                            New Lead
+                            {text.sendReport}
                           </button>
 
                           <button
@@ -2059,7 +2311,7 @@ export default function RepresentativePortal() {
                             }
                             className="flex h-11 items-center gap-2 rounded-[13px] border border-[var(--portal-border)] bg-[var(--portal-surface-2)] px-5 text-[7.5px] font-extrabold"
                           >
-                            Continue Training
+                            {text.continueTraining}
 
                             <span className="h-3.5 w-3.5">
                               <ArrowRightIcon />
@@ -2074,7 +2326,7 @@ export default function RepresentativePortal() {
                         <div className="flex items-start justify-between gap-5">
                           <div>
                             <span className="text-[6px] font-black uppercase tracking-[0.15em] text-[var(--portal-faint)]">
-                              Training progress
+                              {text.trainingProgress}
                             </span>
 
                             <strong className="mt-2 block text-[27px] font-black tracking-[-0.05em]">
@@ -2109,7 +2361,7 @@ export default function RepresentativePortal() {
                                 .training
                                 .completed
                             }{" "}
-                            complete
+                            {text.complete}
                           </span>
 
                           <span className="text-[6.5px] text-[var(--portal-muted)]">
@@ -2118,12 +2370,71 @@ export default function RepresentativePortal() {
                                 .training
                                 .total
                             }{" "}
-                            modules
+                            {text.modules}
                           </span>
                         </div>
                       </div>
                     </div>
                   </section>
+
+                  {programs[0] && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigate(
+                          "programs",
+                        )
+                      }
+                      className="mt-5 flex w-full flex-col gap-4 rounded-[22px] border border-[var(--portal-border)] bg-[var(--portal-surface)] p-5 text-left shadow-[0_10px_35px_var(--portal-shadow)] transition hover:border-[var(--portal-border-strong)] sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="flex min-w-0 items-center gap-4">
+                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-[var(--portal-green-soft)] text-[var(--portal-green)]">
+                          <span className="h-5 w-5">
+                            <TargetIcon />
+                          </span>
+                        </span>
+
+                        <span className="min-w-0">
+                          <span className="block text-[10px] font-black uppercase tracking-[0.13em] text-[var(--portal-green)]">
+                            {text.activeProgram}
+                          </span>
+
+                          <strong className="mt-1 block truncate text-[14px]">
+                            {
+                              programs[0].title
+                            }
+                          </strong>
+
+                          <span className="mt-1 block text-[10px] text-[var(--portal-muted)]">
+                            {
+                              programs[0].targets.length
+                            }{" "}
+                            {text.goals}{" "}
+                            · {programDeadline(programs[0].endDate, language)}
+                          </span>
+                        </span>
+                      </div>
+
+                      <span className="flex min-w-[150px] items-center gap-3">
+                        <span className="h-2 flex-1 overflow-hidden rounded-full bg-[var(--portal-border)]">
+                          <span
+                            className="block h-full rounded-full bg-[var(--portal-green)]"
+                            style={{
+                              width:
+                                `${programs[0].progressPercent}%`,
+                            }}
+                          />
+                        </span>
+
+                        <strong className="text-[12px] text-[var(--portal-green)]">
+                          {
+                            programs[0].progressPercent
+                          }
+                          %
+                        </strong>
+                      </span>
+                    </button>
+                  )}
 
                   {/* METRICS */}
 
@@ -2137,7 +2448,10 @@ export default function RepresentativePortal() {
                         </span>
 
                         <span className="text-[6px] font-black uppercase tracking-[0.14em] text-[var(--portal-faint)]">
-                          All time
+                          {language ===
+                          "am"
+                            ? "ሁሉም ጊዜ"
+                            : "All time"}
                         </span>
                       </div>
 
@@ -2150,7 +2464,10 @@ export default function RepresentativePortal() {
                       </strong>
 
                       <span className="mt-1 block text-[7px] font-bold text-[var(--portal-muted)]">
-                        Reports submitted
+                        {language ===
+                        "am"
+                          ? "የተላኩ ሪፖርቶች"
+                          : "Reports submitted"}
                       </span>
                     </article>
 
@@ -2169,12 +2486,15 @@ export default function RepresentativePortal() {
                         {
                           dashboard
                             .reports
-                            .active
+                            .replies
                         }
                       </strong>
 
                       <span className="mt-1 block text-[7px] font-bold text-[var(--portal-muted)]">
-                        Active opportunities
+                        {language ===
+                        "am"
+                          ? "የAdmin ምላሾች"
+                          : "Admin replies"}
                       </span>
                     </article>
 
@@ -2187,7 +2507,10 @@ export default function RepresentativePortal() {
                         </span>
 
                         <span className="text-[6px] font-black uppercase tracking-[0.14em] text-[var(--portal-faint)]">
-                          Closed
+                          {language ===
+                          "am"
+                            ? "ምላሾች"
+                            : "Replies"}
                         </span>
                       </div>
 
@@ -2195,12 +2518,15 @@ export default function RepresentativePortal() {
                         {
                           dashboard
                             .reports
-                            .won
+                            .unreadReplies
                         }
                       </strong>
 
                       <span className="mt-1 block text-[7px] font-bold text-[var(--portal-muted)]">
-                        Successful sales
+                        {language ===
+                        "am"
+                          ? "ያልተነበቡ ምላሾች"
+                          : "Unread replies"}
                       </span>
                     </article>
 
@@ -2222,7 +2548,10 @@ export default function RepresentativePortal() {
                       </strong>
 
                       <span className="mt-1 block text-[7px] font-bold text-[var(--portal-muted)]">
-                        Active Partner account
+                        {language ===
+                        "am"
+                          ? "ንቁ Partner account"
+                          : "Active Partner account"}
                       </span>
                     </article>
                   </div>
@@ -2234,11 +2563,17 @@ export default function RepresentativePortal() {
                       <div className="flex items-center justify-between gap-4">
                         <div>
                           <span className="text-[6px] font-black uppercase tracking-[0.16em] text-[var(--portal-green)]">
-                            Recent activity
+                            {language ===
+                            "am"
+                              ? "የቅርብ ጊዜ እንቅስቃሴ"
+                              : "Recent activity"}
                           </span>
 
                           <h2 className="mt-1.5 text-[14px] font-black tracking-[-0.035em]">
-                            Your latest leads
+                            {language ===
+                            "am"
+                              ? "የቅርብ ጊዜ ሪፖርቶችዎ"
+                              : "Your latest reports"}
                           </h2>
                         </div>
 
@@ -2251,7 +2586,10 @@ export default function RepresentativePortal() {
                           }
                           className="flex items-center gap-1.5 text-[7px] font-extrabold text-[var(--portal-green)]"
                         >
-                          See all
+                          {language ===
+                          "am"
+                            ? "ሁሉንም ይመልከቱ"
+                            : "See all"}
 
                           <span className="h-3 w-3">
                             <ArrowUpRightIcon />
@@ -2272,11 +2610,17 @@ export default function RepresentativePortal() {
                             </span>
 
                             <strong className="mt-3 text-[8.5px]">
-                              No leads yet
+                              {language ===
+                              "am"
+                                ? "እስካሁን ሪፖርት የለም"
+                                : "No reports yet"}
                             </strong>
 
                             <p className="mt-1 text-[6.5px] text-[var(--portal-muted)]">
-                              Your submitted prospects will appear here.
+                              {language ===
+                              "am"
+                                ? "የሚልኳቸው የሥራ መረጃዎች እዚህ ይታያሉ።"
+                                : "Your submitted updates will appear here."}
                             </p>
                           </div>
                         ) : (
@@ -2301,26 +2645,33 @@ export default function RepresentativePortal() {
                                   <div className="min-w-0 flex-1">
                                     <strong className="block truncate text-[8.5px] font-black">
                                       {
-                                        report.businessName
+                                        report.message
                                       }
                                     </strong>
 
                                     <span className="mt-1 block truncate text-[6.5px] text-[var(--portal-muted)]">
                                       {
-                                        report.title
+                                        formatDate(
+                                          report.createdAt,
+                                        )
                                       }
                                     </span>
                                   </div>
 
-                                  <span
-                                    className={`shrink-0 rounded-full px-2.5 py-1.5 text-[5.5px] font-black uppercase tracking-[0.08em] ${reportStatusClass(
-                                      report.status,
-                                      dark,
-                                    )}`}
-                                  >
-                                    {
-                                      report.status
-                                    }
+                                  <span className={`shrink-0 rounded-full px-2.5 py-1.5 text-[9.5px] font-black ${
+                                    report.latestReply
+                                      ? "bg-[var(--portal-green-soft)] text-[var(--portal-green)]"
+                                      : "bg-[var(--portal-surface)] text-[var(--portal-faint)]"
+                                  }`}>
+                                    {report.latestReply
+                                      ? language ===
+                                        "am"
+                                        ? "ምላሽ አለው"
+                                        : "Replied"
+                                      : language ===
+                                          "am"
+                                        ? "ተልኳል"
+                                        : "Sent"}
                                   </span>
                                 </div>
                               ),
@@ -2347,15 +2698,15 @@ export default function RepresentativePortal() {
                       </span>
 
                       <span className="relative mt-6 block text-[6px] font-black uppercase tracking-[0.17em] text-[var(--portal-green)]">
-                        Partner principle
+                        {text.partnerPrinciple}
                       </span>
 
                       <h2 className="relative mt-2.5 text-[20px] font-black leading-tight tracking-[-0.045em]">
-                        Protect the customer&apos;s trust.
+                        {text.protectTrust}
                       </h2>
 
                       <p className="relative mt-3 text-[7.5px] leading-5 text-[var(--portal-muted)]">
-                        Never collect customer money, invent features, promise unapproved prices or guarantee delivery dates.
+                        {text.principleHelper}
                       </p>
 
                       <button
@@ -2367,7 +2718,7 @@ export default function RepresentativePortal() {
                         }
                         className="relative mt-6 flex h-10 items-center gap-2 rounded-xl bg-[var(--portal-surface)] px-4 text-[7px] font-extrabold text-[var(--portal-green)]"
                       >
-                        Open Sales Kit
+                        {text.openSalesKit}
 
                         <span className="h-3.5 w-3.5">
                           <ArrowRightIcon />
@@ -2385,135 +2736,192 @@ export default function RepresentativePortal() {
             {activeTab ===
               "reports" && (
               <div className="mt-7">
-                {reports.length ===
-                0 ? (
-                  <section className="flex min-h-[390px] flex-col items-center justify-center rounded-[26px] border border-[var(--portal-border)] bg-[var(--portal-surface)] px-5 text-center shadow-[0_15px_45px_var(--portal-shadow)]">
-                    <span className="flex h-16 w-16 items-center justify-center rounded-[22px] bg-[var(--portal-green-soft)] text-[var(--portal-green)]">
-                      <span className="h-7 w-7">
+                <RepresentativeReportCenter
+                  data={
+                    reportData
+                  }
+                  onRefresh={
+                    loadPortalData
+                  }
+                />
+              </div>
+            )}
+
+            {/* =============================================
+                PROGRAMS
+                ============================================= */}
+
+            {activeTab ===
+              "programs" && (
+              <div className="mt-7 grid gap-5 lg:grid-cols-2">
+                {programs.map(
+                  (
+                    program,
+                  ) => (
+                    <article
+                      key={
+                        program.id
+                      }
+                      className="rounded-[24px] border border-[var(--portal-border)] bg-[var(--portal-surface)] p-5 shadow-[0_12px_40px_var(--portal-shadow)] sm:p-6"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <span className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-[var(--portal-green-soft)] text-[var(--portal-green)]">
+                          <span className="h-5 w-5">
+                            <TargetIcon />
+                          </span>
+                        </span>
+
+                        <span className="rounded-full bg-[var(--portal-green-soft)] px-3 py-1.5 text-[10px] font-black capitalize text-[var(--portal-green)]">
+                          {text.status[
+                            program.effectiveStatus as keyof typeof text.status
+                          ] ?? program.effectiveStatus}
+                        </span>
+                      </div>
+
+                      <h2 className="mt-5 text-[19px] font-black tracking-[-0.04em]">
+                        {
+                          program.title
+                        }
+                      </h2>
+
+                      <p className="mt-2 min-h-10 text-[11px] leading-5 text-[var(--portal-muted)]">
+                        {program.description ||
+                          text.noProgramDescription}
+                      </p>
+
+                      <div className="mt-5 flex items-end justify-between gap-3">
+                        <div>
+                          <span className="text-[10px] font-black uppercase tracking-[0.12em] text-[var(--portal-faint)]">
+                            {text.overallProgress}
+                          </span>
+
+                          <strong className="mt-1 block text-[28px] font-black tracking-[-0.05em] text-[var(--portal-green)]">
+                            {
+                              program.progressPercent
+                            }
+                            %
+                          </strong>
+                        </div>
+
+                        <span className="text-[10px] text-[var(--portal-muted)]">
+                          {programDeadline(program.endDate, language)}
+                        </span>
+                      </div>
+
+                      <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--portal-border)]">
+                        <div
+                          className="h-full rounded-full bg-[var(--portal-green)]"
+                          style={{
+                            width:
+                              `${program.progressPercent}%`,
+                          }}
+                        />
+                      </div>
+
+                      <div className="mt-5 space-y-2">
+                        {program.targets.map(
+                          (
+                            target,
+                          ) => {
+                            const label =
+                              target.targetType ===
+                              "reports"
+                                ? text.reportsSubmitted
+                                : target.targetType ===
+                                    "lessons"
+                                  ? text.lessonsCompleted
+                                  : language ===
+                                      "am"
+                                    ? target.courseTitleAm ||
+                                      text.courseCompletion
+                                    : target.courseTitleEn ||
+                                      text.courseCompletion;
+
+                            const percent =
+                              Math.min(
+                                100,
+                                Math.round(
+                                  100 *
+                                    target.actualValue /
+                                    Math.max(
+                                      1,
+                                      target.targetValue,
+                                    ),
+                                ),
+                              );
+
+                            return (
+                              <div
+                                key={
+                                  target.id
+                                }
+                                className="rounded-[16px] border border-[var(--portal-border)] bg-[var(--portal-surface-2)] p-3.5"
+                              >
+                                <div className="flex items-center justify-between gap-3">
+                                  <strong className="text-[11px]">
+                                    {
+                                      label
+                                    }
+                                  </strong>
+
+                                  <span className="text-[10px] font-black text-[var(--portal-green)]">
+                                    {
+                                      target.actualValue
+                                    }
+                                    /
+                                    {
+                                      target.targetValue
+                                    }
+                                  </span>
+                                </div>
+
+                                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--portal-border)]">
+                                  <div
+                                    className="h-full rounded-full bg-[var(--portal-green)]"
+                                    style={{
+                                      width:
+                                        `${percent}%`,
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          },
+                        )}
+                      </div>
+                    </article>
+                  ),
+                )}
+
+                {programs.length ===
+                  0 && (
+                  <div className="col-span-full flex min-h-[260px] flex-col items-center justify-center rounded-[24px] border border-dashed border-[var(--portal-border-strong)] bg-[var(--portal-surface)] px-6 text-center">
+                    <span className="flex h-12 w-12 items-center justify-center rounded-[16px] bg-[var(--portal-green-soft)] text-[var(--portal-green)]">
+                      <span className="h-5 w-5">
                         <TargetIcon />
                       </span>
                     </span>
 
-                    <span className="mt-6 text-[6px] font-black uppercase tracking-[0.18em] text-[var(--portal-green)]">
-                      Your pipeline starts here
-                    </span>
-
-                    <h2 className="mt-2 text-[22px] font-black tracking-[-0.045em]">
-                      No leads submitted yet.
+                    <h2 className="mt-4 text-[15px] font-black">
+                      {text.noActiveProgram}
                     </h2>
 
-                    <p className="mt-2 max-w-[400px] text-[7.5px] leading-5 text-[var(--portal-muted)]">
-                      When you find a serious prospect, create a report so the opportunity can be reviewed and attributed to you.
+                    <p className="mt-2 max-w-sm text-[10px] leading-5 text-[var(--portal-muted)]">
+                      {text.noActiveProgramHelper}
                     </p>
-
-                    <button
-                      type="button"
-                      onClick={
-                        openReport
-                      }
-                      className="mt-6 flex h-11 items-center gap-2 rounded-[13px] bg-[var(--portal-green)] px-5 text-[7.5px] font-extrabold text-white"
-                    >
-                      <span className="h-4 w-4">
-                        <PlusIcon />
-                      </span>
-
-                      Report First Lead
-                    </button>
-                  </section>
-                ) : (
-                  <div className="grid gap-3">
-                    {reports.map(
-                      (
-                        report,
-                      ) => (
-                        <article
-                          key={
-                            report.id
-                          }
-                          className="rounded-[22px] border border-[var(--portal-border)] bg-[var(--portal-surface)] p-4 shadow-[0_10px_35px_var(--portal-shadow)] transition hover:border-[var(--portal-border-strong)] sm:p-5"
-                        >
-                          <div className="flex flex-col gap-5 lg:flex-row lg:items-center">
-                            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[15px] bg-[var(--portal-green-soft)] text-[var(--portal-green)]">
-                              <span className="h-5 w-5">
-                                <TargetIcon />
-                              </span>
-                            </span>
-
-                            <div className="min-w-0 flex-1">
-                              <div className="flex flex-wrap items-center gap-2.5">
-                                <strong className="text-[11px] font-black tracking-[-0.02em]">
-                                  {
-                                    report.businessName
-                                  }
-                                </strong>
-
-                                <span
-                                  className={`rounded-full px-2.5 py-1 text-[5.5px] font-black uppercase tracking-[0.08em] ${reportStatusClass(
-                                    report.status,
-                                    dark,
-                                  )}`}
-                                >
-                                  {
-                                    report.status
-                                  }
-                                </span>
-                              </div>
-
-                              <h3 className="mt-2 text-[8px] font-bold text-[var(--portal-muted)]">
-                                {
-                                  report.title
-                                }
-                              </h3>
-
-                              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[6px] font-medium text-[var(--portal-faint)]">
-                                <span>
-                                  {
-                                    formatDate(
-                                      report.createdAt,
-                                    )
-                                  }
-                                </span>
-
-                                <span>
-                                  {
-                                    report.category.replace(
-                                      "_",
-                                      " ",
-                                    )
-                                  }
-                                </span>
-                              </div>
-                            </div>
-
-                            {report.estimatedBudget !==
-                              null && (
-                              <div className="rounded-[14px] border border-[var(--portal-border)] bg-[var(--portal-surface-2)] px-4 py-3 lg:min-w-[145px] lg:text-right">
-                                <span className="block text-[5.5px] font-bold uppercase tracking-[0.1em] text-[var(--portal-faint)]">
-                                  Estimated budget
-                                </span>
-
-                                <strong className="mt-1 block text-[10px] font-black text-[var(--portal-green)]">
-                                  ETB{" "}
-                                  {
-                                    report
-                                      .estimatedBudget
-                                      .toLocaleString()
-                                  }
-                                </strong>
-                              </div>
-                            )}
-                          </div>
-
-                          <p className="mt-4 border-t border-[var(--portal-border)] pt-4 text-[7.5px] leading-5 text-[var(--portal-muted)]">
-                            {
-                              report.details
-                            }
-                          </p>
-                        </article>
-                      ),
-                    )}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* =============================================
+                PARTNER CHAT
+                ============================================= */}
+
+            {activeTab ===
+              "chat" && (
+              <div className="mt-5 min-h-0">
+                <PartnerChat role="representative" />
               </div>
             )}
 
@@ -2527,11 +2935,11 @@ export default function RepresentativePortal() {
                 <section className="mt-7 flex flex-col gap-4 rounded-[24px] border border-[var(--portal-border)] bg-[var(--portal-surface)] p-5 shadow-[0_12px_40px_var(--portal-shadow)] sm:flex-row sm:items-center sm:justify-between sm:p-6">
                   <div>
                     <span className="text-[6px] font-black uppercase tracking-[0.17em] text-[var(--portal-green)]">
-                      Your progress
+                      {text.yourProgress}
                     </span>
 
                     <h2 className="mt-2 text-[18px] font-black tracking-[-0.04em]">
-                      Build confidence before you sell.
+                      {text.buildConfidence}
                     </h2>
                   </div>
 
@@ -2544,7 +2952,7 @@ export default function RepresentativePortal() {
                             .completed ??
                           0
                         }{" "}
-                        completed
+                        {text.completedWord}
                       </span>
 
                       <span>
@@ -2625,7 +3033,7 @@ export default function RepresentativePortal() {
                                 {
                                   module.durationMinutes
                                 }{" "}
-                                min lesson
+                                {text.minuteLesson}
                               </span>
 
                               {module.completed && (
@@ -2634,7 +3042,7 @@ export default function RepresentativePortal() {
                                     <CheckIcon />
                                   </span>
 
-                                  Complete
+                                  {text.completeLabel}
                                 </span>
                               )}
                             </div>
@@ -2677,13 +3085,13 @@ export default function RepresentativePortal() {
                                     <CheckIcon />
                                   </span>
 
-                                  Completed
+                                  {text.completedWord}
                                 </>
                               ) : completingTraining ===
                                 module.id ? (
-                                "Saving..."
+                                text.saving
                               ) : (
-                                "Mark as Complete"
+                                text.markComplete
                               )}
                             </button>
                           </div>
@@ -2730,25 +3138,25 @@ export default function RepresentativePortal() {
 
                       <span className="mt-6 text-[5.5px] font-black uppercase tracking-[0.17em] text-[var(--portal-green)]">
                         {
-                          resource.category
+                          localizeResource(resource, language).category
                         }
                       </span>
 
                       <h2 className="mt-2 text-[17px] font-black tracking-[-0.04em]">
                         {
-                          resource.title
+                          localizeResource(resource, language).title
                         }
                       </h2>
 
                       <p className="mt-2 text-[7.5px] leading-5 text-[var(--portal-muted)]">
                         {
-                          resource.description
+                          localizeResource(resource, language).description
                         }
                       </p>
 
                       <div className="mt-4 flex-1 rounded-[16px] border border-[var(--portal-border)] bg-[var(--portal-surface-2)] p-4 text-[7.5px] leading-5 text-[var(--portal-muted)]">
                         {
-                          resource.content
+                          localizeResource(resource, language).content
                         }
                       </div>
 
@@ -2761,7 +3169,7 @@ export default function RepresentativePortal() {
                           rel="noopener noreferrer"
                           className="mt-5 flex items-center gap-2 text-[7px] font-extrabold text-[var(--portal-green)]"
                         >
-                          Open resource
+                          {text.openResource}
 
                           <span className="h-3.5 w-3.5">
                             <ArrowUpRightIcon />
@@ -2779,7 +3187,51 @@ export default function RepresentativePortal() {
                 ============================================= */}
 
             {activeTab ===
-              "account" && (
+              "account" &&
+              profile && (
+                <RepresentativeProfileSettings
+                  profile={
+                    profile
+                  }
+                  dark={
+                    dark
+                  }
+                  onThemeChange={
+                    saveTheme
+                  }
+                  onLanguageChange={
+                    setLanguage
+                  }
+                  onProfileChange={(
+                    updated,
+                  ) => {
+                    setProfile(
+                      updated,
+                    );
+
+                    setUser(
+                      (
+                        current,
+                      ) =>
+                        current
+                          ? {
+                              ...current,
+
+                              name:
+                                updated.effectiveName,
+                            }
+                          : current,
+                    );
+                  }}
+                  onLogout={
+                    logout
+                  }
+                />
+              )}
+
+            {activeTab ===
+              "account" &&
+              !profile && (
               <div className="mt-7 grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
                 <section className="overflow-hidden rounded-[26px] border border-[var(--portal-border)] bg-[var(--portal-surface)] shadow-[0_15px_50px_var(--portal-shadow)]">
                   <div className="relative overflow-hidden border-b border-[var(--portal-border)] bg-[var(--portal-green-soft)] p-6 sm:p-7">
@@ -2795,7 +3247,7 @@ export default function RepresentativePortal() {
                     </span>
 
                     <span className="mt-5 block text-[6px] font-black uppercase tracking-[0.17em] text-[var(--portal-green)]">
-                      Sales Partner
+                      {text.salesPartner}
                     </span>
 
                     <h2 className="mt-2 text-[24px] font-black tracking-[-0.05em]">
@@ -2873,11 +3325,11 @@ export default function RepresentativePortal() {
                     </span>
 
                     <h2 className="mt-5 text-[17px] font-black tracking-[-0.04em]">
-                      Account security
+                    {text.accountSecurity}
                     </h2>
 
                     <p className="mt-2 text-[7.5px] leading-5 text-[var(--portal-muted)]">
-                      Keep your password private and update it immediately if you believe another person may know it.
+                    {text.securityHelper}
                     </p>
 
                     <button
@@ -2889,7 +3341,7 @@ export default function RepresentativePortal() {
                       }
                       className="mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-[13px] bg-[var(--portal-green-soft)] text-[7.5px] font-extrabold text-[var(--portal-green)]"
                     >
-                      Change Password
+                    {text.changePassword}
 
                       <span className="h-3.5 w-3.5">
                         <ArrowRightIcon />
@@ -2901,11 +3353,11 @@ export default function RepresentativePortal() {
 
                   <section className="rounded-[24px] border border-[var(--portal-border)] bg-[var(--portal-surface)] p-5 shadow-[0_12px_40px_var(--portal-shadow)] sm:p-6">
                     <span className="text-[6px] font-black uppercase tracking-[0.16em] text-[var(--portal-green)]">
-                      Appearance
+                    {text.appearance}
                     </span>
 
                     <h2 className="mt-2 text-[15px] font-black">
-                      Portal theme
+                    {text.portalTheme}
                     </h2>
 
                     <div className="mt-4 grid grid-cols-2 gap-2">
@@ -2926,7 +3378,7 @@ export default function RepresentativePortal() {
                           <SunIcon />
                         </span>
 
-                        Light
+                      {text.light}
                       </button>
 
                       <button
@@ -2946,7 +3398,7 @@ export default function RepresentativePortal() {
                           <MoonIcon />
                         </span>
 
-                        Dark
+                      {text.dark}
                       </button>
                     </div>
 
@@ -2961,7 +3413,7 @@ export default function RepresentativePortal() {
                         <LogoutIcon />
                       </span>
 
-                      Log Out
+                    {text.logout}
                     </button>
                   </section>
                 </div>
@@ -2970,369 +3422,6 @@ export default function RepresentativePortal() {
           </div>
         </section>
       </div>
-
-      {/* ===================================================
-          NEW REPORT MODAL
-          =================================================== */}
-
-      {reportOpen && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 px-4 py-5 backdrop-blur-[7px]">
-          <button
-            type="button"
-            aria-label="Close report form"
-            onClick={() =>
-              !reportSaving &&
-              setReportOpen(
-                false,
-              )
-            }
-            className="absolute inset-0"
-          />
-
-          <form
-            onSubmit={
-              submitReport
-            }
-            className="relative z-10 max-h-[calc(100vh-40px)] w-full max-w-[680px] overflow-y-auto rounded-[28px] border border-[var(--portal-border)] bg-[var(--portal-surface)] p-5 text-[var(--portal-text)] shadow-[0_35px_120px_rgba(0,0,0,0.35)] sm:p-7"
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <span className="inline-flex items-center gap-2 rounded-full bg-[var(--portal-green-soft)] px-3 py-2 text-[6px] font-black uppercase tracking-[0.16em] text-[var(--portal-green)]">
-                  <span className="h-3.5 w-3.5">
-                    <TargetIcon />
-                  </span>
-
-                  New opportunity
-                </span>
-
-                <h2 className="mt-4 text-[25px] font-black tracking-[-0.05em]">
-                  Report a prospect.
-                </h2>
-
-                <p className="mt-2 max-w-[480px] text-[7.5px] leading-5 text-[var(--portal-muted)]">
-                  Share accurate information about the prospect so the opportunity can be reviewed and correctly attributed to you.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                disabled={
-                  reportSaving
-                }
-                onClick={() =>
-                  setReportOpen(
-                    false,
-                  )
-                }
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--portal-border)] bg-[var(--portal-surface-2)] text-[var(--portal-muted)]"
-              >
-                <span className="h-4 w-4">
-                  <CloseIcon />
-                </span>
-              </button>
-            </div>
-
-            <div className="mt-7 grid gap-4 sm:grid-cols-2">
-              <label>
-                <span className="mb-2 block text-[6.5px] font-extrabold text-[var(--portal-muted)]">
-                  Category *
-                </span>
-
-                <select
-                  value={
-                    reportForm.category
-                  }
-                  onChange={(
-                    event,
-                  ) =>
-                    setReportForm(
-                      (
-                        current,
-                      ) => ({
-                        ...current,
-
-                        category:
-                          event.target
-                            .value as
-                            RepresentativeReportCategory,
-                      }),
-                    )
-                  }
-                  className="h-12 w-full rounded-[14px] border border-[var(--portal-border)] bg-[var(--portal-surface-2)] px-3 text-[8.5px] text-[var(--portal-text)] outline-none transition focus:border-[var(--portal-green)]"
-                >
-                  <option value="lead">
-                    New Lead
-                  </option>
-
-                  <option value="follow_up">
-                    Follow Up
-                  </option>
-
-                  <option value="meeting">
-                    Meeting
-                  </option>
-
-                  <option value="issue">
-                    Issue
-                  </option>
-
-                  <option value="other">
-                    Other
-                  </option>
-                </select>
-              </label>
-
-              <label>
-                <span className="mb-2 block text-[6.5px] font-extrabold text-[var(--portal-muted)]">
-                  Report Title *
-                </span>
-
-                <input
-                  value={
-                    reportForm.title
-                  }
-                  onChange={(
-                    event,
-                  ) =>
-                    setReportForm(
-                      (
-                        current,
-                      ) => ({
-                        ...current,
-
-                        title:
-                          event.target.value,
-                      }),
-                    )
-                  }
-                  placeholder="Interested restaurant owner"
-                  className="h-12 w-full rounded-[14px] border border-[var(--portal-border)] bg-[var(--portal-surface-2)] px-3 text-[8.5px] text-[var(--portal-text)] outline-none placeholder:text-[var(--portal-faint)] focus:border-[var(--portal-green)]"
-                />
-              </label>
-
-              <label>
-                <span className="mb-2 block text-[6.5px] font-extrabold text-[var(--portal-muted)]">
-                  Business / Organization *
-                </span>
-
-                <input
-                  value={
-                    reportForm.businessName
-                  }
-                  onChange={(
-                    event,
-                  ) =>
-                    setReportForm(
-                      (
-                        current,
-                      ) => ({
-                        ...current,
-
-                        businessName:
-                          event.target.value,
-                      }),
-                    )
-                  }
-                  placeholder="Business name"
-                  className="h-12 w-full rounded-[14px] border border-[var(--portal-border)] bg-[var(--portal-surface-2)] px-3 text-[8.5px] text-[var(--portal-text)] outline-none placeholder:text-[var(--portal-faint)] focus:border-[var(--portal-green)]"
-                />
-              </label>
-
-              <label>
-                <span className="mb-2 block text-[6.5px] font-extrabold text-[var(--portal-muted)]">
-                  Contact Person
-                </span>
-
-                <input
-                  value={
-                    reportForm.contactName
-                  }
-                  onChange={(
-                    event,
-                  ) =>
-                    setReportForm(
-                      (
-                        current,
-                      ) => ({
-                        ...current,
-
-                        contactName:
-                          event.target.value,
-                      }),
-                    )
-                  }
-                  placeholder="Contact name"
-                  className="h-12 w-full rounded-[14px] border border-[var(--portal-border)] bg-[var(--portal-surface-2)] px-3 text-[8.5px] text-[var(--portal-text)] outline-none placeholder:text-[var(--portal-faint)] focus:border-[var(--portal-green)]"
-                />
-              </label>
-
-              <label>
-                <span className="mb-2 block text-[6.5px] font-extrabold text-[var(--portal-muted)]">
-                  Client Phone
-                </span>
-
-                <input
-                  value={
-                    reportForm.clientPhone
-                  }
-                  onChange={(
-                    event,
-                  ) =>
-                    setReportForm(
-                      (
-                        current,
-                      ) => ({
-                        ...current,
-
-                        clientPhone:
-                          event.target.value,
-                      }),
-                    )
-                  }
-                  placeholder="+251..."
-                  className="h-12 w-full rounded-[14px] border border-[var(--portal-border)] bg-[var(--portal-surface-2)] px-3 text-[8.5px] text-[var(--portal-text)] outline-none placeholder:text-[var(--portal-faint)] focus:border-[var(--portal-green)]"
-                />
-              </label>
-
-              <label>
-                <span className="mb-2 block text-[6.5px] font-extrabold text-[var(--portal-muted)]">
-                  Client Email
-                </span>
-
-                <input
-                  type="email"
-                  value={
-                    reportForm.clientEmail
-                  }
-                  onChange={(
-                    event,
-                  ) =>
-                    setReportForm(
-                      (
-                        current,
-                      ) => ({
-                        ...current,
-
-                        clientEmail:
-                          event.target.value,
-                      }),
-                    )
-                  }
-                  placeholder="client@example.com"
-                  className="h-12 w-full rounded-[14px] border border-[var(--portal-border)] bg-[var(--portal-surface-2)] px-3 text-[8.5px] text-[var(--portal-text)] outline-none placeholder:text-[var(--portal-faint)] focus:border-[var(--portal-green)]"
-                />
-              </label>
-
-              <label className="sm:col-span-2">
-                <span className="mb-2 block text-[6.5px] font-extrabold text-[var(--portal-muted)]">
-                  Estimated Budget (ETB)
-                </span>
-
-                <input
-                  type="number"
-                  min="0"
-                  value={
-                    reportForm.estimatedBudget
-                  }
-                  onChange={(
-                    event,
-                  ) =>
-                    setReportForm(
-                      (
-                        current,
-                      ) => ({
-                        ...current,
-
-                        estimatedBudget:
-                          event.target.value,
-                      }),
-                    )
-                  }
-                  placeholder="50000"
-                  className="h-12 w-full rounded-[14px] border border-[var(--portal-border)] bg-[var(--portal-surface-2)] px-3 text-[8.5px] text-[var(--portal-text)] outline-none placeholder:text-[var(--portal-faint)] focus:border-[var(--portal-green)]"
-                />
-              </label>
-
-              <label className="sm:col-span-2">
-                <span className="mb-2 block text-[6.5px] font-extrabold text-[var(--portal-muted)]">
-                  Details *
-                </span>
-
-                <textarea
-                  rows={
-                    6
-                  }
-                  maxLength={
-                    5000
-                  }
-                  value={
-                    reportForm.details
-                  }
-                  onChange={(
-                    event,
-                  ) =>
-                    setReportForm(
-                      (
-                        current,
-                      ) => ({
-                        ...current,
-
-                        details:
-                          event.target.value,
-                      }),
-                    )
-                  }
-                  placeholder="Explain what the customer needs, how interested they are, what you discussed and anything important Baki should know..."
-                  className="w-full resize-y rounded-[14px] border border-[var(--portal-border)] bg-[var(--portal-surface-2)] px-3 py-3 text-[8.5px] leading-5 text-[var(--portal-text)] outline-none placeholder:text-[var(--portal-faint)] focus:border-[var(--portal-green)]"
-                />
-              </label>
-            </div>
-
-            {error && (
-              <div className="mt-4 rounded-[14px] border border-red-400/20 bg-red-500/10 px-4 py-3 text-[7.5px] text-red-400">
-                {
-                  error
-                }
-              </div>
-            )}
-
-            <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <button
-                type="button"
-                disabled={
-                  reportSaving
-                }
-                onClick={() =>
-                  setReportOpen(
-                    false,
-                  )
-                }
-                className="h-11 rounded-[13px] border border-[var(--portal-border)] bg-[var(--portal-surface-2)] px-5 text-[7.5px] font-extrabold text-[var(--portal-muted)]"
-              >
-                Cancel
-              </button>
-
-              <button
-                type="submit"
-                disabled={
-                  reportSaving
-                }
-                className="flex h-11 items-center justify-center gap-2 rounded-[13px] bg-[var(--portal-green)] px-6 text-[7.5px] font-extrabold text-white shadow-[0_10px_25px_rgba(66,108,43,0.20)] disabled:opacity-60"
-              >
-                {reportSaving
-                  ? "Submitting..."
-                  : "Submit Report"}
-
-                {!reportSaving && (
-                  <span className="h-3.5 w-3.5">
-                    <ArrowRightIcon />
-                  </span>
-                )}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
     </main>
   );
 }

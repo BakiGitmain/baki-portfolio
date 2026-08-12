@@ -7,6 +7,10 @@ import {
 } from "zod";
 
 import {
+  rateLimit,
+} from "express-rate-limit";
+
+import {
   db,
 } from "../config/db.js";
 
@@ -15,12 +19,50 @@ import {
   requireRepresentativeReady,
 } from "../middleware/representative-auth.middleware.js";
 
+import {
+  sendNewPartnerReportAdminEmail,
+} from "../services/application-email.service.js";
+
+import {
+  emitAdminReportsChanged,
+} from "../socket/partner-chat.socket.js";
+
 /* =========================================================
    ROUTER
    ========================================================= */
 
 const router =
   Router();
+
+const reportWriteRateLimit =
+  rateLimit({
+    windowMs:
+      15 *
+      60 *
+      1000,
+
+    limit:
+      20,
+
+    standardHeaders:
+      true,
+
+    legacyHeaders:
+      false,
+
+    message: {
+      success:
+        false,
+
+      message: {
+        en:
+          "Too many report attempts. Please try again later.",
+
+        am:
+          "ብዙ ጊዜ ሪፖርት ለመላክ ሞክረዋል። እባክዎ ቆይተው ይሞክሩ።",
+      },
+    },
+  });
 
 /*
   Every route below requires:
@@ -49,37 +91,19 @@ function mapReport(
     id:
       row.id,
 
-    category:
-      row.category,
+    message:
+      row.message,
 
-    title:
-      row.title,
+    adminReadAt:
+      row.admin_read_at ??
+      null,
 
-    businessName:
-      row.business_name,
-
-    contactName:
-      row.contact_name,
-
-    clientPhone:
-      row.client_phone,
-
-    clientEmail:
-      row.client_email,
-
-    estimatedBudget:
-      row.estimated_budget ===
-        null
-        ? null
-        : Number(
-            row.estimated_budget,
-          ),
-
-    details:
-      row.details,
-
-    status:
-      row.status,
+    replies:
+      Array.isArray(
+        row.replies,
+      )
+        ? row.replies
+        : [],
 
     createdAt:
       row.created_at,
@@ -87,6 +111,278 @@ function mapReport(
     updatedAt:
       row.updated_at,
   };
+}
+
+async function createReportWithCooldown(
+  representativeId:
+    string,
+
+  message:
+    string,
+) {
+  const client =
+    await db.connect();
+
+  let transactionOpen =
+    false;
+
+  try {
+    await client.query(
+      "BEGIN",
+    );
+
+    transactionOpen =
+      true;
+
+    /*
+      Serialize report creation on the authenticated owner row.
+      The cooldown is therefore enforced against database time
+      even if concurrent requests reach different server workers.
+    */
+
+    await client.query(
+      `
+        SELECT id
+        FROM sales_representatives
+        WHERE
+          id = $1
+          AND is_active = TRUE
+        FOR UPDATE
+      `,
+      [
+        representativeId,
+      ],
+    );
+
+    const cooldownResult =
+      await client.query(
+        `
+          SELECT
+            created_at + INTERVAL '2 hours' AS next_report_at,
+            GREATEST(
+              0,
+              CEIL(
+                EXTRACT(
+                  EPOCH FROM (
+                    created_at + INTERVAL '2 hours' - NOW()
+                  )
+                )
+              )
+            )::int AS remaining_seconds
+          FROM representative_reports
+          WHERE representative_id = $1
+          ORDER BY created_at DESC
+          LIMIT 1
+        `,
+        [
+          representativeId,
+        ],
+      );
+
+    const cooldown =
+      cooldownResult.rows[0];
+
+    const remainingSeconds =
+      Number(
+        cooldown
+          ?.remaining_seconds ??
+          0,
+      );
+
+    if (
+      remainingSeconds >
+      0
+    ) {
+      await client.query(
+        "ROLLBACK",
+      );
+
+      transactionOpen =
+        false;
+
+      return {
+        created:
+          false as const,
+
+        remainingSeconds,
+
+        nextReportAt:
+          cooldown
+            .next_report_at,
+      };
+    }
+
+    const result =
+      await client.query(
+        `
+          INSERT INTO representative_reports (
+            representative_id,
+            message
+          )
+          VALUES (
+            $1,
+            $2
+          )
+          RETURNING
+            id,
+            message,
+            admin_read_at,
+            created_at,
+            updated_at
+        `,
+        [
+          representativeId,
+          message,
+        ],
+      );
+
+    await client.query(
+      "COMMIT",
+    );
+
+    transactionOpen =
+      false;
+
+    return {
+      created:
+        true as const,
+
+      result,
+    };
+  } catch (
+    error
+  ) {
+    if (
+      transactionOpen
+    ) {
+      await client.query(
+        "ROLLBACK",
+      );
+    }
+
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function notifyAdminOfNewReport(
+  input: {
+    reportId:
+      string;
+
+    representativeId:
+      string;
+
+    createdAt:
+      Date;
+
+    reportMessage:
+      string;
+  },
+) {
+  try {
+    const [
+      adminResult,
+      representativeResult,
+    ] =
+      await Promise.all([
+        db.query(
+          `
+            SELECT
+              name,
+              email
+            FROM admins
+            WHERE
+              is_active = TRUE
+              AND NULLIF(TRIM(email), '') IS NOT NULL
+            ORDER BY created_at ASC
+            LIMIT 1
+          `,
+        ),
+
+        db.query(
+          `
+            SELECT
+              COALESCE(
+                NULLIF(TRIM(display_name), ''),
+                name
+              ) AS name,
+              username
+            FROM sales_representatives
+            WHERE id = $1::uuid
+            LIMIT 1
+          `,
+          [
+            input.representativeId,
+          ],
+        ),
+      ]);
+
+    const admin =
+      adminResult.rows[0];
+
+    const representative =
+      representativeResult.rows[0];
+
+    if (
+      !admin ||
+      !representative
+    ) {
+      return;
+    }
+
+    const sent =
+      await sendNewPartnerReportAdminEmail({
+        reportId:
+          input.reportId,
+
+        adminEmail:
+          admin.email,
+
+        adminName:
+          admin.name,
+
+        representativeName:
+          representative.name,
+
+        partnerId:
+          representative.username,
+
+        reportMessage:
+          input.reportMessage,
+
+        createdAt:
+          input.createdAt,
+      });
+
+    if (
+      sent
+    ) {
+      await db.query(
+        `
+          UPDATE representative_reports
+          SET admin_notification_sent_at = NOW()
+          WHERE
+            id = $1::uuid
+            AND admin_notification_sent_at IS NULL
+        `,
+        [
+          input.reportId,
+        ],
+      );
+    }
+  } catch (
+    error
+  ) {
+    console.error(
+      "New Partner report notification failed:",
+      error instanceof
+        Error
+        ? error.message
+        : "Unknown report notification error.",
+    );
+  }
 }
 
 /* =========================================================
@@ -114,22 +410,20 @@ router.get(
           db.query(
             `
               SELECT
-                COUNT(*)::int AS total,
+                COUNT(DISTINCT report.id)::int AS total,
 
-                COUNT(*) FILTER (
-                  WHERE status IN (
-                    'submitted',
-                    'reviewing',
-                    'contacted',
-                    'qualified'
-                  )
-                )::int AS active,
+                COUNT(reply.id)::int AS replies,
 
-                COUNT(*) FILTER (
-                  WHERE status = 'won'
-                )::int AS won
-              FROM representative_reports
-              WHERE representative_id = $1
+                COUNT(reply.id) FILTER (
+                  WHERE reply.representative_read_at IS NULL
+                )::int AS unread_replies
+
+              FROM representative_reports report
+
+              LEFT JOIN representative_report_replies reply
+                ON reply.report_id = report.id
+
+              WHERE report.representative_id = $1
             `,
             [
               representativeId,
@@ -137,45 +431,65 @@ router.get(
           ),
 
           db.query(
-            `
-              SELECT
-                COUNT(m.id)::int AS total,
+  `
+    SELECT
+      COUNT(l.id)::int AS total,
 
-                COUNT(m.id) FILTER (
-                  WHERE
-                    COALESCE(
-                      p.completed,
-                      FALSE
-                    ) = TRUE
-                )::int AS completed
-              FROM representative_training_modules m
+      COUNT(l.id) FILTER (
+        WHERE
+          COALESCE(
+            p.completed,
+            FALSE
+          ) = TRUE
+      )::int AS completed
 
-              LEFT JOIN representative_training_progress p
-                ON
-                  p.module_id = m.id
-                  AND
-                  p.representative_id = $1
+    FROM training_lessons l
 
-              WHERE
-                m.is_published = TRUE
-            `,
-            [
-              representativeId,
-            ],
-          ),
+    INNER JOIN training_sections s
+      ON s.id = l.section_id
+
+    INNER JOIN training_courses c
+      ON c.id = s.course_id
+
+    LEFT JOIN representative_training_lesson_progress p
+      ON
+        p.lesson_id = l.id
+        AND
+        p.representative_id = $1
+
+    WHERE
+      c.status = 'published'
+  `,
+  [
+    representativeId,
+  ],
+),
 
           db.query(
             `
               SELECT
-                id,
-                category,
-                title,
-                business_name,
-                status,
-                created_at
-              FROM representative_reports
-              WHERE representative_id = $1
-              ORDER BY created_at DESC
+                report.id,
+                report.message,
+                report.created_at,
+                latest_reply.message AS latest_reply_message,
+                latest_reply.created_at AS latest_reply_created_at,
+                latest_reply.representative_read_at
+
+              FROM representative_reports report
+
+              LEFT JOIN LATERAL (
+                SELECT
+                  reply.message,
+                  reply.created_at,
+                  reply.representative_read_at
+                FROM representative_report_replies reply
+                WHERE reply.report_id = report.id
+                ORDER BY reply.created_at DESC
+                LIMIT 1
+              ) latest_reply ON TRUE
+
+              WHERE report.representative_id = $1
+              ORDER BY report.created_at DESC
               LIMIT 5
             `,
             [
@@ -201,14 +515,14 @@ router.get(
                 reports.total,
               ),
 
-            active:
+            replies:
               Number(
-                reports.active,
+                reports.replies,
               ),
 
-            won:
+            unreadReplies:
               Number(
-                reports.won,
+                reports.unread_replies,
               ),
           },
 
@@ -232,20 +546,25 @@ router.get(
                 id:
                   row.id,
 
-                category:
-                  row.category,
-
-                title:
-                  row.title,
-
-                businessName:
-                  row.business_name,
-
-                status:
-                  row.status,
+                message:
+                  row.message,
 
                 createdAt:
                   row.created_at,
+
+                latestReply:
+                  row.latest_reply_message
+                    ? {
+                        message:
+                          row.latest_reply_message,
+
+                        createdAt:
+                          row.latest_reply_created_at,
+
+                        readAt:
+                          row.representative_read_at,
+                      }
+                    : null,
               }),
             ),
         },
@@ -266,82 +585,11 @@ router.get(
 
 const reportSchema =
   z.object({
-    category:
-      z.enum([
-        "lead",
-        "follow_up",
-        "meeting",
-        "issue",
-        "other",
-      ]),
-
-    title:
+    message:
       z
         .string()
         .trim()
-        .min(3)
-        .max(160),
-
-    businessName:
-      z
-        .string()
-        .trim()
-        .min(2)
-        .max(180),
-
-    contactName:
-      z
-        .string()
-        .trim()
-        .max(160)
-        .optional()
-        .default(
-          "",
-        ),
-
-    clientPhone:
-      z
-        .string()
-        .trim()
-        .max(40)
-        .optional()
-        .default(
-          "",
-        ),
-
-    clientEmail:
-      z
-        .union([
-          z
-            .string()
-            .trim()
-            .email()
-            .max(255),
-
-          z.literal(
-            "",
-          ),
-        ])
-        .optional()
-        .default(
-          "",
-        ),
-
-    estimatedBudget:
-      z
-        .number()
-        .nonnegative()
-        .max(
-          100_000_000,
-        )
-        .nullable()
-        .optional(),
-
-    details:
-      z
-        .string()
-        .trim()
-        .min(20)
+        .min(1)
         .max(5000),
   });
 
@@ -362,26 +610,178 @@ router.get(
     next,
   ) => {
     try {
+      const representativeId =
+        req.auth!.id;
+
+      const [
+        reportsResult,
+        cooldownResult,
+        unreadResult,
+      ] =
+        await Promise.all([
+          db.query(
+            `
+              SELECT
+                report.id,
+                report.message,
+                report.admin_read_at,
+                report.created_at,
+                report.updated_at,
+
+                COALESCE(
+                  (
+                    SELECT JSON_AGG(
+                      JSON_BUILD_OBJECT(
+                        'id', reply.id,
+                        'message', reply.message,
+                        'readAt', reply.representative_read_at,
+                        'createdAt', reply.created_at,
+                        'updatedAt', reply.updated_at
+                      )
+                      ORDER BY reply.created_at ASC
+                    )
+                    FROM representative_report_replies reply
+                    WHERE reply.report_id = report.id
+                  ),
+                  '[]'::json
+                ) AS replies
+
+              FROM representative_reports report
+              WHERE report.representative_id = $1
+              ORDER BY report.created_at DESC
+              LIMIT 200
+            `,
+            [
+              representativeId,
+            ],
+          ),
+
+          db.query(
+            `
+              SELECT
+                MAX(created_at) AS last_report_at,
+
+                CASE
+                  WHEN MAX(created_at) IS NULL
+                    THEN NULL
+                  ELSE MAX(created_at) + INTERVAL '2 hours'
+                END AS next_report_at,
+
+                GREATEST(
+                  0,
+                  CEIL(
+                    EXTRACT(
+                      EPOCH FROM (
+                        MAX(created_at) + INTERVAL '2 hours' - NOW()
+                      )
+                    )
+                  )
+                )::int AS remaining_seconds
+
+              FROM representative_reports
+              WHERE representative_id = $1
+            `,
+            [
+              representativeId,
+            ],
+          ),
+
+          db.query(
+            `
+              SELECT COUNT(*)::int AS unread_count
+              FROM representative_report_replies reply
+              INNER JOIN representative_reports report
+                ON report.id = reply.report_id
+              WHERE
+                report.representative_id = $1
+                AND reply.representative_read_at IS NULL
+            `,
+            [
+              representativeId,
+            ],
+          ),
+        ]);
+
+      const cooldown =
+        cooldownResult.rows[0];
+
+      const remainingSeconds =
+        Number(
+          cooldown
+            ?.remaining_seconds ??
+            0,
+        );
+
+      res.json({
+        success:
+          true,
+
+        reports:
+          reportsResult.rows.map(
+            mapReport,
+          ),
+
+        cooldown: {
+          canSubmit:
+            remainingSeconds <=
+            0,
+
+          lastReportAt:
+            cooldown
+              ?.last_report_at ??
+            null,
+
+          nextReportAt:
+            cooldown
+              ?.next_report_at ??
+            null,
+
+          remainingSeconds,
+        },
+
+        unreadReplyCount:
+          Number(
+            unreadResult.rows[0]
+              ?.unread_count ??
+              0,
+          ),
+      });
+    } catch (
+      error
+    ) {
+      next(
+        error,
+      );
+    }
+  },
+);
+
+/* =========================================================
+   MARK MY ADMIN REPLIES READ
+   ========================================================= */
+
+router.post(
+  "/reports/mark-replies-read",
+
+  async (
+    req,
+    res,
+    next,
+  ) => {
+    try {
       const result =
         await db.query(
           `
-            SELECT
-              id,
-              category,
-              title,
-              business_name,
-              contact_name,
-              client_phone,
-              client_email,
-              estimated_budget,
-              details,
-              status,
-              created_at,
-              updated_at
-            FROM representative_reports
-            WHERE representative_id = $1
-            ORDER BY created_at DESC
-            LIMIT 200
+            UPDATE representative_report_replies reply
+            SET
+              representative_read_at = NOW(),
+              updated_at = NOW()
+            FROM representative_reports report
+            WHERE
+              report.id = reply.report_id
+              AND report.representative_id = $1
+              AND reply.representative_read_at IS NULL
+            RETURNING reply.id
           `,
           [
             req.auth!.id,
@@ -392,10 +792,12 @@ router.get(
         success:
           true,
 
-        reports:
-          result.rows.map(
-            mapReport,
-          ),
+        markedRead:
+          result.rowCount ??
+          0,
+
+        unreadReplyCount:
+          0,
       });
     } catch (
       error
@@ -413,6 +815,8 @@ router.get(
 
 router.post(
   "/reports",
+
+  reportWriteRateLimit,
 
   async (
     req,
@@ -438,7 +842,7 @@ router.post(
 
             message: {
               en:
-                "Check the report information and try again.",
+                "Write a report message and try again.",
 
               am:
                 "የReport መረጃውን ያረጋግጡ እና ይሞክሩ።",
@@ -448,91 +852,66 @@ router.post(
         return;
       }
 
-      const input =
-        parsed.data;
+      const creation =
+        await createReportWithCooldown(
+          req.auth!.id,
+          parsed.data.message,
+        );
+
+      if (
+        !creation.created
+      ) {
+        res.setHeader(
+          "Retry-After",
+          String(
+            creation.remainingSeconds,
+          ),
+        );
+
+        res
+          .status(
+            429,
+          )
+          .json({
+            success:
+              false,
+
+            code:
+              "REPORT_COOLDOWN",
+
+            retryAfterSeconds:
+              creation.remainingSeconds,
+
+            nextReportAt:
+              creation.nextReportAt,
+
+            message: {
+              en:
+                "You can only send one report every two hours.",
+
+              am:
+                "በየሁለት ሰዓቱ አንድ ሪፖርት ብቻ መላክ ይችላሉ።",
+            },
+          });
+
+        return;
+      }
 
       const result =
-        await db.query(
-          `
-            INSERT INTO representative_reports (
-              representative_id,
+        creation.result;
 
-              category,
-              title,
+      const createdReport =
+        result.rows[0];
 
-              business_name,
-              contact_name,
+      emitAdminReportsChanged({
+        reportId:
+          createdReport.id,
 
-              client_phone,
-              client_email,
-
-              estimated_budget,
-
-              details,
-
-              status
-            )
-            VALUES (
-              $1,
-
-              $2,
-              $3,
-
-              $4,
-              $5,
-
-              $6,
-              $7,
-
-              $8,
-
-              $9,
-
-              'submitted'
-            )
-            RETURNING
-              id,
-              category,
-              title,
-              business_name,
-              contact_name,
-              client_phone,
-              client_email,
-              estimated_budget,
-              details,
-              status,
-              created_at,
-              updated_at
-          `,
-          [
-            /*
-              Ownership ALWAYS comes from authenticated JWT.
-            */
-
-            req.auth!.id,
-
-            input.category,
-
-            input.title,
-
-            input.businessName,
-
-            input.contactName ||
-              null,
-
-            input.clientPhone ||
-              null,
-
-            input.clientEmail ||
-              null,
-
-            input
-              .estimatedBudget ??
-              null,
-
-            input.details,
-          ],
-        );
+        createdAt:
+          new Date(
+            createdReport.created_at,
+          ).toISOString(),
+      });
 
       res
         .status(
@@ -544,17 +923,36 @@ router.post(
 
           report:
             mapReport(
-              result.rows[0],
+              createdReport,
             ),
 
           message: {
             en:
-              "Report submitted successfully.",
+              "Report sent successfully.",
 
             am:
               "Report በተሳካ ሁኔታ ተልኳል።",
           },
         });
+
+      // The success response is already committed. Waiting here keeps
+      // serverless runtimes alive for delivery without coupling email
+      // failure to the representative's saved report.
+      await notifyAdminOfNewReport({
+        reportId:
+          createdReport.id,
+
+        representativeId:
+          req.auth!.id,
+
+        createdAt:
+          new Date(
+            createdReport.created_at,
+          ),
+
+        reportMessage:
+          createdReport.message,
+      });
     } catch (
       error
     ) {

@@ -8,6 +8,9 @@ import {
 } from "react";
 import AcceptRepresentativeButton from "@/components/admin/accept-representative-button";
 import AdminShell from "@/components/admin/admin-shell";
+import AdminPartnerInsight, {
+  type AdminPartnerDetailTab,
+} from "@/components/admin/admin-partner-insight";
 
 import {
   useLanguage,
@@ -16,9 +19,11 @@ import {
 import {
   getAdminApplication,
   getAdminApplicationDocument,
+  getAdminApplicationInsight,
   getAdminApplications,
   updateAdminApplication,
   type AdminApplication,
+  type AdminApplicationInsight,
   type ApplicationDocumentSide,
   type ApplicationFilterStatus,
   type ApplicationStatus,
@@ -391,6 +396,16 @@ export default function AdminApplications() {
     useState<
       AdminApplication | null
     >(null);
+
+  const [
+    insight,
+    setInsight,
+  ] = useState<AdminApplicationInsight | null>(null);
+
+  const [
+    detailTab,
+    setDetailTab,
+  ] = useState<AdminPartnerDetailTab>("overview");
 
   const [
     drawerLoading,
@@ -1003,15 +1018,26 @@ export default function AdminApplications() {
       true,
     );
 
+    setInsight(null);
+    setDetailTab("overview");
+
     setError("");
     setSuccess("");
 
     try {
-      const fresh =
-        await getAdminApplication(
+      const [
+        fresh,
+        freshInsight,
+      ] = await Promise.all([
+        getAdminApplication(
           application.id,
           language,
-        );
+        ),
+        getAdminApplicationInsight(
+          application.id,
+          language,
+        ),
+      ]);
 
       setSelected(
         fresh,
@@ -1024,6 +1050,10 @@ export default function AdminApplications() {
       setNotes(
         fresh.adminNotes ??
           "",
+      );
+
+      setInsight(
+        freshInsight,
       );
     } catch (
       openError
@@ -1053,6 +1083,9 @@ export default function AdminApplications() {
     }
 
     setSelected(null);
+
+    setInsight(null);
+    setDetailTab("overview");
 
     setNotes("");
 
@@ -1756,7 +1789,23 @@ export default function AdminApplications() {
                   <div className="h-8 w-8 animate-spin rounded-full border-2 border-black/10 border-t-[#426c2b]" />
                 </div>
               ) : (
-                <div className="mx-auto max-w-[700px] space-y-5">
+                <>
+                  {insight?.representative && (
+                    <div className="mx-auto mb-5 max-w-[700px]">
+                      <AdminPartnerInsight
+                        insight={insight}
+                        activeTab={detailTab}
+                        onTabChange={setDetailTab}
+                        language={language}
+                      />
+                    </div>
+                  )}
+
+                  <div
+                    className={`mx-auto max-w-[700px] space-y-5 ${
+                      detailTab === "overview" ? "" : "hidden"
+                    }`}
+                  >
                   {/* =======================================
                       PERSONAL INFORMATION
                       ======================================= */}
@@ -2134,7 +2183,8 @@ export default function AdminApplications() {
                       )}
                     </div>
                   </section>
-                </div>
+                  </div>
+                </>
               )}
             </div>
 
@@ -2184,6 +2234,7 @@ export default function AdminApplications() {
                       }
                     </button>
 
+{selected.status !== "accepted" && (
 <AcceptRepresentativeButton
   applicationId={
     selected.id
@@ -2194,7 +2245,38 @@ export default function AdminApplications() {
   label={
     copy.accept
   }
-/>
+  onAccepted={async () => {
+    const [
+      fresh,
+      freshInsight,
+    ] = await Promise.all([
+      getAdminApplication(
+        selected.id,
+        language,
+      ),
+      getAdminApplicationInsight(
+        selected.id,
+        language,
+      ),
+    ]);
+
+    setSelected(
+      fresh,
+    );
+    setStatusDraft(
+      fresh.status,
+    );
+    setNotes(
+      fresh.adminNotes ??
+        "",
+    );
+    setInsight(
+      freshInsight,
+    );
+    await refreshApplications();
+  }}
+ />
+)}
                   </div>
 
                   {/* =======================================

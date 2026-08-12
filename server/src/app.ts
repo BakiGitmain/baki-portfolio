@@ -8,11 +8,17 @@ import express, {
 import cors from "cors";
 import accountAuthRouter from "./routes/account-auth.routes.js";
 import helmetModule from "helmet";
-
+import adminTrainingRouter from "./routes/admin-training.routes.js";
 import cookieParser from "cookie-parser";
 import representativeAuthRouter from "./routes/representative-auth.routes.js";
-
+import representativeTrainingRouter from "./routes/representative-training.routes.js";
+import representativeChatRouter from "./routes/representative-chat.routes.js";
+import representativeProfileRouter from "./routes/representative-profile.routes.js";
+import representativeProgramsRouter from "./routes/representative-programs.routes.js";
 import representativeRouter from "./routes/representative.routes.js";
+
+import representativeReportReminderRouter from "./routes/representative-report-reminder.routes.js";
+import partnerChatRetentionRouter from "./routes/partner-chat-retention.routes.js";
 
 import representativeOnboardingRouter from "./routes/representative-onboarding.routes.js";
 /* =========================================================
@@ -32,6 +38,11 @@ import aiRouter from "./routes/ai.routes.js";
 import authRouter from "./routes/auth.routes.js";
 
 import adminRouter from "./routes/admin.routes.js";
+
+import adminReportsRouter from "./routes/admin-reports.routes.js";
+import adminChatRouter from "./routes/admin-chat.routes.js";
+import adminDashboardRouter from "./routes/admin-dashboard.routes.js";
+import adminProgramsRouter from "./routes/admin-programs.routes.js";
 
 import applicationsRouter from "./routes/applications.routes.js";
 
@@ -108,6 +119,17 @@ app.use(
   "/api/internal/health-checks",
 
   siteHealthRunnerRouter,
+);
+
+app.use(
+  "/api/internal/representative-report-reminders",
+
+  representativeReportReminderRouter,
+);
+
+app.use(
+  "/api/internal/partner-chat-retention",
+  partnerChatRetentionRouter,
 );
 
 /* =========================================================
@@ -259,6 +281,30 @@ app.use(
 );
 
 /* =========================================================
+   REPRESENTATIVE TRAINING
+   ========================================================= */
+
+app.use(
+  "/api/representative/training",
+  representativeTrainingRouter,
+);
+
+app.use(
+  "/api/representative/chat",
+  representativeChatRouter,
+);
+
+app.use(
+  "/api/representative/profile",
+  representativeProfileRouter,
+);
+
+app.use(
+  "/api/representative/programs",
+  representativeProgramsRouter,
+);
+
+/* =========================================================
    REPRESENTATIVE PORTAL
    ========================================================= */
 
@@ -296,7 +342,39 @@ app.use(
 
   adminProjectsRouter,
 );
+/* =========================================================
+   ADMIN TRAINING
+   ========================================================= */
 
+app.use(
+  "/api/admin/training",
+  adminTrainingRouter,
+);
+
+/* =========================================================
+   ADMIN REPRESENTATIVE REPORTS
+   ========================================================= */
+
+app.use(
+  "/api/admin/reports",
+
+  adminReportsRouter,
+);
+
+app.use(
+  "/api/admin/chat",
+  adminChatRouter,
+);
+
+app.use(
+  "/api/admin/dashboard",
+  adminDashboardRouter,
+);
+
+app.use(
+  "/api/admin/programs",
+  adminProgramsRouter,
+);
 /* =========================================================
    ADMIN ANALYTICS
    ========================================================= */

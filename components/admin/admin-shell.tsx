@@ -24,6 +24,20 @@ import {
   useLanguage,
 } from "@/components/providers/language-provider";
 
+import {
+  ADMIN_REPORTS_CHANGED_EVENT,
+  getAdminUnreadReportCount,
+} from "@/lib/admin-reports-api";
+
+import {
+  usePartnerChatUnread,
+} from "@/components/chat/use-partner-chat-unread";
+
+import {
+  disconnectPartnerChat,
+  getPartnerChatConnection,
+} from "@/lib/partner-chat-socket";
+
 /* =========================================================
    TYPES
    ========================================================= */
@@ -39,6 +53,8 @@ type AdminPageKey =
   | "projects"
   | "sites"
   | "applications"
+  | "reports"
+  | "chat"
   | "programs"
   | "training"
   | "settings";
@@ -198,6 +214,54 @@ function ApplicationsIcon() {
 
       <path
         d="M8 12H16M8 16H13"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function ReportsIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M5 4H19V17H9L5 21V4Z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+
+      <path
+        d="M9 9H15M9 13H13"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function ChatIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M4 5.5C4 4.7 4.7 4 5.5 4H18.5C19.3 4 20 4.7 20 5.5V15.5C20 16.3 19.3 17 18.5 17H10L5 21V17H5.5C4.7 17 4 16.3 4 15.5V5.5Z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+
+      <path
+        d="M8 9H16M8 13H13"
         stroke="currentColor"
         strokeWidth="1.7"
         strokeLinecap="round"
@@ -417,6 +481,17 @@ export default function AdminShell({
       null,
     );
 
+  const unreadChatCount =
+    usePartnerChatUnread({
+      role:
+        "admin",
+      language,
+      enabled:
+        Boolean(
+          admin,
+        ),
+    });
+
   const [
     loading,
     setLoading,
@@ -439,6 +514,11 @@ const [
     accountOpen,
     setAccountOpen,
   ] = useState(false);
+
+  const [
+    unreadReportCount,
+    setUnreadReportCount,
+  ] = useState(0);
 
   const accountRef =
     useRef<HTMLDivElement | null>(
@@ -466,6 +546,9 @@ const [
 
           applications:
             "ማመልከቻዎች",
+
+          reports:
+            "ሪፖርቶች",
 
           programs:
             "ፕሮግራሞች",
@@ -533,6 +616,14 @@ const [
                 "የSales Representative applicationsን ይመልከቱ እና ያስተዳድሩ።",
             },
 
+            reports: {
+              title:
+                "ሪፖርቶች",
+
+              description:
+                "የSales Partner የሥራ ሪፖርቶችን ያንብቡ እና ምላሽ ይላኩ።",
+            },
+
             programs: {
               title:
                 "ፕሮግራሞች",
@@ -573,6 +664,9 @@ const [
 
           applications:
             "Applications",
+
+          reports:
+            "Reports",
 
           programs:
             "Programs",
@@ -638,6 +732,14 @@ const [
 
               description:
                 "Review and manage sales representative applications.",
+            },
+
+            reports: {
+              title:
+                "Reports",
+
+              description:
+                "Read Sales Partner work reports and send replies.",
             },
 
             programs: {
@@ -717,6 +819,31 @@ const [
 
     {
       label:
+        copy.reports,
+
+      href:
+        "/admin/reports",
+
+      icon:
+        <ReportsIcon />,
+    },
+
+    {
+      label:
+        language ===
+          "am"
+          ? "ውይይት"
+          : "Chat",
+
+      href:
+        "/admin/chat",
+
+      icon:
+        <ChatIcon />,
+    },
+
+    {
+      label:
         copy.programs,
 
       href:
@@ -769,6 +896,20 @@ const [
       "applications";
   } else if (
     pathname.startsWith(
+      "/admin/reports",
+    )
+  ) {
+    pageKey =
+      "reports";
+  } else if (
+    pathname.startsWith(
+      "/admin/chat",
+    )
+  ) {
+    pageKey =
+      "chat";
+  } else if (
+    pathname.startsWith(
       "/admin/programs",
     )
   ) {
@@ -791,9 +932,25 @@ const [
   }
 
   const page =
-    copy.pages[
-      pageKey
-    ];
+    pageKey ===
+    "chat"
+      ? language ===
+          "am"
+        ? {
+            title:
+              "የአጋሮች ውይይት",
+            description:
+              "ከBaki Digital አጋሮች ጋር በቀጥታ ይወያዩ እና መልዕክቶችን ያስተዳድሩ።",
+          }
+        : {
+            title:
+              "Partner Chat",
+            description:
+              "Talk with Baki Digital partners in real time and moderate messages.",
+          }
+      : copy.pages[
+          pageKey
+        ];
 
   /* =======================================================
      AUTH
@@ -887,6 +1044,135 @@ const [
   router,
   authRetryKey,
 ]);
+
+  useEffect(() => {
+    if (
+      !admin
+    ) {
+      return;
+    }
+
+    let cancelled =
+      false;
+
+    async function refreshUnreadReports() {
+      try {
+        const count =
+          await getAdminUnreadReportCount(
+            language,
+          );
+
+        if (
+          !cancelled
+        ) {
+          setUnreadReportCount(
+            count,
+          );
+        }
+      } catch (
+        error
+      ) {
+        console.error(
+          "Unable to load the unread report count:",
+          error,
+        );
+      }
+    }
+
+    const handleReportsChanged =
+      () => {
+        void refreshUnreadReports();
+      };
+
+    void refreshUnreadReports();
+
+    const intervalId =
+      window.setInterval(
+        refreshUnreadReports,
+        60_000,
+      );
+
+    window.addEventListener(
+      ADMIN_REPORTS_CHANGED_EVENT,
+      handleReportsChanged,
+    );
+
+    let cleanupSocket:
+      (() => void) |
+      null =
+      null;
+
+    void getPartnerChatConnection(
+      "admin",
+      language,
+    )
+      .then(
+        (
+          connection,
+        ) => {
+          if (
+            cancelled
+          ) {
+            return;
+          }
+
+          const handleRealtimeReport =
+            () => {
+              window.dispatchEvent(
+                new Event(
+                  ADMIN_REPORTS_CHANGED_EVENT,
+                ),
+              );
+            };
+
+          connection.socket.on(
+            "admin:reports:changed",
+            handleRealtimeReport,
+          );
+
+          cleanupSocket =
+            () => {
+              connection.socket.off(
+                "admin:reports:changed",
+                handleRealtimeReport,
+              );
+            };
+        },
+      )
+      .catch(
+        (
+          error,
+        ) => {
+          console.error(
+            "Unable to connect report notifications:",
+            error instanceof
+              Error
+              ? error.message
+              : "Unknown realtime notification error.",
+          );
+        },
+      );
+
+    return () => {
+      cancelled =
+        true;
+
+      window.clearInterval(
+        intervalId,
+      );
+
+      window.removeEventListener(
+        ADMIN_REPORTS_CHANGED_EVENT,
+        handleReportsChanged,
+      );
+
+      cleanupSocket?.();
+    };
+  }, [
+    admin,
+    language,
+  ]);
+
   /* =======================================================
      ACCOUNT DROPDOWN OUTSIDE CLICK
      ======================================================= */
@@ -950,6 +1236,10 @@ const [
     try {
       await logoutAdmin();
     } finally {
+      disconnectPartnerChat(
+        "admin",
+      );
+
       router.replace(
         "/admin/login",
       );
@@ -1191,9 +1481,42 @@ if (
                       }
                     </span>
 
-                    {active && (
+                    {(
+                      item.href ===
+                        "/admin/reports" &&
+                      unreadReportCount >
+                        0
+                    ) ||
+                    (
+                      item.href ===
+                        "/admin/chat" &&
+                      unreadChatCount >
+                        0
+                    ) ? (
+                      <span
+                        role="status"
+                        aria-label={`${
+                          item.href ===
+                          "/admin/chat"
+                            ? unreadChatCount
+                            : unreadReportCount
+                        } unread ${item.label.toLowerCase()} items`}
+                        className="flex min-w-5 shrink-0 items-center justify-center rounded-full bg-[#c74f3d] px-1.5 py-0.5 text-[9px] font-extrabold leading-none text-white shadow-[0_4px_10px_rgba(199,79,61,0.24)]"
+                      >
+                        {(item.href ===
+                        "/admin/chat"
+                          ? unreadChatCount
+                          : unreadReportCount) >
+                        99
+                          ? "99+"
+                          : item.href ===
+                              "/admin/chat"
+                            ? unreadChatCount
+                            : unreadReportCount}
+                      </span>
+                    ) : active ? (
                       <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#80c93c] shadow-[0_0_8px_rgba(128,201,60,0.45)]" />
-                    )}
+                    ) : null}
                   </Link>
                 );
               },

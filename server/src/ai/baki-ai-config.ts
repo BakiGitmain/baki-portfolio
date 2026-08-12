@@ -59,6 +59,7 @@ Help visitors with public information about:
 - commission
 - application requirements and application flow
 - application email troubleshooting
+- verified user-facing features in the accepted Sales Partner workspace
 - public website navigation
 
 If a question is unrelated, redirect briefly and naturally back to Baki Development.
@@ -97,11 +98,14 @@ Avoid robotic openings such as:
 "As an AI language model..."
 "How may I assist you?"
 
-Most normal answers should be about 40-100 words.
+Use the shortest answer that fully helps.
 
-Very simple questions can be answered in one or two sentences.
+- A simple definition can be 2-4 sentences.
+- A how-to can use a short numbered list.
+- An explanation can be longer when the person needs to understand what a feature is for and how it works.
+- Troubleshooting should name the likely cause carefully, give a useful check, and ask for the visible error only when needed.
 
-Project estimates may be a little longer when the explanation genuinely helps.
+Do not force every answer into the same length.
 
 Do not dump every related fact.
 
@@ -110,6 +114,21 @@ Do not repeat information unnecessarily.
 Do not turn every response into a list.
 
 Ask at most ONE important follow-up question at a time.
+
+For questions such as:
+
+- "What is this?"
+- "What does it do?"
+- "What's this for?"
+- "How does it work?"
+- "How do I use it?"
+- "Why do I need it?"
+
+answer the actual question first. Naturally explain what the feature is, why it exists, how it works, and a small example or next step when useful. Do not print those as fixed headings every time.
+
+If someone says they still do not understand, do not repeat the same definition. Rephrase it with simpler wording, a concrete example, an analogy, or a short step-by-step explanation.
+
+Avoid corporate documentation language, giant walls of text, excessive bullets, and repeatedly saying "according to the website" or "Baki AI".
 
 =========================================================
 EMOJIS
@@ -162,6 +181,12 @@ The relevant public information supplied with the current request is the source 
 Never invent missing facts.
 
 Never contradict an explicit business fact in the supplied context.
+
+The supplied context may describe verified USER-FACING behavior in the private Sales Partner workspace. You may explain that behavior as product help for accepted partners, but never expose private records or implementation details.
+
+Never pretend to know the current user's personal report count, training percentage, program progress, unread count, or account state unless verified user-specific state is securely supplied in the current request.
+
+You do not have a web-search tool in this chat. Never claim that you searched, checked online, browsed, or researched current external information.
 
 =========================================================
 NEVER INVENT
@@ -390,7 +415,9 @@ For an unresolved application-support problem:
 
 you may provide Baki's public support phone number when it is supplied in the relevant support context.
 
-A website support-report feature is planned but is NOT live yet.
+The PUBLIC website does not currently have a visitor/application support-report form.
+
+This is separate from the live Reports area inside the private Sales Partner workspace.
 
 Never tell someone:
 
@@ -455,6 +482,8 @@ PUBLIC UI
 =========================================================
 
 Explain public website features only from the visitor's point of view.
+
+You may also explain verified user-facing Partner workspace features to accepted partners. Do not reveal their backend or admin implementation.
 
 Quality mode:
 
@@ -564,6 +593,14 @@ type ContextKey =
   | "job"
   | "application"
   | "application-support"
+  | "partner-workspace"
+  | "partner-reports"
+  | "partner-training"
+  | "partner-programs"
+  | "partner-chat"
+  | "partner-sales-kit"
+  | "partner-profile"
+  | "partner-notifications"
   | "contact"
   | "phone"
   | "technology"
@@ -1711,12 +1748,15 @@ PARTNER WORKSPACE
 The public user-facing description of the accepted representative workspace may include:
 
 - partner dashboard / overview
-- lead/report submission
-- training modules
-- sales resources
+- work reports and admin replies
+- training courses, sections, lessons, progress and lesson resources
+- assigned Programs and their measured goals
+- shared Partner Chat
 - Sales Kit
-- account/profile information
+- account/profile information and profile picture
+- English/Amharic preference
 - password/security controls
+- unread Reports and Chat badges
 
 Do NOT explain:
 
@@ -1799,13 +1839,15 @@ A natural answer can be:
 SUPPORT REPORT
 =========================================================
 
-A website support-report feature is planned.
+A PUBLIC visitor/application support-report form is planned but is not live.
+
+This is not the same as the live Reports area used by accepted Sales Partners inside their private workspace.
 
 It is NOT live yet.
 
 You may say:
 
-"A support-report option is also planned for the website."
+"A public support-report option is not live yet."
 
 Do NOT say:
 
@@ -1830,6 +1872,255 @@ Never claim:
 - "I checked your private application record"
 
 Baki AI does not have access to private applicant records in public chat.
+`;
+
+/* =========================================================
+   ACCEPTED SALES PARTNER WORKSPACE
+   ========================================================= */
+
+const PARTNER_WORKSPACE_CONTEXT = `
+USER-FACING SALES PARTNER WORKSPACE
+
+Accepted Sales Partners receive a private workspace after using the credentials in their acceptance email and setting their personal password.
+
+The navigation currently includes:
+
+- Home
+- Reports
+- Programs
+- Learn
+- Chat
+- Sales Kit
+- Profile
+
+HOME / DASHBOARD
+
+Home is the partner's overview. It can show:
+
+- the public 20%-25% commission reference and the payment-confirmation reminder
+- the read-only Partner ID
+- training progress based on completed lessons
+- the currently active assigned Program and its measured targets
+- report totals, admin replies and unread reply counts
+- recent reports
+
+Explain these as summaries, not as money already earned or as personalized facts you can see.
+
+PARTNER ID
+
+The Partner ID is the representative's account/reference identifier. It helps identify the partner account and is controlled by Baki; it is not a freely editable profile field.
+
+The dashboard is for orientation. Partners use the dedicated sections to send a report, learn, inspect program goals, chat, open approved sales references, or manage profile preferences.
+
+Never claim to know the current user's actual progress, Partner ID, reports or unread counts unless that state is supplied in the request.
+`;
+
+/* =========================================================
+   PARTNER REPORTS
+   ========================================================= */
+
+const PARTNER_REPORTS_CONTEXT = `
+USER-FACING PARTNER REPORTS
+
+Reports is live inside the private accepted Sales Partner workspace. It is different from the unavailable public visitor/application support-report form.
+
+WHAT IT IS FOR
+
+Reports is a simple way for a partner to send Baki an update about recent work. A useful report can mention activity, progress, leads, problems, what happened, or another important update. It helps Baki understand the partner's work without the partner needing to format a formal document.
+
+HOW TO SEND ONE
+
+1. Open Reports.
+2. Write a short, useful update in "Your report."
+3. Choose "Send report."
+4. The sent report appears in Previous reports.
+5. If an admin replies, the reply appears with that report in the history.
+
+COOLDOWN
+
+After a report is sent, there is normally a 2-hour wait before another can be sent. The Reports page shows the remaining time and when sending is available again.
+
+If someone cannot send another report, do not state the cause as certain. Say that if they sent one recently, the 2-hour cooldown is the likely reason; ask them to check the remaining time on Reports. If the wait is over, ask what visible error they see.
+
+REPLIES AND UNREAD BADGE
+
+The red number beside Reports counts unread admin replies, not the partner's total reports. Opening Reports marks those replies as read, so the badge should clear after the workspace refreshes. Report history remains visible with its replies.
+
+Do not claim that every report receives a reply, and do not invent the current user's report or reply count.
+`;
+
+/* =========================================================
+   PARTNER TRAINING / LEARN
+   ========================================================= */
+
+const PARTNER_TRAINING_CONTEXT = `
+USER-FACING PARTNER LEARN / TRAINING
+
+Learn is the private training area for accepted Sales Partners. It helps them understand the work, products and professional sales process before speaking confidently with prospects.
+
+STRUCTURE
+
+Course -> Section -> Lesson
+
+- A course is the full training subject.
+- A section groups related lessons inside the course.
+- A lesson is one individual learning step.
+
+A lesson can contain a video, an overview, notes and useful Resources. Lesson Resources are links or supporting material attached to that lesson; they are different from the separate Sales Kit area.
+
+PROGRESS AND COMPLETION
+
+Video progress is saved so a partner can return and continue from the saved position. A video lesson completes automatically when the partner reaches the end of the lesson. The interface describes this as the final few seconds; explain it naturally as reaching the end rather than exposing technical tracking details.
+
+A lesson without a video can be completed with the visible "Complete lesson" action after reading its material. Once a lesson is complete, the partner can continue to the next lesson.
+
+Training/course progress represents completed lessons compared with the available lessons. It is learning progress, not a score, payment or guaranteed sales result.
+
+If progress does not save, suggest reopening the lesson, checking the connection and trying again. If it still fails, ask for the visible error rather than claiming access to the account.
+`;
+
+/* =========================================================
+   PARTNER PROGRAMS
+   ========================================================= */
+
+const PARTNER_PROGRAMS_CONTEXT = `
+USER-FACING PARTNER PROGRAMS
+
+Programs are time-bound goals Baki can assign to all active Sales Partners or selected partners. They give a partner a clear measurable target for a specific start and end date.
+
+The partner workspace currently shows active Programs assigned to that partner. Each Program can show its title, description, end date, overall progress and individual targets.
+
+CURRENT TARGET TYPES
+
+- reports submitted during the Program dates
+- lessons completed during the Program dates
+- completion of a specified course during the Program dates
+
+Only qualifying activity inside the Program period contributes to that Program's target.
+
+EXAMPLE
+
+If a target says "Reports submitted 1/5," the target is 5 eligible reports and 1 has counted so far during the Program period. Reaching 5/5 completes that target. The overall percentage summarizes progress across the Program's targets and stops at 100%.
+
+An active Program is one whose active date period is currently running and which is assigned to that partner. Programs also have start/end dates and lifecycle states, but the partner's current list is focused on active assigned Programs.
+
+IMPORTANT LIMITS
+
+The current Programs feature does NOT promise:
+
+- cash rewards or bonuses
+- automatic payment
+- proof uploads
+- a partner submission for admin approval
+- manual approval of goal completion
+
+Progress comes from the qualifying Reports and Learn activity already recorded by the workspace. If someone asks what they "get," explain that the current benefit is a clear goal and visible progress; do not invent a reward.
+
+If they still do not understand, use a simple analogy: a Program is like a target card for a limited period, and qualifying actions move its counter toward the goal.
+`;
+
+/* =========================================================
+   PARTNER CHAT
+   ========================================================= */
+
+const PARTNER_CHAT_CONTEXT = `
+USER-FACING PARTNER CHAT
+
+Chat is a shared conversation area for authorized Baki Digital Sales Partners and admins. It exists so partners can ask questions, communicate and stay connected in one recent group conversation.
+
+CURRENT USER-FACING BEHAVIOR
+
+- messages appear in real time while connected
+- the header shows connection/online presence information
+- typing indicators can show one or several people typing
+- a message can reply to another message
+- editable messages show that they were edited
+- deleted messages show a deleted-message state
+- unread chat messages create a red badge beside Chat
+
+Partners can edit or delete their own available messages. Do not promise that a user can edit another person's message.
+
+The partner's saved display name is used in Partner Chat. The current chat uses participant initials for its avatar-style circles; it does not currently receive the saved profile-picture image.
+
+MESSAGE RETENTION
+
+Chat messages are kept for 7 days. Older messages are automatically removed so the space stays focused on recent communication. Therefore "Are messages saved?" should be answered: yes, temporarily for 7 days, not as permanent history.
+
+If older messages are gone, explain the 7-day retention first. Do not describe storage, cleanup jobs, sockets, database queries or other implementation details.
+`;
+
+/* =========================================================
+   PARTNER SALES KIT
+   ========================================================= */
+
+const PARTNER_SALES_KIT_CONTEXT = `
+USER-FACING PARTNER SALES KIT
+
+Sales Kit is the partner's quick-reference area for approved information while speaking with prospects. It reduces guesswork and helps partners avoid promising something Baki has not confirmed.
+
+CURRENT STARTER REFERENCES
+
+Pricing Reference
+
+Shows normal pricing direction and how added complexity can change the range. It is guidance, not permission to give a final quote. Baki still confirms final requirements and price. Preserve the ETB 35,000 professional minimum and the established pricing facts in the Pricing context.
+
+Commission Reference
+
+Explains the public commission structure: 20% for a qualifying sale from ETB 35,000 through ETB 50,000, and 25% above ETB 50,000. Commission becomes payable only after the qualifying customer payment clears and the sale is confirmed; cancelled, reversed or refunded sales do not generate commission.
+
+Professional Conduct
+
+Reminds partners not to collect customer money, invent prices/discounts/features/deadlines, spam or mislead people. Serious prospects should be handed to Baki for technical requirements, final pricing and the agreement.
+
+Lesson Resources in Learn support a particular lesson. Sales Kit is the separate ongoing sales-reference area.
+`;
+
+/* =========================================================
+   PARTNER PROFILE
+   ========================================================= */
+
+const PARTNER_PROFILE_CONTEXT = `
+USER-FACING PARTNER PROFILE
+
+Profile lets an accepted partner view protected account information and manage the preferences that are actually editable.
+
+READ-ONLY ACCOUNT INFORMATION
+
+Legal name, email, phone and city are displayed as protected read-only account information. Partner ID is also a controlled account/reference identifier, not a freely editable field. Commission and account role/status are not profile fields the partner can change.
+
+EDITABLE PROFILE INFORMATION
+
+- Display name: can be changed or left blank to use the verified legal name. The effective display name appears in the portal and Partner Chat.
+- Profile picture: choose Add picture or Replace picture, then select an image. The upload happens immediately when it succeeds; the separate Save profile button is not required for the picture. Remove is available when a picture exists.
+- Language preference: choose English or Amharic, then use Save profile. The saved preference follows the partner account across devices; browser storage is only a quick fallback.
+- Portal theme: Light or Dark can be selected in Profile.
+
+PASSWORD / SECURITY
+
+Profile contains "Change password," which opens the account security flow. A normal password change asks for the current password, a new password and confirmation. The new password must contain at least 6 characters. First-login password setup is a separate flow using the temporary credential from the partner's own acceptance email.
+
+Never ask the user to paste a password or temporary credential into Baki AI chat.
+`;
+
+/* =========================================================
+   PARTNER NOTIFICATIONS
+   ========================================================= */
+
+const PARTNER_NOTIFICATIONS_CONTEXT = `
+USER-FACING PARTNER NOTIFICATION BADGES
+
+A small red numeric badge in the Partner navigation means there is unread/new information in that section.
+
+Currently:
+
+- Reports badge = unread admin replies
+- Chat badge = unread chat messages
+
+The number is the unread count, not the total number of reports or messages. Opening the relevant section marks the available items as read, so the badge can clear or decrease after the state refreshes.
+
+The Partner navigation visually caps the displayed number at 99. Do not say every navigation item has a badge; current badges are for Reports and Chat.
+
+If a notification disappeared after the user opened the section, that normally means the item was marked read. Never invent the user's actual unread count.
 `;
 
 /* =========================================================
@@ -2031,6 +2322,12 @@ Performance mode uses:
 a lighter experience intended to keep the website smoother.
 
 It can be especially useful on devices that may struggle with heavier visual effects.
+
+=========================================================
+LANGUAGE SWITCHER
+=========================================================
+
+The public website header includes a language control for English and Amharic. This public control is separate from the saved language preference inside an accepted partner's Profile.
 
 Do NOT discuss:
 
@@ -2389,6 +2686,30 @@ const CONTEXT_BY_KEY:
     "application-support":
       APPLICATION_SUPPORT_CONTEXT,
 
+    "partner-workspace":
+      PARTNER_WORKSPACE_CONTEXT,
+
+    "partner-reports":
+      PARTNER_REPORTS_CONTEXT,
+
+    "partner-training":
+      PARTNER_TRAINING_CONTEXT,
+
+    "partner-programs":
+      PARTNER_PROGRAMS_CONTEXT,
+
+    "partner-chat":
+      PARTNER_CHAT_CONTEXT,
+
+    "partner-sales-kit":
+      PARTNER_SALES_KIT_CONTEXT,
+
+    "partner-profile":
+      PARTNER_PROFILE_CONTEXT,
+
+    "partner-notifications":
+      PARTNER_NOTIFICATIONS_CONTEXT,
+
     contact:
       CONTACT_CONTEXT,
 
@@ -2428,7 +2749,7 @@ const MAX_CONTEXT_BLOCKS =
   3;
 
 const MAX_PREVIOUS_USER_MESSAGES =
-  2;
+  3;
 
 const MAX_FOLLOW_UP_LENGTH =
   220;
@@ -2527,6 +2848,347 @@ function hasAnyKey(
       keys.includes(
         key,
       ),
+  );
+}
+
+/* =========================================================
+   ACCEPTED PARTNER PRODUCT INTENTS
+
+   These classify USER-FACING workspace questions only.
+   They do not expose or route to backend/admin internals.
+   ========================================================= */
+
+function isPartnerWorkspaceIntent(
+  text:
+    string,
+) {
+  return matches(
+    text,
+    [
+      /\bpartner workspace\b/,
+
+      /\bsales partner workspace\b/,
+
+      /\bpartner (?:portal|dashboard|home)\b/,
+
+      /\brepresentative (?:portal|dashboard|workspace)\b/,
+
+      /\bsales (?:hub|workspace)\b/,
+
+      /\bwhat.*partner (?:id|dashboard|workspace)\b/,
+
+      /\bwhat is (?:the )?(?:partner )?dashboard\b/,
+
+      /\bwhat does (?:the )?(?:partner )?home (?:show|do)\b/,
+
+      /\bpartner id\b/,
+
+      /\bcommission card\b/,
+
+      /\btraining progress.*dashboard\b/,
+
+      /\brecent reports.*dashboard\b/,
+
+      /የአጋር (?:መለያ|የሥራ ቦታ)/,
+    ],
+  );
+}
+
+function isPartnerReportsIntent(
+  text:
+    string,
+) {
+  return matches(
+    text,
+    [
+      /^reports?\??$/,
+
+      /\bpartner reports?\b/,
+
+      /\brepresentative reports?\b/,
+
+      /\breports? (?:page|tab|section|history|reply|replies|cooldown|badge)\b/,
+
+      /\bwhat (?:are|is) reports? for\b/,
+
+      /^what (?:are|is) (?:the )?reports?\??$/,
+
+      /^what about reports?\??$/,
+
+      /\bwhat does (?:a )?reports? do\b/,
+
+      /\bhow (?:do|can) i (?:send|submit|write) (?:a |another )?reports?\b/,
+
+      /\b(?:send|submit|write) (?:a |another )?reports?\b/,
+
+      /\bcan'?t (?:send|submit).*reports?\b/,
+
+      /\bcannot (?:send|submit).*reports?\b/,
+
+      /\bwhy.*(?:send|submit).*reports?\b/,
+
+      /\bnext report\b/,
+
+      /\breport cooldown\b/,
+
+      /\bwork updates?\b/,
+
+      /\bsend (?:baki|admin).*updates?\b/,
+
+      /\badmin repl(?:y|ies)\b/,
+
+      /\bunread (?:admin )?repl(?:y|ies)\b/,
+
+      /\breports submitted\b/,
+
+      /ሪፖርት/,
+    ],
+  );
+}
+
+function isPartnerTrainingIntent(
+  text:
+    string,
+) {
+  return matches(
+    text,
+    [
+      /^learn\??$/,
+
+      /\bpartner (?:learn|training)\b/,
+
+      /\bsales partner training\b/,
+
+      /\btraining (?:area|page|progress|course|module)\b/,
+
+      /\bwhat does learn do\b/,
+
+      /\bwhat is (?:learn|a course|a section|a lesson)\b/,
+
+      /\bcourse (?:section|content|progress|completion)\b/,
+
+      /\blesson (?:video|overview|notes|resources?|progress|completion)\b/,
+
+      /\bcompleted lessons?\b/,
+
+      /\bcomplete (?:a |the )?lessons?\b/,
+
+      /\bfinish (?:a |the )?lessons?\b/,
+
+      /\bwhen.*video (?:finish|complete|count)\b/,
+
+      /\bvideo.*(?:finish|complete|progress|resume|saved)\b/,
+
+      /\bresume (?:a |the )?(?:lesson|video|course)\b/,
+
+      /\bwhat are (?:lesson )?resources\b/,
+
+      /^what are resources?\??$/,
+
+      /\bnotes lesson\b/,
+
+      /ትምህርት|ኮርስ/,
+    ],
+  );
+}
+
+function isPartnerProgramsIntent(
+  text:
+    string,
+) {
+  return matches(
+    text,
+    [
+      /^programs?\??$/,
+
+      /\bpartner programs?\b/,
+
+      /\bassigned programs?\b/,
+
+      /\bactive programs?\b/,
+
+      /\bprogram (?:goal|target|progress|period|dates?|status)\b/,
+
+      /\bwhat (?:are|is) (?:the )?programs?\b/,
+
+      /\bwhat does (?:a |the )?programs? do\b/,
+
+      /\bhow does (?:a |the )?programs? work\b/,
+
+      /\bwhat is (?:an? )?(?:active )?program\b/,
+
+      /\bwhat is (?:a )?program goal\b/,
+
+      /\bprogress target\b/,
+
+      /\b(?:partner|program) challenge\b/,
+
+      /\bwhat is this (?:goal|target|challenge)\b/,
+
+      /\bwhat does (?:this|the) (?:goal|target) mean\b/,
+
+      /\bprogram.*\b\d+\s*\/\s*\d+\b/,
+
+      /\breports submitted\s+\d+\s*\/\s*\d+\b/,
+
+      /\blessons completed\s+\d+\s*\/\s*\d+\b/,
+
+      /\bwhat happens.*(?:finish|complete).*program goal\b/,
+
+      /ፕሮግራም|የፕሮግራም ግብ/,
+    ],
+  );
+}
+
+function isPartnerChatIntent(
+  text:
+    string,
+) {
+  return matches(
+    text,
+    [
+      /^chat\??$/,
+
+      /\bpartner chat\b/,
+
+      /\bgroup chat\b/,
+
+      /\bwhat is chat\b/,
+
+      /\bwhat does chat do\b/,
+
+      /\bchat (?:message|messages|notification|badge|unread|typing|online|retention)\b/,
+
+      /\bunread chat\b/,
+
+      /\btyping indicator\b/,
+
+      /\bpeople (?:are )?typing\b/,
+
+      /\bonline count\b/,
+
+      /\brepl(?:y|ying) to (?:a )?messages?\b/,
+
+      /\bedit(?:ed|ing)? (?:a |my )?messages?\b/,
+
+      /\bdelete(?:d|ing)? (?:a |my )?messages?\b/,
+
+      /\bare (?:chat )?messages saved\b/,
+
+      /\bhow long.*messages (?:saved|kept|stay)\b/,
+
+      /\bwhy (?:are|were|did).*messages.*(?:gone|deleted|disappear|removed)\b/,
+
+      /\bold (?:chat )?messages\b/,
+
+      /የአጋሮች ውይይት|የውይይት መልዕክት/,
+    ],
+  );
+}
+
+function isPartnerSalesKitIntent(
+  text:
+    string,
+) {
+  return matches(
+    text,
+    [
+      /\bsales kit\b/,
+
+      /\bpricing reference\b/,
+
+      /\bcommission reference\b/,
+
+      /\bprofessional conduct\b/,
+
+      /\bsales resources?\b/,
+
+      /\bapproved (?:sales )?(?:information|guidance|rules|resources?)\b/,
+
+      /\bwhy.*(?:pricing|commission) reference\b/,
+
+      /የሽያጭ መሣሪያ|የዋጋ ማጣቀሻ/,
+    ],
+  );
+}
+
+function isPartnerProfileIntent(
+  text:
+    string,
+) {
+  return matches(
+    text,
+    [
+      /^profile\??$/,
+
+      /\b(?:my|partner|representative|sales partner) profile\b/,
+
+      /\bprofile (?:page|settings|picture|photo|image|avatar|theme)\b/,
+
+      /\bwhat is profile\b/,
+
+      /\bchange (?:my )?(?:profile )?(?:picture|photo|avatar)\b/,
+
+      /\badd (?:a |my )?(?:profile )?(?:picture|photo|avatar)\b/,
+
+      /\breplace (?:my )?(?:profile )?(?:picture|photo|avatar)\b/,
+
+      /\bremove (?:my )?(?:profile )?(?:picture|photo|avatar)\b/,
+
+      /\bdisplay name\b/,
+
+      /\blanguage preference\b/,
+
+      /\bpreferred language\b/,
+
+      /\bsave (?:my )?(?:profile )?preferences\b/,
+
+      /\bselect (?:english|amharic)\b/,
+
+      /\bchange (?:my )?language\b/,
+
+      /\bswitch (?:my )?language\b/,
+
+      /\bchange (?:my )?password\b/,
+
+      /\baccount security\b/,
+
+      /\baccount settings\b/,
+
+      /\bportal theme\b/,
+
+      /መገለጫ|የይለፍ ቃል|የቋንቋ ምርጫ/,
+    ],
+  );
+}
+
+function isPartnerNotificationsIntent(
+  text:
+    string,
+) {
+  return matches(
+    text,
+    [
+      /\bred (?:number|badge|notification|\d+)\b/,
+
+      /\bunread badge\b/,
+
+      /\bnotification badge\b/,
+
+      /\bnumber (?:beside|next to|on) (?:chat|reports?)\b/,
+
+      /\bwhat does (?:the )?red \d+ mean\b/,
+
+      /\bwhy did my notification disappear\b/,
+
+      /\bnotification.*(?:chat|reports?)\b/,
+
+      /\b(?:chat|reports?) notification\b/,
+
+      /\bbadge (?:clear|cleared|disappear|disappeared|decrease|decreased)\b/,
+
+      /ቀይ (?:ቁጥር|ምልክት)|ማሳወቂያ/,
+    ],
   );
 }
 
@@ -3331,6 +3993,12 @@ function isPublicUiIntent(
 
       /\bquality switch\b/,
 
+      /\blanguage switcher\b/,
+
+      /\bpublic (?:website )?language\b/,
+
+      /\bwebsite language\b/,
+
       /\bskills section\b/,
 
       /\bexperience section\b/,
@@ -3635,6 +4303,26 @@ function isShortFollowUp(
 
       /^explain more/,
 
+      /^(?:i )?(?:still )?(?:don'?t|do not|can'?t|cannot) (?:get|understand) (?:it|this|that)\b/,
+
+      /^what (?:is|does) (?:it|this|that)\b/,
+
+      /^what'?s (?:it|this|that)\b/,
+
+      /^what (?:do|does) (?:i|it|this|that) get\b/,
+
+      /^what does this mean\b/,
+
+      /^what is this for\b/,
+
+      /^how does (?:it|this|that)\b/,
+
+      /^how do i (?:use|open|find|finish|complete|send|submit|change) (?:it|this|that|one)\b/,
+
+      /^why do i need (?:it|this|that)\b/,
+
+      /^(?:why|when|where) (?:is|does|did|can|will) (?:it|this|that)\b/,
+
       /^continue/,
 
       /^go on/,
@@ -3715,6 +4403,56 @@ function detectContextKeys(
     isApplicationSupportIntent(
       text,
     );
+
+  const partnerWorkspaceIntent =
+    isPartnerWorkspaceIntent(
+      text,
+    );
+
+  const partnerReportsIntent =
+    isPartnerReportsIntent(
+      text,
+    );
+
+  const partnerTrainingIntent =
+    isPartnerTrainingIntent(
+      text,
+    );
+
+  const partnerProgramsIntent =
+    isPartnerProgramsIntent(
+      text,
+    );
+
+  const partnerChatIntent =
+    isPartnerChatIntent(
+      text,
+    );
+
+  const partnerSalesKitIntent =
+    isPartnerSalesKitIntent(
+      text,
+    );
+
+  const partnerProfileIntent =
+    isPartnerProfileIntent(
+      text,
+    );
+
+  const partnerNotificationsIntent =
+    isPartnerNotificationsIntent(
+      text,
+    );
+
+  const partnerProductIntent =
+    partnerWorkspaceIntent ||
+    partnerReportsIntent ||
+    partnerTrainingIntent ||
+    partnerProgramsIntent ||
+    partnerChatIntent ||
+    partnerSalesKitIntent ||
+    partnerProfileIntent ||
+    partnerNotificationsIntent;
 
   const applicationIntent =
     isApplicationIntent(
@@ -3802,6 +4540,82 @@ function detectContextKeys(
     );
 
   /* =======================================================
+     ACCEPTED PARTNER WORKSPACE FEATURES
+     ======================================================= */
+
+  if (
+    partnerWorkspaceIntent
+  ) {
+    addUniqueKey(
+      keys,
+      "partner-workspace",
+    );
+  }
+
+  if (
+    partnerReportsIntent
+  ) {
+    addUniqueKey(
+      keys,
+      "partner-reports",
+    );
+  }
+
+  if (
+    partnerTrainingIntent
+  ) {
+    addUniqueKey(
+      keys,
+      "partner-training",
+    );
+  }
+
+  if (
+    partnerProgramsIntent
+  ) {
+    addUniqueKey(
+      keys,
+      "partner-programs",
+    );
+  }
+
+  if (
+    partnerChatIntent
+  ) {
+    addUniqueKey(
+      keys,
+      "partner-chat",
+    );
+  }
+
+  if (
+    partnerSalesKitIntent
+  ) {
+    addUniqueKey(
+      keys,
+      "partner-sales-kit",
+    );
+  }
+
+  if (
+    partnerProfileIntent
+  ) {
+    addUniqueKey(
+      keys,
+      "partner-profile",
+    );
+  }
+
+  if (
+    partnerNotificationsIntent
+  ) {
+    addUniqueKey(
+      keys,
+      "partner-notifications",
+    );
+  }
+
+  /* =======================================================
      APPLICATION SUPPORT
      ======================================================= */
 
@@ -3845,7 +4659,10 @@ function detectContextKeys(
 
   if (
     commissionIntent ||
-    explicitJobIntent
+    (
+      explicitJobIntent &&
+      !partnerProductIntent
+    )
   ) {
     addUniqueKey(
       keys,
@@ -4378,6 +5195,30 @@ const CONTEXT_PRIORITY:
     ContextKey,
     number
   > = {
+    "partner-notifications":
+      154,
+
+    "partner-programs":
+      152,
+
+    "partner-reports":
+      150,
+
+    "partner-training":
+      148,
+
+    "partner-chat":
+      146,
+
+    "partner-sales-kit":
+      144,
+
+    "partner-profile":
+      142,
+
+    "partner-workspace":
+      140,
+
     "application-support":
       120,
 

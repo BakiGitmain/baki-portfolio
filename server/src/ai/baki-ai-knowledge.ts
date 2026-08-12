@@ -1,10 +1,15 @@
 /* =========================================================
    BAKI AI KNOWLEDGE BASE
 
-   Public business facts for Baki AI.
+   Structured public business reference for Baki AI.
+
+   The current AI route does not import this object. Runtime
+   instructions and routed contexts live in baki-ai-config.ts.
+   Keep this legacy/reference structure accurate for possible
+   future reuse without duplicating every runtime context here.
 
    Rules:
-   - Treat this as source of truth.
+   - Preserve established public business facts.
    - Never invent missing facts.
    - Never expose private/internal information.
    ========================================================= */
@@ -25,7 +30,7 @@ export const BAKI_AI_KNOWLEDGE = {
       "Eyosiyas Daniel",
 
     purpose:
-      "Help visitors understand Baki's services, pricing, projects, partnerships, sales representative program, application process, and how to work with Baki.",
+      "Help visitors understand Baki's services, pricing, projects, partnerships, sales representative program, application process, accepted-partner workspace, and how to work with Baki.",
 
     phone:
       "+251936363094",
@@ -782,7 +787,7 @@ export const BAKI_AI_KNOWLEDGE = {
     ],
 
     onboarding:
-      "Accepted representatives receive onboarding information, tutorials, product explanations and instructions for continuing the sales process.",
+      "Accepted representatives receive onboarding information and access instructions for their private Sales Partner workspace, which includes training and approved product/sales references.",
   },
 
   /* =======================================================
@@ -889,11 +894,22 @@ export const BAKI_AI_KNOWLEDGE = {
 
       privateArea: [
         "Representative dashboard",
-        "Lead/report submission",
-        "Training modules",
-        "Sales resources",
+
+        "Work reports and admin replies",
+
+        "Training courses, sections, lessons, saved progress and lesson resources",
+
+        "Assigned time-bound Programs with measured report/training targets",
+
+        "Shared Partner Chat for authorized partners and admins",
+
+        "Sales Kit pricing, commission and professional-conduct references",
+
         "Commission and sales guidance",
-        "Representative account and security settings",
+
+        "Representative profile, picture, language preference and security settings",
+
+        "Unread badges for Reports replies and Chat messages",
       ],
     },
 
@@ -919,7 +935,7 @@ export const BAKI_AI_KNOWLEDGE = {
 
         "For an application-email problem that still cannot be resolved, Baki's direct phone number may be provided.",
 
-        "A website support-report feature is planned but is not live yet. Do not pretend the report feature already exists.",
+        "A public visitor/application support-report form is not live yet. This is separate from the live Reports area inside the private accepted-partner workspace.",
       ],
 
       noResendPromise:
@@ -942,7 +958,7 @@ export const BAKI_AI_KNOWLEDGE = {
       false,
 
     reportSystemMessage:
-      "A support-report feature is planned for the website but is not live yet. Until it is available, visitors should contact Baki directly when a problem needs manual help.",
+      "A public visitor/application support-report form is not live yet. This is separate from the live Reports area inside the private accepted-partner workspace. Visitors should contact Baki directly when a problem needs manual help.",
 
     directEscalationPhone:
       "+251936363094",

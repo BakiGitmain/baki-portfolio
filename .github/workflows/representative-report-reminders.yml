@@ -1,0 +1,52 @@
+name: Representative Report Reminders
+
+on:
+  schedule:
+    # Run hourly. Database eligibility and locking enforce the
+    # 24-hour inactivity/reminder windows and prevent duplicates.
+    - cron: "17 * * * *"
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: representative-report-reminders
+  cancel-in-progress: false
+
+jobs:
+  remind:
+    name: Send eligible report reminders
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Trigger report reminders
+        env:
+          REPORT_REMINDER_URL: ${{ secrets.REPORT_REMINDER_URL }}
+          REPORT_REMINDER_SECRET: ${{ secrets.REPORT_REMINDER_SECRET }}
+
+        run: |
+          if [ -z "$REPORT_REMINDER_URL" ]; then
+            echo "REPORT_REMINDER_URL secret is missing."
+            exit 1
+          fi
+
+          if [ -z "$REPORT_REMINDER_SECRET" ]; then
+            echo "REPORT_REMINDER_SECRET secret is missing."
+            exit 1
+          fi
+
+          curl \
+            --fail-with-body \
+            --show-error \
+            --silent \
+            --retry 2 \
+            --retry-all-errors \
+            --connect-timeout 10 \
+            --max-time 240 \
+            -X POST \
+            -H "Accept: application/json" \
+            -H "X-Report-Reminder-Secret: $REPORT_REMINDER_SECRET" \
+            "${REPORT_REMINDER_URL%/}/api/internal/representative-report-reminders/run"

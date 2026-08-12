@@ -132,6 +132,268 @@ export type AdminApplicationsResult = {
     ApplicationsPagination;
 };
 
+export type AdminApplicationInsight = {
+  representative: {
+    id:
+      string;
+
+    partnerId:
+      string;
+
+    legalName:
+      string;
+
+    displayName:
+      string;
+
+    effectiveName:
+      string;
+
+    email:
+      string;
+
+    phone:
+      string;
+
+    city:
+      string;
+
+    preferredLanguage:
+      "en" |
+      "am";
+
+    active:
+      boolean;
+
+    avatarUrl:
+      string |
+      null;
+
+    createdAt:
+      string;
+
+    lastLoginAt:
+      string |
+      null;
+
+    lastActivityAt:
+      string |
+      null;
+  } | null;
+
+  summary: {
+    reports:
+      number;
+
+    unreadReports:
+      number;
+
+    lastReportAt:
+      string |
+      null;
+
+    trainingPercent:
+      number;
+
+    completedLessons:
+      number;
+
+    totalLessons:
+      number;
+
+    programs:
+      number;
+
+    activePrograms:
+      number;
+  } | null;
+
+  reports:
+    Array<{
+      id:
+        string;
+
+      message:
+        string;
+
+      adminReadAt:
+        string |
+        null;
+
+      replyCount:
+        number;
+
+      latestReplyAt:
+        string |
+        null;
+
+      replies:
+        Array<{
+          id:
+            string;
+
+          message:
+            string;
+
+          representativeReadAt:
+            string |
+            null;
+
+          createdAt:
+            string;
+        }>;
+
+      createdAt:
+        string;
+
+      updatedAt:
+        string;
+    }>;
+
+  training:
+    Array<{
+      id:
+        string;
+
+      titleEn:
+        string;
+
+      titleAm:
+        string;
+
+      status:
+        string;
+
+      progress: {
+        totalLessons:
+          number;
+
+        completedLessons:
+          number;
+
+        percent:
+          number;
+      };
+
+      sections:
+        Array<{
+          id:
+            string;
+
+          titleEn:
+            string;
+
+          titleAm:
+            string;
+
+          lessons:
+            Array<{
+              id:
+                string;
+
+              titleEn:
+                string;
+
+              titleAm:
+                string;
+
+              durationSeconds:
+                number;
+
+              watchedSeconds:
+                number;
+
+              completed:
+                boolean;
+
+              completedAt:
+                string |
+                null;
+
+              updatedAt:
+                string |
+                null;
+            }>;
+        }>;
+    }>;
+
+  programs:
+    Array<{
+      id:
+        string;
+
+      title:
+        string;
+
+      description:
+        string;
+
+      effectiveStatus:
+        string;
+
+      startDate:
+        string;
+
+      endDate:
+        string;
+
+      progressPercent:
+        number;
+
+      targets:
+        Array<{
+          id:
+            string;
+
+          targetType:
+            "reports" |
+            "lessons" |
+            "course_completion";
+
+          targetValue:
+            number;
+
+          actualValue:
+            number;
+
+          courseId:
+            string |
+            null;
+
+          courseTitleEn:
+            string |
+            null;
+
+          courseTitleAm:
+            string |
+            null;
+        }>;
+    }>;
+
+  activity:
+    Array<{
+      type:
+        string;
+
+      entityId:
+        string;
+
+      label:
+        string;
+
+      createdAt:
+        string;
+    }>;
+
+  leads: {
+    available:
+      false;
+
+    reason:
+      string;
+  };
+};
+
 type Language =
   | "en"
   | "am";
@@ -547,4 +809,53 @@ export async function getAdminApplicationDocument(
   }
 
   return response.json();
+}
+
+export async function getAdminApplicationInsight(
+  id:
+    string,
+
+  language:
+    Language,
+) {
+  const response =
+    await fetch(
+      `${getApiUrl()}/api/admin/applications/${encodeURIComponent(
+        id,
+      )}/insight`,
+      {
+        method:
+          "GET",
+
+        credentials:
+          "include",
+
+        cache:
+          "no-store",
+
+        headers: {
+          Accept:
+            "application/json",
+        },
+      },
+    );
+
+  if (
+    !response.ok
+  ) {
+    throw new Error(
+      await getApiError(
+        response,
+        language,
+      ),
+    );
+  }
+
+  const result =
+    await response.json() as {
+      insight:
+        AdminApplicationInsight;
+    };
+
+  return result.insight;
 }
