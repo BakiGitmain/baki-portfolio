@@ -10,7 +10,7 @@ import {
 
 import {
   rateLimit,
-} from "express-rate-limit";
+} from "../middleware/rate-limit.middleware.js";
 
 import {
   z,
@@ -576,9 +576,6 @@ router.post(
         allowed_formats:
           "jpg,png,webp",
 
-        max_file_size:
-          MAX_AVATAR_BYTES,
-
         transformation:
           `c_fill,g_auto,h_${AVATAR_SIZE},w_${AVATAR_SIZE}`,
       };
@@ -598,6 +595,9 @@ router.post(
 
         apiKey:
           env.CLOUDINARY_API_KEY,
+
+        cloudName:
+          env.CLOUDINARY_CLOUD_NAME,
 
         signature,
 

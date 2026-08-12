@@ -66,6 +66,10 @@ import healthRouter from "./routes/health.routes.js";
 
 import projectsRouter from "./routes/projects.routes.js";
 
+import {
+  EXPRESS_TRUST_PROXY,
+} from "./middleware/rate-limit.middleware.js";
+
 /* =========================================================
    APP
    ========================================================= */
@@ -93,7 +97,7 @@ const helmet =
 
 app.set(
   "trust proxy",
-  1,
+  EXPRESS_TRUST_PROXY,
 );
 
 /* =========================================================

@@ -218,6 +218,9 @@ type AvatarSignature = {
   apiKey:
     string;
 
+  cloudName:
+    string;
+
   signature:
     string;
 

@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs";
 
 import {
   rateLimit,
-} from "express-rate-limit";
+} from "../middleware/rate-limit.middleware.js";
 
 import {
   z,

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { Router, type Response } from "express";
-import { rateLimit } from "express-rate-limit";
+import { rateLimit } from "../middleware/rate-limit.middleware.js";
 import { z } from "zod";
 
 import { cloudinary } from "../config/cloudinary.js";

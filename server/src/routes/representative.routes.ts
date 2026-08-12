@@ -8,7 +8,7 @@ import {
 
 import {
   rateLimit,
-} from "express-rate-limit";
+} from "../middleware/rate-limit.middleware.js";
 
 import {
   db,

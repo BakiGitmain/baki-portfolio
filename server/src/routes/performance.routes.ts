@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { rateLimit } from "express-rate-limit";
+import { rateLimit } from "../middleware/rate-limit.middleware.js";
 import { z } from "zod";
 
 import { db } from "../config/db.js";
