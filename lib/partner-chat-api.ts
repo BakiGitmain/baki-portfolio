@@ -1,3 +1,8 @@
+import {
+  logPartnerChatPerformance,
+  partnerChatPerformanceNow,
+} from "@/lib/partner-chat-performance";
+
 export type PartnerChatRole =
   | "representative"
   | "admin";
@@ -188,6 +193,8 @@ async function request<T>(
   init?:
     RequestInit,
 ) {
+  const startedAt =
+    partnerChatPerformanceNow();
   const response =
     await fetch(
       `${getApiUrl()}${chatPath(
@@ -224,6 +231,25 @@ async function request<T>(
       ),
     );
   }
+
+  logPartnerChatPerformance(
+    `${role}${path}`,
+    {
+      requestMs:
+        Number(
+          (
+            partnerChatPerformanceNow() -
+            startedAt
+          ).toFixed(
+            1,
+          ),
+        ),
+      serverTiming:
+        response.headers.get(
+          "Server-Timing",
+        ),
+    },
+  );
 
   return response.json() as
     Promise<T>;

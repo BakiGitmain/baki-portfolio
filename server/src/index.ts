@@ -19,7 +19,7 @@ const httpServer =
     app,
   );
 
-await createPartnerChatSocketServer(
+createPartnerChatSocketServer(
   httpServer,
 );
 

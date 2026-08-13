@@ -131,21 +131,23 @@ export async function requireRepresentative(
       await db.query(
         `
           SELECT
-            id,
-            username,
+            representative.id,
+            representative.username,
             COALESCE(
-              NULLIF(TRIM(display_name), ''),
-              name
+              NULLIF(TRIM(representative.display_name), ''),
+              representative.name
             ) AS name,
-            email,
-            role,
-            is_active,
-            must_change_password,
-            session_version,
+            representative.email,
+            representative.role,
+            representative.is_active,
+            representative.must_change_password,
+            representative.session_version,
             active_ban.reason AS ban_reason,
             active_ban.banned_until,
             active_ban.is_permanent AS ban_is_permanent
           FROM sales_representatives representative
+          INNER JOIN sales_representative_applications application
+            ON application.id = representative.application_id
           LEFT JOIN LATERAL (
             SELECT
               ban.reason,
@@ -162,7 +164,9 @@ export async function requireRepresentative(
             ORDER BY ban.started_at DESC
             LIMIT 1
           ) active_ban ON TRUE
-          WHERE representative.id = $1
+          WHERE
+            representative.id = $1
+            AND application.status = 'accepted'
           LIMIT 1
         `,
         [

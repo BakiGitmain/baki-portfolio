@@ -50,6 +50,15 @@ const envSchema =
       .min(32)
       .optional(),
 
+    CHAT_PERF_DIAGNOSTICS: z
+      .enum([
+        "true",
+        "false",
+      ])
+      .default(
+        "false",
+      ),
+
     /* =====================================================
        AUTH
        ===================================================== */

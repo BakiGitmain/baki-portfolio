@@ -307,6 +307,147 @@ let activeChatServer:
   null =
   null;
 
+type RealtimeInitializationState =
+  | "not_initialized"
+  | "connecting"
+  | "ready"
+  | "failed";
+
+let realtimeInitializationState:
+  RealtimeInitializationState =
+  "not_initialized";
+
+let realtimeInitializationPromise:
+  Promise<boolean> |
+  null =
+  null;
+
+const chatPerformanceDiagnosticsEnabled =
+  env.NODE_ENV !==
+    "production" ||
+  env.CHAT_PERF_DIAGNOSTICS ===
+    "true";
+
+function ensureRealtimeAdapter(
+  io:
+    ChatServer,
+) {
+  if (
+    realtimeInitializationPromise
+  ) {
+    return realtimeInitializationPromise;
+  }
+
+  realtimeInitializationState =
+    "connecting";
+
+  realtimeInitializationPromise =
+    (async () => {
+      if (
+        !env.REDIS_URL
+      ) {
+        realtimeInitializationState =
+          "failed";
+
+        if (
+          env.NODE_ENV ===
+          "production"
+        ) {
+          console.error(
+            "REDIS_URL is required for production Partner Chat fan-out.",
+          );
+        }
+
+        return false;
+      }
+
+      const startedAt =
+        performance.now();
+
+      try {
+        const publisher =
+          new Redis(
+            env.REDIS_URL,
+            {
+              lazyConnect:
+                true,
+
+              maxRetriesPerRequest:
+                null,
+
+              retryStrategy: (
+                attempts:
+                  number,
+              ) =>
+                Math.min(
+                  attempts *
+                    250,
+                  5_000,
+                ),
+            },
+          );
+
+        const subscriber =
+          publisher.duplicate();
+
+        await Promise.all([
+          publisher.connect(),
+          subscriber.connect(),
+        ]);
+
+        io.adapter(
+          createAdapter(
+            publisher,
+            subscriber,
+          ),
+        );
+
+        distributedRateLimitRedis =
+          publisher;
+        realtimeInitializationState =
+          "ready";
+
+        if (
+          chatPerformanceDiagnosticsEnabled
+        ) {
+          console.info(
+            "[chat-perf] Redis adapter ready",
+            {
+              durationMs:
+                Number(
+                  (
+                    performance.now() -
+                    startedAt
+                  ).toFixed(
+                    1,
+                  ),
+                ),
+            },
+          );
+        }
+
+        return true;
+      } catch (
+        error
+      ) {
+        realtimeInitializationState =
+          "failed";
+
+        console.error(
+          "Partner Chat Redis adapter failed to initialize:",
+          error instanceof
+            Error
+            ? error.message
+            : "Unknown Redis error.",
+        );
+
+        return false;
+      }
+    })();
+
+  return realtimeInitializationPromise;
+}
+
 export async function getPartnerChatOnlineSummary() {
   if (
     !activeChatServer
@@ -563,10 +704,16 @@ function userRoom(
   return `partner-chat:user:${identity.publicKey}`;
 }
 
-export async function createPartnerChatSocketServer(
+export function createPartnerChatSocketServer(
   httpServer:
     HttpServer,
 ) {
+  if (
+    activeChatServer
+  ) {
+    return activeChatServer;
+  }
+
   const io:
     ChatServer =
     new Server(
@@ -612,74 +759,10 @@ export async function createPartnerChatSocketServer(
     "Partner Chat socket server initialized.",
   );
 
-  let distributedRealtimeReady =
-    false;
-
-  if (
-    env.REDIS_URL
-  ) {
-    try {
-      const publisher =
-        new Redis(
-          env.REDIS_URL,
-          {
-            lazyConnect:
-              true,
-
-            maxRetriesPerRequest:
-              null,
-
-            retryStrategy: (
-              attempts:
-                number,
-            ) =>
-              Math.min(
-                attempts *
-                  250,
-                5_000,
-              ),
-          },
-        );
-
-      const subscriber =
-        publisher.duplicate();
-
-      await Promise.all([
-        publisher.connect(),
-        subscriber.connect(),
-      ]);
-
-      io.adapter(
-        createAdapter(
-          publisher,
-          subscriber,
-        ),
-      );
-
-      distributedRateLimitRedis =
-        publisher;
-
-      distributedRealtimeReady =
-        true;
-    } catch (
-      error
-    ) {
-      console.error(
-        "Partner Chat Redis adapter failed to initialize:",
-        error instanceof
-          Error
-          ? error.message
-          : "Unknown Redis error.",
-      );
-    }
-  } else if (
-    env.NODE_ENV ===
-    "production"
-  ) {
-    console.error(
-      "REDIS_URL is required for production Partner Chat fan-out.",
+  const realtimeReady =
+    ensureRealtimeAdapter(
+      io,
     );
-  }
 
   io.use(
     async (
@@ -687,10 +770,55 @@ export async function createPartnerChatSocketServer(
       next,
     ) => {
       try {
+        const authenticationStartedAt =
+          performance.now();
+        let redisWaitMs =
+          0;
+
+        if (
+          env.REDIS_URL ||
+          env.NODE_ENV ===
+            "production"
+        ) {
+          const redisWaitStartedAt =
+            performance.now();
+          const ready =
+            await realtimeReady;
+          redisWaitMs =
+            performance.now() -
+            redisWaitStartedAt;
+
+          if (
+            env.NODE_ENV ===
+              "production" &&
+            !ready
+          ) {
+            console.warn(
+              "Partner Chat socket authentication rejected.",
+              {
+                code:
+                  "CHAT_REALTIME_UNAVAILABLE",
+                origin:
+                  socket.handshake.headers.origin ??
+                  "unknown",
+              },
+            );
+
+            next(
+              new Error(
+                "CHAT_REALTIME_UNAVAILABLE",
+              ),
+            );
+
+            return;
+          }
+        }
+
         if (
           env.NODE_ENV ===
             "production" &&
-          !distributedRealtimeReady
+          realtimeInitializationState !==
+            "ready"
         ) {
           console.warn(
             "Partner Chat socket authentication rejected.",
@@ -744,10 +872,46 @@ export async function createPartnerChatSocketServer(
           return;
         }
 
+        const verificationStartedAt =
+          performance.now();
         const identity =
           await verifyPartnerChatSocketToken(
             token,
           );
+
+        if (
+          chatPerformanceDiagnosticsEnabled
+        ) {
+          console.info(
+            "[chat-perf] socket authentication",
+            {
+              redisWaitMs:
+                Number(
+                  redisWaitMs.toFixed(
+                    1,
+                  ),
+                ),
+              verificationMs:
+                Number(
+                  (
+                    performance.now() -
+                    verificationStartedAt
+                  ).toFixed(
+                    1,
+                  ),
+                ),
+              totalMs:
+                Number(
+                  (
+                    performance.now() -
+                    authenticationStartedAt
+                  ).toFixed(
+                    1,
+                  ),
+                ),
+            },
+          );
+        }
 
         if (
           !identity

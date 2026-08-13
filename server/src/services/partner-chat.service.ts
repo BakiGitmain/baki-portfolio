@@ -25,6 +25,9 @@ import {
 export const PARTNER_CHAT_ROOM_SLUG =
   "baki-digital-partners";
 
+const PARTNER_CHAT_ROOM_NAME =
+  "Baki Digital Partners";
+
 export const CHAT_RETENTION_DAYS =
   7;
 
@@ -434,6 +437,7 @@ const messageSelect = `
     message.deleted_at,
     message.created_at,
     message.updated_at,
+    NOW() AS chat_server_time,
 
     reply.id AS reply_id,
     reply.message AS reply_message,
@@ -502,20 +506,13 @@ async function getRoomRow() {
   return room;
 }
 
-export async function getPartnerChatRoom() {
-  const room =
-    await getRoomRow();
-
+export function getPartnerChatRoom() {
   return {
     slug:
-      String(
-        room.slug,
-      ),
+      PARTNER_CHAT_ROOM_SLUG,
 
     name:
-      String(
-        room.name,
-      ),
+      PARTNER_CHAT_ROOM_NAME,
 
     retentionDays:
       CHAT_RETENTION_DAYS,
@@ -590,30 +587,21 @@ export async function getPartnerChatMessages({
   limit:
     number;
 }) {
-  const room =
-    await getRoomRow();
-
-  const timeResult =
-    await db.query(
-      "SELECT NOW() AS server_time",
-    );
-
-  const serverTime =
-    toIso(
-      timeResult.rows[0]
-        .server_time,
-    );
-
   const result =
     await db.query(
         `
           ${messageSelect}
           WHERE
-            message.room_id = $1::uuid
+            message.room_id = (
+              SELECT id
+              FROM partner_chat_rooms
+              WHERE LOWER(slug) = LOWER($1::text)
+              LIMIT 1
+            )
             AND message.created_at >=
               NOW() - INTERVAL '7 days'
             AND message.created_at <=
-              $4::timestamptz
+              NOW()
             AND (
               $2::timestamptz IS NULL
               OR (
@@ -627,21 +615,34 @@ export async function getPartnerChatMessages({
           ORDER BY
             message.created_at DESC,
             message.id DESC
-          LIMIT $5::integer
+          LIMIT $4::integer
         `,
         [
-          room.id,
+          PARTNER_CHAT_ROOM_SLUG,
           before?.createdAt ??
             null,
           before?.id ??
             null,
-
-          serverTime,
-
           limit +
             1,
         ],
       );
+
+  const serverTime =
+    result.rows[0]
+      ?.chat_server_time
+      ? toIso(
+          result.rows[0]
+            .chat_server_time,
+        )
+      : toIso(
+          (
+            await db.query(
+              "SELECT NOW() AS server_time",
+            )
+          ).rows[0]
+            .server_time,
+        );
 
   const hasMore =
     result.rows.length >
@@ -687,26 +688,17 @@ export async function synchronizePartnerChatMessages(
   since:
     string,
 ) {
-  const room =
-    await getRoomRow();
-
-  const snapshotResult =
-    await db.query(
-      "SELECT NOW() AS server_time",
-    );
-
-  const serverTime =
-    toIso(
-      snapshotResult.rows[0]
-        .server_time,
-    );
-
   const result =
     await db.query(
       `
         ${messageSelect}
         WHERE
-          message.room_id = $1::uuid
+          message.room_id = (
+            SELECT id
+            FROM partner_chat_rooms
+            WHERE LOWER(slug) = LOWER($1::text)
+            LIMIT 1
+          )
           AND message.created_at >=
             NOW() - INTERVAL '7 days'
           AND message.updated_at >
@@ -715,18 +707,33 @@ export async function synchronizePartnerChatMessages(
               NOW() - INTERVAL '7 days'
             )
           AND message.updated_at <=
-            $3::timestamptz
+            NOW()
         ORDER BY
           message.updated_at ASC,
           message.id ASC
         LIMIT 501
       `,
       [
-        room.id,
+        PARTNER_CHAT_ROOM_SLUG,
         since,
-        serverTime,
       ],
     );
+
+  const serverTime =
+    result.rows[0]
+      ?.chat_server_time
+      ? toIso(
+          result.rows[0]
+            .chat_server_time,
+        )
+      : toIso(
+          (
+            await db.query(
+              "SELECT NOW() AS server_time",
+            )
+          ).rows[0]
+            .server_time,
+        );
 
   return {
     messages:

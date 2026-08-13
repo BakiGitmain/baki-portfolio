@@ -10,16 +10,20 @@ import {
 } from "../middleware/rate-limit.middleware.js";
 
 import {
+  env,
+} from "../config/env.js";
+
+import {
   z,
 } from "zod";
 
 import {
   createPartnerChatSocketToken,
-  loadChatIdentity,
 } from "../services/partner-chat-auth.service.js";
 
 import {
   decodeChatCursor,
+  createChatPublicKey,
   getPartnerChatMessages,
   getPartnerChatRoom,
   getPartnerChatUnreadCount,
@@ -38,6 +42,74 @@ import {
 import {
   emitAdminChatReportsChanged,
 } from "../socket/partner-chat.socket.js";
+
+const chatPerformanceDiagnosticsEnabled =
+  env.NODE_ENV !==
+    "production" ||
+  env.CHAT_PERF_DIAGNOSTICS ===
+    "true";
+
+function finishChatPerformance(
+  res:
+    Response,
+  operation:
+    string,
+  stages:
+    Record<string, number>,
+) {
+  const total =
+    performance.now() -
+    Number(
+      res.locals
+        .partnerChatStartedAt ??
+        performance.now(),
+    );
+
+  const allStages = {
+    ...stages,
+    total,
+  };
+
+  res.setHeader(
+    "Server-Timing",
+    Object.entries(
+      allStages,
+    )
+      .map(
+        ([
+          name,
+          duration,
+        ]) =>
+          `${name};dur=${Math.max(0, duration).toFixed(1)}`,
+      )
+      .join(", "),
+  );
+
+  if (
+    chatPerformanceDiagnosticsEnabled
+  ) {
+    console.info(
+      `[chat-perf] ${operation}`,
+      Object.fromEntries(
+        Object.entries(
+          allStages,
+        ).map(
+          ([
+            name,
+            duration,
+          ]) => [
+            `${name}Ms`,
+            Number(
+              duration.toFixed(
+                1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 const historyQuerySchema =
   z.object({
@@ -106,19 +178,42 @@ async function getRequestIdentity(
     return null;
   }
 
-  return loadChatIdentity({
+  return {
     id:
       req.auth.id,
 
-    role,
+    role:
+      role,
+
+    name:
+      req.auth.name,
+
+    reference:
+      role ===
+        "representative"
+        ? req.auth.username
+        : null,
+
+    publicKey:
+      createChatPublicKey(
+        role,
+        req.auth.id,
+      ),
+
+    avatarUrl:
+      null,
 
     sessionVersion:
       role ===
         "representative"
         ? req.auth
-            .sessionVersion
-        : undefined,
-  });
+            .sessionVersion ??
+          null
+        : null,
+
+    performance:
+      null,
+  };
 }
 
 async function withIdentity(
@@ -243,7 +338,35 @@ export function createPartnerChatRouter({
     });
 
   router.use(
+    (
+      _req,
+      res,
+      next,
+    ) => {
+      res.locals
+        .partnerChatStartedAt =
+        performance.now();
+
+      next();
+    },
+
     ...auth,
+
+    (
+      _req,
+      res,
+      next,
+    ) => {
+      res.locals
+        .partnerChatAuthMs =
+        performance.now() -
+        Number(
+          res.locals
+            .partnerChatStartedAt,
+        );
+
+      next();
+    },
   );
 
   router.get(
@@ -255,6 +378,8 @@ export function createPartnerChatRouter({
       next,
     ) => {
       try {
+        const identityStartedAt =
+          performance.now();
         const identity =
           await withIdentity(
             req,
@@ -268,24 +393,53 @@ export function createPartnerChatRouter({
           return;
         }
 
+        const identityMs =
+          performance.now() -
+          identityStartedAt;
+
         const room =
-          await getPartnerChatRoom();
+          getPartnerChatRoom();
+
+        const tokenStartedAt =
+          performance.now();
+        const socketToken =
+          createPartnerChatSocketToken({
+            identity,
+
+            sessionVersion:
+              role ===
+                "representative"
+                ? req.auth
+                    ?.sessionVersion
+                : undefined,
+          });
+        const tokenMs =
+          performance.now() -
+          tokenStartedAt;
+
+        finishChatPerformance(
+          res,
+          `${role} session`,
+          {
+            auth:
+              Number(
+                res.locals
+                  .partnerChatAuthMs ??
+                  0,
+              ),
+            identity:
+              identityMs,
+            token:
+              tokenMs,
+          },
+        );
 
         res.json({
           success:
             true,
 
           socketToken:
-            createPartnerChatSocketToken({
-              identity,
-
-              sessionVersion:
-                role ===
-                  "representative"
-                  ? req.auth
-                      ?.sessionVersion
-                  : undefined,
-            }),
+            socketToken,
 
           self:
             toChatParticipant(
@@ -313,6 +467,8 @@ export function createPartnerChatRouter({
       next,
     ) => {
       try {
+        const identityStartedAt =
+          performance.now();
         const identity =
           await withIdentity(
             req,
@@ -325,6 +481,10 @@ export function createPartnerChatRouter({
         ) {
           return;
         }
+
+        const identityMs =
+          performance.now() -
+          identityStartedAt;
 
         const parsed =
           historyQuerySchema.safeParse(
@@ -359,12 +519,34 @@ export function createPartnerChatRouter({
           return;
         }
 
+        const historyStartedAt =
+          performance.now();
         const result =
           await getPartnerChatMessages({
             before,
             limit:
               parsed.data.limit,
           });
+        const historyMs =
+          performance.now() -
+          historyStartedAt;
+
+        finishChatPerformance(
+          res,
+          `${role} history`,
+          {
+            auth:
+              Number(
+                res.locals
+                  .partnerChatAuthMs ??
+                  0,
+              ),
+            identity:
+              identityMs,
+            history:
+              historyMs,
+          },
+        );
 
         res.json({
           success:

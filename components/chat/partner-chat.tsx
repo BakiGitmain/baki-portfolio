@@ -37,6 +37,11 @@ import {
   type PartnerChatSocketResult,
 } from "@/lib/partner-chat-socket";
 
+import {
+  logPartnerChatPerformance,
+  partnerChatPerformanceNow,
+} from "@/lib/partner-chat-performance";
+
 import ChatComposer from "./chat-composer";
 import ChatHeader from "./chat-header";
 import ChatMessageList from "./chat-message-list";
@@ -355,6 +360,17 @@ export default function PartnerChat({
     } | null>(
       null,
     );
+  const initialHistoryRequestRef =
+    useRef<{
+      key:
+        string;
+      promise:
+        ReturnType<
+          typeof getPartnerChatMessages
+        >;
+    } | null>(
+      null,
+    );
 
   const copy =
     language ===
@@ -610,21 +626,145 @@ export default function PartnerChat({
         null =
         null;
 
-      void Promise.all([
+      const componentStartedAt =
+        partnerChatPerformanceNow();
+      const historyStartedAt =
+        partnerChatPerformanceNow();
+      const connectionPromise =
         getPartnerChatConnection(
           role,
           language,
-        ),
-        getPartnerChatMessages(
-          role,
-          language,
-        ),
-      ])
+        );
+      const historyRequestKey =
+        `${role}:${language}:${reloadKey}`;
+
+      if (
+        initialHistoryRequestRef
+          .current?.key !==
+        historyRequestKey
+      ) {
+        initialHistoryRequestRef.current = {
+          key:
+            historyRequestKey,
+          promise:
+            getPartnerChatMessages(
+              role,
+              language,
+            ),
+        };
+      }
+
+      const historyPromise =
+        initialHistoryRequestRef
+          .current.promise;
+
+      logPartnerChatPerformance(
+        `${role} component connection start`,
+        {
+          t0:
+            Number(
+              componentStartedAt.toFixed(
+                1,
+              ),
+            ),
+        },
+      );
+
+      void historyPromise
         .then(
-          ([
-            connection,
+          (
             history,
-          ]) => {
+          ) => {
+            if (
+              cancelled
+            ) {
+              return;
+            }
+
+            mergeIntoState(
+              history.messages,
+            );
+            cursorRef.current =
+              history.nextCursor;
+            hasMoreRef.current =
+              history.hasMore;
+            setHasMore(
+              history.hasMore,
+            );
+            serverTimeRef.current =
+              history.serverTime;
+            setLoading(
+              false,
+            );
+            setError(
+              null,
+            );
+
+            logPartnerChatPerformance(
+              `${role} initial history ready`,
+              {
+                historyMs:
+                  Number(
+                    (
+                      partnerChatPerformanceNow() -
+                      historyStartedAt
+                    ).toFixed(
+                      1,
+                    ),
+                  ),
+                totalFromComponentMs:
+                  Number(
+                    (
+                      partnerChatPerformanceNow() -
+                      componentStartedAt
+                    ).toFixed(
+                      1,
+                    ),
+                  ),
+              },
+            );
+
+            window.setTimeout(
+              () => {
+                if (
+                  !cancelled
+                ) {
+                  scrollToLatest(
+                    "auto",
+                  );
+                }
+              },
+              0,
+            );
+          },
+        )
+        .catch(
+          (
+            requestError,
+          ) => {
+            if (
+              cancelled
+            ) {
+              return;
+            }
+
+            setLoading(
+              false,
+            );
+            setError(
+              requestError instanceof
+                Error
+                ? requestError.message
+                : copy.loadError,
+            );
+          },
+        );
+
+      void connectionPromise
+        .then(
+          (
+            connection,
+          ) => {
             if (
               cancelled
             ) {
@@ -648,41 +788,93 @@ export default function PartnerChat({
             setOnlineCount(
               latestPresence.onlineCount,
             );
-            messagesRef.current =
-              history.messages;
-            setMessages(
-              history.messages,
+            setError(
+              null,
             );
-            cursorRef.current =
-              history.nextCursor;
-            hasMoreRef.current =
-              history.hasMore;
-            setHasMore(
-              history.hasMore,
-            );
-            serverTimeRef.current =
-              history.serverTime;
-            setConnectionState(
-              socket.connected
-                ? "connected"
-                : "connecting",
-            );
-            setLoading(
-              false,
-            );
+
+            let composerUsableLogged =
+              false;
 
             const handleConnect =
               () => {
                 setConnectionState(
                   "connected",
                 );
+
+                if (
+                  !composerUsableLogged
+                ) {
+                  composerUsableLogged =
+                    true;
+
+                  const now =
+                    partnerChatPerformanceNow();
+                  const timings =
+                    connection.getPerformanceTimings();
+
+                  logPartnerChatPerformance(
+                    `${role} composer usable`,
+                    {
+                      totalFromComponentMs:
+                        Number(
+                          (
+                            now -
+                            componentStartedAt
+                          ).toFixed(
+                            1,
+                          ),
+                        ),
+                      connectionBootstrapMs:
+                        timings.socketConnectedAt ===
+                        null
+                          ? null
+                          : Number(
+                              (
+                                timings.socketConnectedAt -
+                                timings.tokenRequestStartedAt
+                              ).toFixed(
+                                1,
+                              ),
+                            ),
+                      managerCreationMs:
+                        Number(
+                          (
+                            timings.managerCreatedAt -
+                            timings.tokenResponseReceivedAt
+                          ).toFixed(
+                            1,
+                          ),
+                        ),
+                      engineStartDelayMs:
+                        Number(
+                          (
+                            timings.engineConnectionStartedAt -
+                            timings.managerCreatedAt
+                          ).toFixed(
+                            1,
+                          ),
+                        ),
+                      prewarmed:
+                        timings.tokenRequestStartedAt <
+                        componentStartedAt,
+                    },
+                  );
+                }
+
                 void synchronize();
               };
 
             const handleDisconnect =
-              () => {
+              (
+                reason:
+                  string,
+              ) => {
                 setConnectionState(
-                  "reconnecting",
+                  reason ===
+                    "io server disconnect" ||
+                  !socket.active
+                    ? "offline"
+                    : "reconnecting",
                 );
                 setTyping(
                   new Map(),
@@ -916,18 +1108,15 @@ export default function PartnerChat({
                 );
               };
 
-            window.setTimeout(
-              () => {
-                if (
-                  !cancelled
-                ) {
-                  scrollToLatest(
-                    "auto",
-                  );
-                }
-              },
-              0,
-            );
+            if (
+              socket.connected
+            ) {
+              handleConnect();
+            } else {
+              setConnectionState(
+                "connecting",
+              );
+            }
           },
         )
         .catch(

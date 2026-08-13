@@ -11,6 +11,11 @@ import {
   type PartnerChatSession,
 } from "@/lib/partner-chat-api";
 
+import {
+  logPartnerChatPerformance,
+  partnerChatPerformanceNow,
+} from "@/lib/partner-chat-performance";
+
 type Language =
   | "en"
   | "am";
@@ -213,6 +218,23 @@ type Connection = {
     participants:
       PartnerChatParticipant[];
   };
+
+  getPerformanceTimings: () => {
+    tokenRequestStartedAt:
+      number;
+    tokenResponseReceivedAt:
+      number;
+    managerCreatedAt:
+      number;
+    engineConnectionStartedAt:
+      number;
+    transportConnectedAt:
+      number |
+      null;
+    socketConnectedAt:
+      number |
+      null;
+  };
 };
 
 const connections =
@@ -265,6 +287,9 @@ function createConnection(
   language:
     Language,
 ) {
+  const tokenRequestStartedAt =
+    partnerChatPerformanceNow();
+
   return getPartnerChatSession(
     role,
     language,
@@ -272,6 +297,24 @@ function createConnection(
     (
       session,
     ) => {
+      const tokenResponseReceivedAt =
+        partnerChatPerformanceNow();
+
+      logPartnerChatPerformance(
+        `${role} token request`,
+        {
+          durationMs:
+            Number(
+              (
+                tokenResponseReceivedAt -
+                tokenRequestStartedAt
+              ).toFixed(
+                1,
+              ),
+            ),
+        },
+      );
+
       const socket:
         PartnerChatSocket =
         io(
@@ -284,9 +327,12 @@ function createConnection(
               false,
 
             transports: [
-              "polling",
               "websocket",
+              "polling",
             ],
+
+            tryAllTransports:
+              true,
 
             withCredentials:
               true,
@@ -312,6 +358,145 @@ function createConnection(
               12_000,
           },
         );
+
+      const managerCreatedAt =
+        partnerChatPerformanceNow();
+      let engineConnectionStartedAt =
+        managerCreatedAt;
+      let transportConnectedAt:
+        number |
+        null =
+        null;
+      let socketConnectedAt:
+        number |
+        null =
+        null;
+      let reconnectStartedAt:
+        number |
+        null =
+        null;
+
+      socket.io.on(
+        "open",
+        () => {
+          const openedAt =
+            partnerChatPerformanceNow();
+
+          if (
+            transportConnectedAt ===
+            null
+          ) {
+            transportConnectedAt =
+              openedAt;
+
+            logPartnerChatPerformance(
+              `${role} socket transport`,
+              {
+                durationMs:
+                  Number(
+                    (
+                      openedAt -
+                      engineConnectionStartedAt
+                    ).toFixed(
+                      1,
+                    ),
+                  ),
+                transport:
+                  socket.io.engine
+                    ?.transport
+                    ?.name ??
+                  "unknown",
+              },
+            );
+          }
+        },
+      );
+
+      socket.on(
+        "connect",
+        () => {
+          const connectedAt =
+            partnerChatPerformanceNow();
+
+          if (
+            socketConnectedAt ===
+            null
+          ) {
+            socketConnectedAt =
+              connectedAt;
+
+            logPartnerChatPerformance(
+              `${role} socket authentication`,
+              {
+                durationMs:
+                  transportConnectedAt ===
+                  null
+                    ? null
+                    : Number(
+                        (
+                          connectedAt -
+                          transportConnectedAt
+                        ).toFixed(
+                          1,
+                        ),
+                      ),
+                totalAfterTokenMs:
+                  Number(
+                    (
+                      connectedAt -
+                      engineConnectionStartedAt
+                    ).toFixed(
+                      1,
+                    ),
+                  ),
+              },
+            );
+          }
+        },
+      );
+
+      socket.io.on(
+        "reconnect_attempt",
+        () => {
+          if (
+            reconnectStartedAt ===
+            null
+          ) {
+            reconnectStartedAt =
+              partnerChatPerformanceNow();
+          }
+        },
+      );
+
+      socket.io.on(
+        "reconnect",
+        (
+          attempt,
+        ) => {
+          if (
+            reconnectStartedAt !==
+            null
+          ) {
+            logPartnerChatPerformance(
+              `${role} reconnect`,
+              {
+                attempt,
+                durationMs:
+                  Number(
+                    (
+                      partnerChatPerformanceNow() -
+                      reconnectStartedAt
+                    ).toFixed(
+                      1,
+                    ),
+                  ),
+              },
+            );
+            reconnectStartedAt =
+              null;
+          }
+        },
+      );
 
       let refreshingToken =
         false;
@@ -413,6 +598,8 @@ function createConnection(
         },
       );
 
+      engineConnectionStartedAt =
+        partnerChatPerformanceNow();
       socket.connect();
 
       return {
@@ -420,6 +607,15 @@ function createConnection(
         session,
         getPresence: () =>
           latestPresence,
+
+        getPerformanceTimings: () => ({
+          tokenRequestStartedAt,
+          tokenResponseReceivedAt,
+          managerCreatedAt,
+          engineConnectionStartedAt,
+          transportConnectedAt,
+          socketConnectedAt,
+        }),
       };
     },
   );

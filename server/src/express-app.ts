@@ -186,6 +186,10 @@ app.use(
 
     credentials:
       true,
+
+    exposedHeaders: [
+      "Server-Timing",
+    ],
   }),
 );
 
