@@ -899,9 +899,13 @@ export const BAKI_AI_KNOWLEDGE = {
 
         "Training courses, sections, lessons, saved progress and lesson resources",
 
-        "Assigned time-bound Programs with measured report/training targets",
+        "Assigned Programs with automatic goals, verified business challenges, progress, deadlines and tracked rewards",
 
         "Shared Partner Chat for authorized partners and admins",
+
+        "Privacy-safe Chat profile cards with Partner ID, rank, verified-sale total and report total",
+
+        "Message reporting for spam, harassment, scams, inappropriate content, threats or another concern",
 
         "Sales Kit pricing, commission and professional-conduct references",
 
@@ -909,7 +913,13 @@ export const BAKI_AI_KNOWLEDGE = {
 
         "Representative profile, picture, language preference and security settings",
 
-        "Unread badges for Reports replies and Chat messages",
+        "Combined and per-section attention badges for Reports replies, Program updates, Chat messages and training not started",
+
+        "Backend-calculated Noob, Pro and Expert performance ranks plus a privacy-safe Top Partners leaderboard",
+
+        "Secure two-email verification for changing the representative account email",
+
+        "Clear account-suspension notices that show the reason and, for temporary restrictions, when access restores automatically",
       ],
     },
 

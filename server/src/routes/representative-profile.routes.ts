@@ -37,6 +37,14 @@ import {
   recordPartnerActivity,
 } from "../services/partner-activity.service.js";
 
+import {
+  getPartnerPerformance,
+} from "../services/partner-performance.service.js";
+
+import {
+  representativeAvatarUrl,
+} from "../services/profile-avatar.service.js";
+
 const router =
   Router();
 
@@ -81,12 +89,6 @@ const profileSchema =
           .string()
           .trim()
           .max(160),
-
-      preferredLanguage:
-        z.enum([
-          "en",
-          "am",
-        ]),
     })
     .strict()
     .superRefine(
@@ -114,6 +116,17 @@ const profileSchema =
         }
       },
     );
+
+const languageSchema =
+  z
+    .object({
+      preferredLanguage:
+        z.enum([
+          "en",
+          "am",
+        ]),
+    })
+    .strict();
 
 const avatarConfirmationSchema =
   z
@@ -181,50 +194,13 @@ function avatarUrl(
     string |
     null,
 ) {
-  if (
-    !publicId
-  ) {
-    return null;
-  }
-
-  return cloudinary.url(
-    publicId,
+  return representativeAvatarUrl(
     {
-      secure:
-        true,
-
-      version:
-        version ??
-        undefined,
-
-      format:
-        format ??
-        undefined,
-
-      transformation: [
-        {
-          width:
-            AVATAR_SIZE,
-
-          height:
-            AVATAR_SIZE,
-
-          crop:
-            "fill",
-
-          gravity:
-            "auto",
-        },
-
-        {
-          quality:
-            "auto",
-
-          fetch_format:
-            "auto",
-        },
-      ],
+      publicId,
+      version,
+      format,
     },
+    AVATAR_SIZE,
   );
 }
 
@@ -390,11 +366,22 @@ async function loadProfile(
       ],
     );
 
-  return result.rows[0]
-    ? mapProfile(
-        result.rows[0],
-      )
-    : null;
+  if (
+    !result.rows[0]
+  ) {
+    return null;
+  }
+
+  return {
+    ...mapProfile(
+      result.rows[0],
+    ),
+
+    performance:
+      await getPartnerPerformance(
+        representativeId,
+      ),
+  };
 }
 
 router.get(
@@ -482,7 +469,6 @@ router.patch(
             UPDATE sales_representatives
             SET
               display_name = NULLIF($2::varchar, ''),
-              preferred_language = $3::varchar,
               updated_at = NOW()
             WHERE id = $1::uuid
             RETURNING id
@@ -490,7 +476,6 @@ router.patch(
           [
             req.auth!.id,
             parsed.data.displayName,
-            parsed.data.preferredLanguage,
           ],
         );
 
@@ -534,6 +519,104 @@ router.patch(
           true,
 
         profile,
+      });
+    } catch (
+      error
+    ) {
+      next(
+        error,
+      );
+    }
+  },
+);
+
+router.patch(
+  "/language",
+
+  writeRateLimit,
+
+  async (
+    req,
+    res,
+    next,
+  ) => {
+    const parsed =
+      languageSchema.safeParse(
+        req.body,
+      );
+
+    if (
+      !parsed.success
+    ) {
+      res.status(400).json({
+        success:
+          false,
+
+        message: {
+          en:
+            "Choose English or Amharic.",
+
+          am:
+            "English ወይም አማርኛን ይምረጡ።",
+        },
+      });
+
+      return;
+    }
+
+    try {
+      const result =
+        await db.query(
+          `
+            UPDATE sales_representatives
+            SET preferred_language = $2::varchar, updated_at = NOW()
+            WHERE id = $1::uuid
+            RETURNING id
+          `,
+          [
+            req.auth!.id,
+            parsed.data.preferredLanguage,
+          ],
+        );
+
+      if (
+        !result.rows[0]
+      ) {
+        res.status(404).json({
+          success:
+            false,
+
+          message:
+            "Partner profile not found.",
+        });
+
+        return;
+      }
+
+      await recordPartnerActivity({
+        eventType:
+          "profile_language_updated",
+
+        actorType:
+          "representative",
+
+        representativeId:
+          req.auth!.id,
+
+        metadata: {
+          label:
+            `Language changed to ${parsed.data.preferredLanguage}`,
+        },
+      });
+
+      res.json({
+        success:
+          true,
+
+        profile:
+          await loadProfile(
+            req.auth!.id,
+          ),
       });
     } catch (
       error

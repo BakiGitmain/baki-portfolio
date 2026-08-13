@@ -24,6 +24,10 @@ import {
   recordPartnerActivity,
 } from "../services/partner-activity.service.js";
 
+import {
+  syncRepresentativeProgramCompletions,
+} from "../services/partner-program.service.js";
+
 const router =
   Router();
 
@@ -1163,6 +1167,21 @@ router.post(
               lesson.title_en,
           },
         });
+
+        try {
+          await syncRepresentativeProgramCompletions(
+            representativeId,
+          );
+        } catch (
+          error
+        ) {
+          console.error(
+            "Unable to refresh Program progress after lesson completion:",
+            error instanceof Error
+              ? error.message
+              : "Unknown Program progress error.",
+          );
+        }
       }
 
       return res.json({

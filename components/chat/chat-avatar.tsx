@@ -4,32 +4,16 @@ import type {
   PartnerChatParticipant,
 } from "@/lib/partner-chat-api";
 
-function getInitials(
+function getInitial(
   name: string,
 ) {
   return name
     .trim()
-    .split(
-      /\s+/,
-    )
-    .filter(
-      Boolean,
-    )
-    .slice(
+    .charAt(
       0,
-      2,
     )
-    .map(
-      (
-        part,
-      ) =>
-        part[0]
-          ?.toUpperCase(),
-    )
-    .join(
-      "",
-    ) ||
-    "BD";
+    .toUpperCase() ||
+    "B";
 }
 
 export default function ChatAvatar({
@@ -67,8 +51,6 @@ export default function ChatAvatar({
       aria-hidden="true"
     >
       {participant.avatarUrl ? (
-        // The API currently returns null, but keeping the renderer ready avoids
-        // changing the message contract when profile photos are introduced.
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={participant.avatarUrl}
@@ -76,7 +58,7 @@ export default function ChatAvatar({
           className={styles.avatarImage}
         />
       ) : (
-        getInitials(
+        getInitial(
           participant.name,
         )
       )}

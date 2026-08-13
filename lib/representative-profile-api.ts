@@ -34,6 +34,19 @@ export type RepresentativeProfile = {
   lastLoginAt:
     string |
     null;
+
+  performance: {
+    verifiedSales:
+      number;
+
+    reports:
+      number;
+
+    rank:
+      "NOOB" |
+      "PRO" |
+      "EXPERT";
+  };
 };
 
 export type RepresentativeProgram = {
@@ -46,6 +59,9 @@ export type RepresentativeProgram = {
   description:
     string;
 
+  instructions:
+    string;
+
   startDate:
     string;
 
@@ -53,7 +69,10 @@ export type RepresentativeProgram = {
     string;
 
   effectiveStatus:
-    string;
+    | "upcoming"
+    | "active"
+    | "completed"
+    | "expired";
 
   progressPercent:
     number;
@@ -66,7 +85,12 @@ export type RepresentativeProgram = {
       targetType:
         "reports" |
         "lessons" |
-        "course_completion";
+        "course_completion" |
+        "leads_submitted" |
+        "qualified_lead" |
+        "confirmed_sale" |
+        "partner_referral" |
+        "custom_challenge";
 
       targetValue:
         number;
@@ -86,6 +110,42 @@ export type RepresentativeProgram = {
         string |
         null;
     }>;
+
+  submissions:
+    Array<{
+      id: string;
+      targetId: string;
+      submissionType: string;
+      status: "pending" | "approved" | "rejected";
+      businessName: string | null;
+      contactName: string | null;
+      contactMethod: string | null;
+      businessType: string | null;
+      needSummary: string | null;
+      notes: string;
+      explanation: string;
+      publicUrl: string | null;
+      saleAmountEtb: number | null;
+      rejectionReason: string | null;
+      createdAt: string;
+      reviewedAt: string | null;
+    }>;
+
+  reward: {
+    id: string | null;
+    type: "bonus_commission" | "fixed_etb" | "none";
+    value: number | null;
+    scope: "next_qualifying_sale" | "challenge_sale" | null;
+    description: string;
+    status: "locked" | "earned" | "approved" | "paid" | "applied";
+    saleReference: string | null;
+    saleAmountEtb: number | null;
+    baseCommissionPercent: number | null;
+    effectiveCommissionPercent: number | null;
+  };
+
+  referralPath:
+    string;
 };
 
 function apiUrl() {
@@ -180,10 +240,6 @@ export async function updateRepresentativeProfile(
   input: {
     displayName:
       string;
-
-    preferredLanguage:
-      "en" |
-      "am";
   },
 ) {
   const result =
@@ -205,6 +261,36 @@ export async function updateRepresentativeProfile(
           JSON.stringify(
             input,
           ),
+      },
+    );
+
+  return result.profile;
+}
+
+export async function updateRepresentativeLanguage(
+  preferredLanguage:
+    "en" |
+    "am",
+) {
+  const result =
+    await request<{
+      profile:
+        RepresentativeProfile;
+    }>(
+      "/api/representative/profile/language",
+      {
+        method:
+          "PATCH",
+
+        headers: {
+          "Content-Type":
+            "application/json",
+        },
+
+        body:
+          JSON.stringify({
+            preferredLanguage,
+          }),
       },
     );
 
@@ -401,4 +487,82 @@ export async function getRepresentativePrograms() {
     );
 
   return result.programs;
+}
+
+export async function getRepresentativeProgramNotificationCount() {
+  const result =
+    await request<{
+      unreadCount:
+        number;
+    }>(
+      "/api/representative/programs/notifications/unread-count",
+    );
+
+  return result.unreadCount;
+}
+
+export async function markRepresentativeProgramNotificationsRead() {
+  await request(
+    "/api/representative/programs/notifications/read",
+    {
+      method:
+        "POST",
+    },
+  );
+}
+
+export async function submitRepresentativeProgramChallenge(
+  programId:
+    string,
+
+  targetId:
+    string,
+
+  input: {
+    businessName?:
+      string;
+
+    contactName?:
+      string;
+
+    contactMethod?:
+      string;
+
+    businessType?:
+      string;
+
+    needSummary?:
+      string;
+
+    notes?:
+      string;
+
+    explanation?:
+      string;
+
+    publicUrl?:
+      string;
+  },
+) {
+  return request(
+    `/api/representative/programs/${encodeURIComponent(
+      programId,
+    )}/targets/${encodeURIComponent(
+      targetId,
+    )}/submissions`,
+    {
+      method:
+        "POST",
+
+      headers: {
+        "Content-Type":
+          "application/json",
+      },
+
+      body:
+        JSON.stringify(
+          input,
+        ),
+    },
+  );
 }

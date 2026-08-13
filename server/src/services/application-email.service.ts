@@ -29,6 +29,9 @@ const PARTNER_DASHBOARD_URL =
 const ADMIN_REPORTS_URL =
   `${SITE_URL}/admin/reports`;
 
+const ADMIN_PROGRAMS_URL =
+  `${SITE_URL}/admin/programs`;
+
 /* =========================================================
    CLIENT
    ========================================================= */
@@ -1425,5 +1428,349 @@ export async function sendNewPartnerReportAdminEmail(
 
     tagType:
       "partner-report-created",
+  });
+}
+
+/* =========================================================
+   NEW VERIFIED PROGRAM SUBMISSION -> ACTIVE ADMIN
+
+   Delivery is best-effort. The saved submission remains the
+   source of truth if Resend is unavailable.
+   ========================================================= */
+
+export async function sendNewProgramSubmissionAdminEmail(
+  input: {
+    submissionId: string;
+    adminEmail: string;
+    adminName: string;
+    programTitle: string;
+    representativeName: string;
+    partnerId: string;
+    businessName: string | null;
+    needSummary: string | null;
+    contactMethod: string | null;
+    notes: string;
+  },
+) {
+  const adminName = firstName(input.adminName);
+  const subject = `New Program Submission - ${input.programTitle}`;
+  const details = [
+    `Partner: ${input.representativeName} (${input.partnerId})`,
+    input.businessName ? `Business: ${input.businessName}` : null,
+    input.needSummary ? `Need: ${input.needSummary}` : null,
+    input.contactMethod ? `Contact: ${input.contactMethod}` : null,
+    input.notes ? `Notes: ${input.notes}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const html = emailLayout({
+    preheader: `${input.representativeName} submitted proof for ${input.programTitle}.`,
+    title: "New Program submission",
+    footer: "This operational notification was sent to an active Baki Digital administrator.",
+    content: `
+      ${paragraph(`Hi ${adminName},`)}
+      ${paragraph(`${input.representativeName} (${input.partnerId}) submitted a verified challenge for review.`)}
+      ${paragraph(`Program: ${input.programTitle}`)}
+      <div style="margin:0 0 18px;padding:16px 18px;border:1px solid #e3eadf;border-radius:12px;background:#f7faf5;color:#343a31;font-size:14px;line-height:22px;white-space:pre-wrap;">${escapeHtml(details)}</div>
+      ${paragraph("Open the authenticated Programs workspace to approve or reject it.")}
+      <p style="margin-top:22px;"><a href="${ADMIN_PROGRAMS_URL}" style="display:inline-block;padding:13px 22px;font-size:14px;font-weight:700;text-decoration:none;color:#ffffff;background:#426c2b;border-radius:11px;">Review Submission</a></p>
+    `,
+  });
+
+  const text = [
+    "Baki Digital",
+    "",
+    `Hi ${adminName},`,
+    "",
+    `New Program submission: ${input.programTitle}`,
+    details,
+    "",
+    `Review: ${ADMIN_PROGRAMS_URL}`,
+  ].join("\n");
+
+  return sendSafely({
+    to: input.adminEmail,
+    subject,
+    html,
+    text,
+    idempotencyKey: `partner-program-submission/${input.submissionId}`,
+    tagType: "partner-program-submission",
+  });
+}
+
+/* =========================================================
+   PROGRAM COMPLETION -> PARTNER
+   ========================================================= */
+
+export async function sendPartnerProgramCompletionEmail(
+  input: {
+    representativeId:
+      string;
+
+    email:
+      string;
+
+    fullName:
+      string;
+
+    programId:
+      string;
+
+    programTitle:
+      string;
+
+    goalSummary:
+      string;
+
+    reward:
+      | {
+          description:
+            string;
+
+          label:
+            string;
+        }
+      | null;
+  },
+) {
+  const name =
+    firstName(
+      input.fullName,
+    );
+
+  const subject =
+    `Well done — you completed ${input.programTitle} 🎉`;
+
+  const rewardHtml =
+    input.reward
+      ? `
+          <div style="margin:4px 0 18px;padding:16px 18px;border:1px solid #dce8d5;border-radius:12px;background:#f4f8f1;">
+            <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#4f7c36;">Reward earned</div>
+            <div style="margin-top:8px;font-size:15px;line-height:23px;color:#343a31;">${escapeHtml(input.reward.description)}</div>
+            <div style="margin-top:8px;font-size:13px;font-weight:700;color:#4f7c36;">${escapeHtml(input.reward.label)}</div>
+          </div>
+        `
+      : paragraph(
+          "Great work completing the challenge.",
+        );
+
+  const html =
+    emailLayout({
+      preheader:
+        `You completed ${input.programTitle}.`,
+
+      title:
+        "Program completed",
+
+      footer:
+        "This achievement email was sent because you completed an assigned Baki Digital Partner Program.",
+
+      content: `
+        ${paragraph(`Hi ${name},`)}
+        ${paragraph("Well done! You've completed:")}
+        <div style="margin:0 0 18px;font-size:20px;line-height:28px;font-weight:700;color:#26311f;">${escapeHtml(input.programTitle)}</div>
+        <div style="margin:0 0 18px;padding:14px 16px;border-radius:11px;background:#f7f9f5;color:#4d5548;font-size:14px;line-height:22px;white-space:pre-wrap;"><strong>Goal completed:</strong><br>${escapeHtml(input.goalSummary)}</div>
+        ${rewardHtml}
+      `,
+    });
+
+  const text = [
+    "Baki Digital",
+    "",
+    `Hi ${name},`,
+    "",
+    "Well done! You've completed:",
+    input.programTitle,
+    "",
+    "Goal completed:",
+    input.goalSummary,
+    ...(input.reward
+      ? [
+          "",
+          "Reward earned:",
+          input.reward.description,
+          `Your reward status: ${input.reward.label}`,
+        ]
+      : [
+          "",
+          "Great work completing the challenge.",
+        ]),
+    "",
+    "Baki Digital",
+  ].join(
+    "\n",
+  );
+
+  return sendSafely({
+    to:
+      input.email,
+
+    subject,
+    html,
+    text,
+
+    idempotencyKey:
+      `partner-program-completed/${input.programId}/${input.representativeId}`,
+
+    tagType:
+      "partner-program-completed",
+  });
+}
+
+/* =========================================================
+   REPRESENTATIVE EMAIL-CHANGE SECURITY MESSAGES
+   ========================================================= */
+
+export async function sendRepresentativeEmailVerificationCode(
+  input: {
+    challengeId:
+      string;
+
+    stage:
+      "current" |
+      "new";
+
+    email:
+      string;
+
+    fullName:
+      string;
+
+    code:
+      string;
+
+    sendVersion:
+      number;
+  },
+) {
+  const name =
+    firstName(
+      input.fullName,
+    );
+
+  const subject =
+    "Your Baki Digital verification code";
+
+  const codeBox = `
+    <div style="margin:22px 0;padding:18px;border:1px solid #dce8d5;border-radius:12px;background:#f4f8f1;text-align:center;">
+      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#668253;">Verification code</div>
+      <div style="margin-top:8px;font-size:32px;line-height:38px;font-weight:800;letter-spacing:.22em;color:#315520;">${escapeHtml(input.code)}</div>
+    </div>
+  `;
+
+  const html =
+    emailLayout({
+      preheader:
+        "Use this code to continue changing your account email.",
+
+      title:
+        "Verify your email",
+
+      footer:
+        "If you did not request an email change, you can ignore this message.",
+
+      content: `
+        ${paragraph(`Hi ${name},`)}
+        ${paragraph("Use the verification code below to continue changing your Baki Digital account email.")}
+        ${codeBox}
+        ${paragraph("This code expires in 10 minutes.")}
+      `,
+    });
+
+  const text = [
+    "Baki Digital",
+    "",
+    `Hi ${name},`,
+    "",
+    "Your verification code is:",
+    input.code,
+    "",
+    "This code expires in 10 minutes.",
+    "",
+    "If you didn't request an email change, you can ignore this message.",
+  ].join(
+    "\n",
+  );
+
+  return sendSafely({
+    to:
+      input.email,
+
+    subject,
+    html,
+    text,
+
+    idempotencyKey:
+      `representative-email-change/${input.challengeId}/${input.stage}/${input.sendVersion}`,
+
+    tagType:
+      "representative-email-change",
+  });
+}
+
+export async function sendRepresentativeEmailChangedNotice(
+  input: {
+    challengeId:
+      string;
+
+    oldEmail:
+      string;
+
+    fullName:
+      string;
+  },
+) {
+  const name =
+    firstName(
+      input.fullName,
+    );
+
+  const subject =
+    "Your Baki Digital account email was changed";
+
+  const html =
+    emailLayout({
+      preheader:
+        "A security change was completed on your Baki Digital account.",
+
+      title:
+        "Account email changed",
+
+      footer:
+        "This security notice was sent to the previous email address on your Baki Digital Partner account.",
+
+      content: `
+        ${paragraph(`Hi ${name},`)}
+        ${paragraph("Your Baki Digital account email was changed successfully.")}
+        ${paragraph("If you did not make this change, contact Baki Digital immediately.")}
+      `,
+    });
+
+  const text = [
+    "Baki Digital",
+    "",
+    `Hi ${name},`,
+    "",
+    "Your Baki Digital account email was changed successfully.",
+    "",
+    "If you did not make this change, contact Baki Digital immediately.",
+  ].join(
+    "\n",
+  );
+
+  return sendSafely({
+    to:
+      input.oldEmail,
+
+    subject,
+    html,
+    text,
+
+    idempotencyKey:
+      `representative-email-changed/${input.challengeId}`,
+
+    tagType:
+      "representative-email-changed",
   });
 }

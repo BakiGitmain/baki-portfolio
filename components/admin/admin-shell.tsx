@@ -30,6 +30,14 @@ import {
 } from "@/lib/admin-reports-api";
 
 import {
+  getAdminProgramAttentionCount,
+} from "@/lib/admin-programs-api";
+
+import {
+  getAdminChatReportAttentionCount,
+} from "@/lib/admin-chat-reports-api";
+
+import {
   usePartnerChatUnread,
 } from "@/components/chat/use-partner-chat-unread";
 
@@ -55,6 +63,7 @@ type AdminPageKey =
   | "applications"
   | "reports"
   | "chat"
+  | "chatReports"
   | "programs"
   | "training"
   | "settings";
@@ -520,6 +529,16 @@ const [
     setUnreadReportCount,
   ] = useState(0);
 
+  const [
+    programAttentionCount,
+    setProgramAttentionCount,
+  ] = useState(0);
+
+  const [
+    chatReportAttentionCount,
+    setChatReportAttentionCount,
+  ] = useState(0);
+
   const accountRef =
     useRef<HTMLDivElement | null>(
       null,
@@ -549,6 +568,9 @@ const [
 
           reports:
             "ሪፖርቶች",
+
+          chatReports:
+            "የChat ሪፖርቶች",
 
           programs:
             "ፕሮግራሞች",
@@ -624,6 +646,14 @@ const [
                 "የSales Partner የሥራ ሪፖርቶችን ያንብቡ እና ምላሽ ይላኩ።",
             },
 
+            chatReports: {
+              title:
+                "የChat ሪፖርቶች",
+
+              description:
+                "Partners ሪፖርት ያደረጓቸውን መልዕክቶች ይገምግሙ እና የመለያ እርምጃ ይውሰዱ።",
+            },
+
             programs: {
               title:
                 "ፕሮግራሞች",
@@ -667,6 +697,9 @@ const [
 
           reports:
             "Reports",
+
+          chatReports:
+            "Chat Reports",
 
           programs:
             "Programs",
@@ -740,6 +773,14 @@ const [
 
               description:
                 "Read Sales Partner work reports and send replies.",
+            },
+
+            chatReports: {
+              title:
+                "Chat Reports",
+
+              description:
+                "Review reported Partner Chat messages and take documented account action.",
             },
 
             programs: {
@@ -844,6 +885,17 @@ const [
 
     {
       label:
+        copy.chatReports,
+
+      href:
+        "/admin/chat-reports",
+
+      icon:
+        <ReportsIcon />,
+    },
+
+    {
+      label:
         copy.programs,
 
       href:
@@ -901,6 +953,13 @@ const [
   ) {
     pageKey =
       "reports";
+  } else if (
+    pathname.startsWith(
+      "/admin/chat-reports",
+    )
+  ) {
+    pageKey =
+      "chatReports";
   } else if (
     pathname.startsWith(
       "/admin/chat",
@@ -1172,6 +1231,78 @@ const [
     admin,
     language,
   ]);
+
+  useEffect(() => {
+    if (!admin) return;
+    let cancelled = false;
+
+    async function refreshProgramAttention() {
+      try {
+        const count = await getAdminProgramAttentionCount();
+        if (!cancelled) setProgramAttentionCount(count);
+      } catch (error) {
+        console.error(
+          "Unable to load Program attention count:",
+          error instanceof Error ? error.message : "Unknown Program attention error.",
+        );
+      }
+    }
+
+    void refreshProgramAttention();
+    const intervalId = window.setInterval(refreshProgramAttention, 60_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [admin, pathname]);
+
+  useEffect(() => {
+    if (!admin) return;
+
+    let cancelled = false;
+    let cleanupSocket: (() => void) | null = null;
+
+    async function refreshChatReportAttention() {
+      try {
+        const count = await getAdminChatReportAttentionCount(language);
+        if (!cancelled) setChatReportAttentionCount(count);
+      } catch (error) {
+        console.error(
+          "Unable to load Chat report attention count:",
+          error instanceof Error ? error.message : "Unknown Chat report error.",
+        );
+      }
+    }
+
+    void refreshChatReportAttention();
+    const intervalId = window.setInterval(refreshChatReportAttention, 60_000);
+
+    void getPartnerChatConnection("admin", language)
+      .then((connection) => {
+        if (cancelled) return;
+
+        const handleChanged = () => {
+          void refreshChatReportAttention();
+        };
+
+        connection.socket.on("admin:chat-reports:changed", handleChanged);
+        cleanupSocket = () => {
+          connection.socket.off("admin:chat-reports:changed", handleChanged);
+        };
+      })
+      .catch((error) => {
+        console.error(
+          "Unable to connect Chat report notifications:",
+          error instanceof Error ? error.message : "Unknown realtime notification error.",
+        );
+      });
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+      cleanupSocket?.();
+    };
+  }, [admin, language, pathname]);
 
   /* =======================================================
      ACCOUNT DROPDOWN OUTSIDE CLICK
@@ -1446,6 +1577,17 @@ if (
                     `${item.href}/`,
                   );
 
+                const itemUnreadCount =
+                  item.href === "/admin/chat"
+                    ? unreadChatCount
+                    : item.href === "/admin/chat-reports"
+                      ? chatReportAttentionCount
+                    : item.href === "/admin/reports"
+                      ? unreadReportCount
+                      : item.href === "/admin/programs"
+                        ? programAttentionCount
+                        : 0;
+
                 return (
                   <Link
                     key={
@@ -1481,38 +1623,15 @@ if (
                       }
                     </span>
 
-                    {(
-                      item.href ===
-                        "/admin/reports" &&
-                      unreadReportCount >
-                        0
-                    ) ||
-                    (
-                      item.href ===
-                        "/admin/chat" &&
-                      unreadChatCount >
-                        0
-                    ) ? (
+                    {itemUnreadCount > 0 ? (
                       <span
                         role="status"
-                        aria-label={`${
-                          item.href ===
-                          "/admin/chat"
-                            ? unreadChatCount
-                            : unreadReportCount
-                        } unread ${item.label.toLowerCase()} items`}
+                        aria-label={`${itemUnreadCount} ${item.label.toLowerCase()} items need attention`}
                         className="flex min-w-5 shrink-0 items-center justify-center rounded-full bg-[#c74f3d] px-1.5 py-0.5 text-[9px] font-extrabold leading-none text-white shadow-[0_4px_10px_rgba(199,79,61,0.24)]"
                       >
-                        {(item.href ===
-                        "/admin/chat"
-                          ? unreadChatCount
-                          : unreadReportCount) >
-                        99
+                        {itemUnreadCount > 99
                           ? "99+"
-                          : item.href ===
-                              "/admin/chat"
-                            ? unreadChatCount
-                            : unreadReportCount}
+                          : itemUnreadCount}
                       </span>
                     ) : active ? (
                       <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#80c93c] shadow-[0_0_8px_rgba(128,201,60,0.45)]" />

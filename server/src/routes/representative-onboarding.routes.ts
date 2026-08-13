@@ -479,6 +479,26 @@ router.post(
         ],
       );
 
+      await client.query(
+        `
+          UPDATE partner_referrals
+          SET
+            status = 'accepted',
+            referred_representative_id = $1::uuid,
+            accepted_at = NOW(),
+            reviewed_by_admin_id = $2::uuid,
+            updated_at = NOW()
+          WHERE
+            application_id = $3::uuid
+            AND status = 'attributed'
+        `,
+        [
+          representative.id,
+          adminId,
+          application.id,
+        ],
+      );
+
       /* ===================================================
          COMMIT BEFORE EMAIL
          =================================================== */

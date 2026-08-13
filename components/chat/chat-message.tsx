@@ -5,6 +5,12 @@ import {
   Trash2,
 } from "lucide-react";
 
+import {
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+
 import styles from "./partner-chat.module.css";
 
 import type {
@@ -13,6 +19,8 @@ import type {
 } from "@/lib/partner-chat-api";
 
 import ChatAvatar from "./chat-avatar";
+import ChatProfileCard from "./chat-profile-card";
+import ChatReportDialog from "./chat-report-dialog";
 
 function formatTime(
   value: string,
@@ -94,10 +102,32 @@ export default function ChatMessage({
     messageId: string,
   ) => void;
 }) {
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const messageRef = useRef<HTMLElement>(null);
+
   const isOwn =
     message.sender
       .participantKey ===
     selfKey;
+
+  useEffect(() => {
+    if (!profileOpen) return;
+
+    const closeOnOutside = (event: PointerEvent) => {
+      if (!messageRef.current?.contains(event.target as Node)) setProfileOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setProfileOpen(false);
+    };
+
+    document.addEventListener("pointerdown", closeOnOutside);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [profileOpen]);
 
   const canDelete =
     !message.deletedAt &&
@@ -145,6 +175,7 @@ export default function ChatMessage({
 
   return (
     <article
+      ref={messageRef}
       id={`partner-chat-message-${message.id}`}
       className={[
         styles.messageRow,
@@ -170,16 +201,29 @@ export default function ChatMessage({
     >
       <div className={styles.messageAvatarCell}>
         {!grouped && (
-          <ChatAvatar
-            participant={message.sender}
-          />
+          <button
+            type="button"
+            className={styles.profileAvatarTrigger}
+            aria-label={`${message.sender.name} profile`}
+            aria-expanded={profileOpen}
+            onClick={() => setProfileOpen((current) => !current)}
+          >
+            <ChatAvatar participant={message.sender} />
+          </button>
         )}
       </div>
 
       <div className={styles.messageContent}>
         {!grouped && (
           <div className={styles.messageMeta}>
-            <strong>{message.sender.name}</strong>
+            <button
+              type="button"
+              className={styles.profileNameTrigger}
+              aria-expanded={profileOpen}
+              onClick={() => setProfileOpen((current) => !current)}
+            >
+              {message.sender.name}
+            </button>
 
             {message.sender.role ===
               "admin" && (
@@ -300,6 +344,28 @@ export default function ChatMessage({
           )}
         </div>
       </div>
+
+      {profileOpen && (
+        <ChatProfileCard
+          participant={message.sender}
+          language={language}
+          alignRight={isOwn}
+          canReport={viewerRole === "representative" && !isOwn && !Boolean(message.deletedAt)}
+          onClose={() => setProfileOpen(false)}
+          onReport={() => {
+            setProfileOpen(false);
+            setReportOpen(true);
+          }}
+        />
+      )}
+
+      {reportOpen && (
+        <ChatReportDialog
+          message={message}
+          language={language}
+          onClose={() => setReportOpen(false)}
+        />
+      )}
     </article>
   );
 }

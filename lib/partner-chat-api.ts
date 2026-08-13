@@ -17,6 +17,21 @@ export type PartnerChatParticipant = {
 
   avatarUrl:
     string | null;
+
+  performance:
+    | {
+        rank:
+          | "NOOB"
+          | "PRO"
+          | "EXPERT";
+
+        verifiedSales:
+          number;
+
+        reports:
+          number;
+      }
+    | null;
 };
 
 export type PartnerChatMessage = {
@@ -391,4 +406,44 @@ export async function markPartnerChatRead(
     readAt:
       result.readAt,
   };
+}
+
+export type PartnerChatReportReason =
+  | "spam"
+  | "harassment"
+  | "scam"
+  | "inappropriate"
+  | "threats"
+  | "other";
+
+export async function reportPartnerChatMessage(
+  language: Language,
+  input: {
+    messageId: string;
+    reason: PartnerChatReportReason;
+    note?: string;
+  },
+) {
+  return request<{
+    success: true;
+    report: {
+      id: string;
+      createdAt: string;
+    };
+    message: {
+      en: string;
+      am: string;
+    };
+  }>(
+    "representative",
+    "/reports",
+    language,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+  );
 }

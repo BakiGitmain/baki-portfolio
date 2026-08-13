@@ -31,6 +31,11 @@ import {
   recordPartnerActivity,
 } from "../services/partner-activity.service.js";
 
+import {
+  materializeOpenProgramAssignmentsForRepresentative,
+  syncRepresentativeProgramCompletions,
+} from "../services/partner-program.service.js";
+
 /* =========================================================
    ROUTER
    ========================================================= */
@@ -272,10 +277,26 @@ router.post(
               must_change_password,
               failed_login_attempts,
               locked_until,
-              session_version
-            FROM sales_representatives
+              session_version,
+              active_ban.reason AS ban_reason,
+              active_ban.banned_until,
+              active_ban.is_permanent AS ban_is_permanent
+            FROM sales_representatives representative
+            LEFT JOIN LATERAL (
+              SELECT ban.reason, ban.banned_until, ban.is_permanent
+              FROM partner_bans ban
+              WHERE
+                ban.representative_id = representative.id
+                AND ban.ended_at IS NULL
+                AND (
+                  ban.is_permanent = TRUE
+                  OR ban.banned_until > NOW()
+                )
+              ORDER BY ban.started_at DESC
+              LIMIT 1
+            ) active_ban ON TRUE
             WHERE
-              LOWER(username) =
+              LOWER(representative.username) =
               LOWER($1)
             LIMIT 1
           `,
@@ -449,6 +470,29 @@ router.post(
                 shouldLock
                   ? "ብዙ የተሳሳቱ login ሙከራዎች ተደርገዋል። ቆይተው ይሞክሩ።"
                   : "Username ወይም password ትክክል አይደለም።",
+            },
+          });
+
+        return;
+      }
+
+      if (
+        representative
+          .ban_reason
+      ) {
+        res
+          .status(403)
+          .json({
+            success: false,
+            code: "ACCOUNT_SUSPENDED",
+            message: {
+              en: "Your Partner account is temporarily unavailable.",
+              am: "የPartner መለያዎ ለጊዜው ታግዷል።",
+            },
+            suspension: {
+              reason: representative.ban_reason,
+              bannedUntil: representative.banned_until ?? null,
+              isPermanent: Boolean(representative.ban_is_permanent),
             },
           });
 
@@ -836,22 +880,38 @@ router.post(
       const updateResult =
         await db.query(
           `
-            UPDATE sales_representatives
-            SET
-              password_hash = $1,
-
-              must_change_password = FALSE,
-
-              password_changed_at = NOW(),
-
-              session_version =
-                session_version + 1,
-
-              updated_at = NOW()
-            WHERE id = $2
-            RETURNING
-              username,
-              session_version
+            WITH updated_representative AS (
+              UPDATE sales_representatives
+              SET
+                password_hash = $1,
+                must_change_password = FALSE,
+                password_changed_at = NOW(),
+                session_version = session_version + 1,
+                updated_at = NOW()
+              WHERE id = $2
+              RETURNING id, username, session_version
+            ),
+            activated_referral AS (
+              UPDATE partner_referrals referral
+              SET
+                status = 'activated',
+                activated_at = NOW(),
+                updated_at = NOW()
+              FROM updated_representative representative
+              WHERE
+                referral.referred_representative_id = representative.id
+                AND referral.status = 'accepted'
+              RETURNING referral.referring_representative_id
+            )
+            SELECT
+              representative.username,
+              representative.session_version,
+              (
+                SELECT referring_representative_id
+                FROM activated_referral
+                LIMIT 1
+              ) AS referring_representative_id
+            FROM updated_representative representative
           `,
           [
             passwordHash,
@@ -861,6 +921,35 @@ router.post(
 
       const updated =
         updateResult.rows[0];
+
+      if (
+        firstTimeSetup
+      ) {
+        try {
+          await materializeOpenProgramAssignmentsForRepresentative(
+            representativeId,
+          );
+
+          if (
+            updated
+              .referring_representative_id
+          ) {
+            await syncRepresentativeProgramCompletions(
+              updated
+                .referring_representative_id,
+            );
+          }
+        } catch (
+          error
+        ) {
+          console.error(
+            "Unable to refresh Program assignments after account activation:",
+            error instanceof Error
+              ? error.message
+              : "Unknown Program activation error.",
+          );
+        }
+      }
 
       /* ===================================================
          ISSUE NEW SESSION

@@ -30,6 +30,7 @@ import {
 
 import {
   createPartnerChatMessage,
+  createChatPublicKey,
   deletePartnerChatMessage,
   editPartnerChatMessage,
   markPartnerChatRead,
@@ -158,6 +159,13 @@ type ServerToClientEvents = {
 
       createdAt:
         string;
+    },
+  ) => void;
+
+  "admin:chat-reports:changed": (
+    payload: {
+      reportId: string;
+      createdAt: string;
     },
   ) => void;
 
@@ -387,6 +395,40 @@ export function emitAdminReportsChanged(
       "admin:reports:changed",
       payload,
     );
+}
+
+export function emitAdminChatReportsChanged(
+  payload: {
+    reportId: string;
+    createdAt: string;
+  },
+) {
+  activeChatServer
+    ?.to(ADMIN_NOTIFICATION_ROOM)
+    .emit("admin:chat-reports:changed", payload);
+}
+
+export function disconnectRepresentativeFromPartnerChat(
+  representativeId: string,
+) {
+  if (!activeChatServer) {
+    return;
+  }
+
+  const identity: ChatIdentity = {
+    id: representativeId,
+    role: "representative",
+    name: "",
+    reference: null,
+    publicKey: createChatPublicKey("representative", representativeId),
+    avatarUrl: null,
+    sessionVersion: null,
+    performance: null,
+  };
+
+  void activeChatServer
+    .in(userRoom(identity))
+    .disconnectSockets(true);
 }
 
 function localized(

@@ -207,7 +207,8 @@ router.get(
                   SELECT COUNT(*)::int
                   FROM partner_programs
                   WHERE
-                    status NOT IN ('draft', 'archived', 'completed')
+                    deleted_at IS NULL
+                    AND status NOT IN ('draft', 'archived', 'completed')
                     AND CURRENT_DATE BETWEEN start_date AND end_date
                 ) AS active_programs
             `,
@@ -687,7 +688,8 @@ router.get(
                   ('/admin/programs/' || program.id::text)::text
                 FROM partner_programs program
                 WHERE
-                  program.status IN ('scheduled', 'active')
+                  program.deleted_at IS NULL
+                  AND program.status IN ('scheduled', 'active')
                   AND (
                     NOT EXISTS (
                       SELECT 1
@@ -715,7 +717,8 @@ router.get(
                   ('/admin/programs/' || program.id::text)::text
                 FROM partner_programs program
                 WHERE
-                  program.status NOT IN ('draft', 'completed', 'archived')
+                  program.deleted_at IS NULL
+                  AND program.status NOT IN ('draft', 'completed', 'archived')
                   AND program.end_date BETWEEN CURRENT_DATE AND CURRENT_DATE + 2
               ) attention
               ORDER BY

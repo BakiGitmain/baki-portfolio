@@ -11,6 +11,7 @@ import {
 } from "next/navigation";
 
 import {
+  AccountLoginError,
   loginAccount,
 } from "@/lib/account-auth-api";
 
@@ -20,7 +21,12 @@ import {
 
 import {
   getCurrentRepresentative,
+  RepresentativeApiError,
 } from "@/lib/representative-api";
+
+import RepresentativeSuspendedScreen, {
+  type RepresentativeSuspension,
+} from "@/components/representative/representative-suspended-screen";
 
 import {
   useLanguage,
@@ -184,6 +190,8 @@ export default function AccountLogin() {
   ] =
     useState("");
 
+  const [suspension, setSuspension] = useState<RepresentativeSuspension | null>(null);
+
   /* =======================================================
      COPY
      ======================================================= */
@@ -325,6 +333,17 @@ export default function AccountLogin() {
           }
 
           if (
+            partnerResult.status === "rejected" &&
+            partnerResult.reason instanceof RepresentativeApiError &&
+            partnerResult.reason.code === "ACCOUNT_SUSPENDED" &&
+            partnerResult.reason.suspension
+          ) {
+            setSuspension(partnerResult.reason.suspension);
+            setChecking(false);
+            return;
+          }
+
+          if (
             partner
           ) {
             router.replace(
@@ -410,6 +429,16 @@ export default function AccountLogin() {
     } catch (
       loginError
     ) {
+      if (
+        loginError instanceof AccountLoginError &&
+        loginError.code === "ACCOUNT_SUSPENDED" &&
+        loginError.suspension
+      ) {
+        setSuspension(loginError.suspension);
+        setLoading(false);
+        return;
+      }
+
       setError(
         loginError instanceof
           Error
@@ -434,6 +463,19 @@ export default function AccountLogin() {
       <main className="flex min-h-screen items-center justify-center bg-[#f7f8f3]">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-black/10 border-t-[#426c2b]" />
       </main>
+    );
+  }
+
+  if (suspension) {
+    return (
+      <RepresentativeSuspendedScreen
+        suspension={suspension}
+        language={language}
+        onLogout={() => {
+          setSuspension(null);
+          setPassword("");
+        }}
+      />
     );
   }
 

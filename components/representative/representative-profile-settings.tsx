@@ -25,6 +25,7 @@ import {
 import {
   deleteRepresentativeAvatar,
   updateRepresentativeProfile,
+  updateRepresentativeLanguage,
   uploadRepresentativeAvatar,
   type RepresentativeProfile,
 } from "@/lib/representative-profile-api";
@@ -32,6 +33,10 @@ import {
 import {
   useLanguage,
 } from "@/components/providers/language-provider";
+
+import PartnerRankBadge from "@/components/representative/partner-rank-badge";
+
+import RepresentativeChangeEmail from "@/components/representative/representative-change-email";
 
 export default function RepresentativeProfileSettings({
   profile,
@@ -77,6 +82,8 @@ export default function RepresentativeProfileSettings({
         displayHelper: "ባዶ ካስቀሩት የተረጋገጠው ሕጋዊ ስምዎ ይጠቀማል። ይህ ስም በአጋሮች ውይይትና በፖርታሉ ይታያል።",
         languagePreference: "የቋንቋ ምርጫ",
         languageHelper: "ይህ ምርጫ በሁሉም መሣሪያዎች ላይ መለያዎን ይከተላል። የአሳሹ ማከማቻ እንደ ፈጣን ምትኬ ይጠቅማል።",
+        languageUpdated: "ቋንቋው ተቀይሯል ✓",
+        languageError: "የቋንቋ ምርጫውን ማስቀመጥ አልተቻለም።",
         english: "English",
         amharic: "አማርኛ",
         saving: "በማስቀመጥ ላይ…",
@@ -113,6 +120,8 @@ export default function RepresentativeProfileSettings({
         displayHelper: "Leave blank to use your verified legal name. This name appears in Partner Chat and the portal.",
         languagePreference: "Language preference",
         languageHelper: "This preference follows your account on every device. Local storage remains a fast fallback.",
+        languageUpdated: "Language updated ✓",
+        languageError: "Unable to save the language preference.",
         english: "English",
         amharic: "አማርኛ",
         saving: "Saving…",
@@ -129,6 +138,7 @@ export default function RepresentativeProfileSettings({
   const [displayName, setDisplayName] = useState(profile.displayName);
   const [preferredLanguage, setPreferredLanguage] = useState(profile.preferredLanguage);
   const [saving, setSaving] = useState(false);
+  const [savingLanguage, setSavingLanguage] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
@@ -149,14 +159,10 @@ export default function RepresentativeProfileSettings({
     try {
       const updated = await updateRepresentativeProfile({
         displayName,
-        preferredLanguage,
       });
       onProfileChange(updated);
-      onLanguageChange(updated.preferredLanguage);
       setDisplayName(updated.displayName);
-      setSuccess(updated.preferredLanguage === "am"
-        ? "የመገለጫ ምርጫዎችዎ ተቀምጠዋል።"
-        : "Profile preferences saved.");
+      setSuccess(copy.profileSaved);
     } catch (saveError) {
       setError(
         language === "en" && saveError instanceof Error
@@ -165,6 +171,80 @@ export default function RepresentativeProfileSettings({
       );
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function saveLanguage(
+    nextLanguage:
+      "en" |
+      "am",
+  ) {
+    if (
+      savingLanguage ||
+      nextLanguage ===
+        preferredLanguage
+    ) {
+      return;
+    }
+
+    const previousLanguage =
+      preferredLanguage;
+
+    setPreferredLanguage(
+      nextLanguage,
+    );
+    onLanguageChange(
+      nextLanguage,
+    );
+    setSavingLanguage(
+      true,
+    );
+    setError(
+      "",
+    );
+    setSuccess(
+      "",
+    );
+
+    try {
+      const updated =
+        await updateRepresentativeLanguage(
+          nextLanguage,
+        );
+
+      onProfileChange(
+        updated,
+      );
+      setPreferredLanguage(
+        updated.preferredLanguage,
+      );
+      setSuccess(
+        nextLanguage ===
+        "am"
+          ? "ቋንቋው ተቀይሯል ✓"
+          : "Language updated ✓",
+      );
+    } catch (
+      languageError
+    ) {
+      setPreferredLanguage(
+        previousLanguage,
+      );
+      onLanguageChange(
+        previousLanguage,
+      );
+      setError(
+        language ===
+          "en" &&
+        languageError instanceof
+          Error
+          ? languageError.message
+          : copy.languageError,
+      );
+    } finally {
+      setSavingLanguage(
+        false,
+      );
     }
   }
 
@@ -264,7 +344,13 @@ export default function RepresentativeProfileSettings({
                   {profile.effectiveName}
                 </h2>
                 <p className="mt-1 text-[11px] font-bold text-[var(--portal-muted)]">
-                  {profile.partnerId}
+                  <span className="inline-flex flex-wrap items-center gap-2">
+                    {profile.partnerId}
+                    <PartnerRankBadge
+                      rank={profile.performance.rank}
+                      language={language}
+                    />
+                  </span>
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button
@@ -341,6 +427,16 @@ export default function RepresentativeProfileSettings({
               {copy.displayHelper}
             </span>
           </label>
+
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => void saveProfile()}
+            className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-[13px] bg-[var(--portal-green)] text-[10px] font-extrabold text-white disabled:opacity-50 sm:w-auto sm:px-5"
+          >
+            <Save className="h-4 w-4" />
+            {saving ? copy.saving : copy.saveProfile}
+          </button>
         </section>
       </div>
 
@@ -371,7 +467,8 @@ export default function RepresentativeProfileSettings({
               <button
                 key={value}
                 type="button"
-                onClick={() => setPreferredLanguage(value)}
+                disabled={savingLanguage}
+                onClick={() => void saveLanguage(value)}
                 className={`h-12 rounded-[14px] border text-[10px] font-extrabold transition ${
                   preferredLanguage === value
                     ? "border-[var(--portal-green)] bg-[var(--portal-green-soft)] text-[var(--portal-green)]"
@@ -382,15 +479,11 @@ export default function RepresentativeProfileSettings({
               </button>
             ))}
           </div>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={() => void saveProfile()}
-            className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-[13px] bg-[var(--portal-green)] text-[10px] font-extrabold text-white disabled:opacity-50"
-          >
-            <Save className="h-4 w-4" />
-            {saving ? copy.saving : copy.saveProfile}
-          </button>
+          {savingLanguage && (
+            <p className="mt-3 text-[10px] font-bold text-[var(--portal-muted)]">
+              {copy.saving}
+            </p>
+          )}
         </section>
 
         <section className="rounded-[24px] border border-[var(--portal-border)] bg-[var(--portal-surface)] p-5 shadow-[0_12px_40px_var(--portal-shadow)] sm:p-6">
@@ -410,6 +503,21 @@ export default function RepresentativeProfileSettings({
           >
             {copy.changePassword}
           </button>
+
+          <div className="mt-2">
+            <RepresentativeChangeEmail
+              currentEmail={profile.email}
+              language={language}
+              onEmailChanged={(
+                email,
+              ) =>
+                onProfileChange({
+                  ...profile,
+                  email,
+                })
+              }
+            />
+          </div>
         </section>
 
         <section className="rounded-[24px] border border-[var(--portal-border)] bg-[var(--portal-surface)] p-5 shadow-[0_12px_40px_var(--portal-shadow)] sm:p-6">

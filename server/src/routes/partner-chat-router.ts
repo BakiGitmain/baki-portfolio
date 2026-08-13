@@ -30,6 +30,15 @@ import {
   type ChatRole,
 } from "../services/partner-chat.service.js";
 
+import {
+  createPartnerChatReport,
+  PartnerChatReportError,
+} from "../services/partner-chat-report.service.js";
+
+import {
+  emitAdminChatReportsChanged,
+} from "../socket/partner-chat.socket.js";
+
 const historyQuerySchema =
   z.object({
     before:
@@ -52,6 +61,22 @@ const syncQuerySchema =
           true,
       }),
   });
+
+const chatReportSchema =
+  z
+    .object({
+      messageId: z.string().uuid(),
+      reason: z.enum([
+        "spam",
+        "harassment",
+        "scam",
+        "inappropriate",
+        "threats",
+        "other",
+      ]),
+      note: z.string().trim().max(1000).optional(),
+    })
+    .strict();
 
 function errorMessage(
   en:
@@ -198,6 +223,22 @@ export function createPartnerChatRouter({
             "Too many chat updates. Please try again shortly.",
             "ብዙ የChat ማሻሻያዎች ተልከዋል። እባክዎ ትንሽ ቆይተው ይሞክሩ።",
           ),
+      },
+    });
+
+  const reportLimiter =
+    rateLimit({
+      windowMs: 24 * 60 * 60 * 1000,
+      limit: 20,
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: {
+        success: false,
+        code: "CHAT_REPORT_RATE_LIMITED",
+        message: errorMessage(
+          "You have submitted too many Chat reports today. Please try again later.",
+          "ዛሬ በጣም ብዙ የChat ሪፖርቶችን ልከዋል። እባክዎ ቆይተው ይሞክሩ።",
+        ),
       },
     });
 
@@ -491,6 +532,73 @@ export function createPartnerChatRouter({
       }
     },
   );
+
+  if (role === "representative") {
+    router.post(
+      "/reports",
+      reportLimiter,
+      async (req, res, next) => {
+        try {
+          const identity = await withIdentity(req, res, role);
+
+          if (!identity) {
+            return;
+          }
+
+          const parsed = chatReportSchema.safeParse(req.body);
+
+          if (!parsed.success) {
+            res.status(400).json({
+              success: false,
+              code: "INVALID_CHAT_REPORT",
+              message: errorMessage(
+                "Choose a valid report reason and keep the note under 1,000 characters.",
+                "ትክክለኛ የሪፖርት ምክንያት ይምረጡ እና ማስታወሻውን ከ1,000 ፊደላት በታች ያድርጉ።",
+              ),
+            });
+            return;
+          }
+
+          const report = await createPartnerChatReport({
+            reporterRepresentativeId: identity.id,
+            ...parsed.data,
+          });
+
+          emitAdminChatReportsChanged({
+            reportId: report.id,
+            createdAt: new Date(report.createdAt).toISOString(),
+          });
+
+          res.status(201).json({
+            success: true,
+            report,
+            message: errorMessage(
+              "Thank you. The message was sent to the Baki Digital admin team for review.",
+              "እናመሰግናለን። መልዕክቱ ለBaki Digital አስተዳዳሪዎች ለግምገማ ተልኳል።",
+            ),
+          });
+        } catch (error) {
+          if (error instanceof PartnerChatReportError) {
+            res.status(error.status).json({
+              success: false,
+              code: error.code,
+              message: errorMessage(
+                error.message,
+                error.code === "CANNOT_REPORT_OWN_MESSAGE"
+                  ? "የራስዎን መልዕክት ሪፖርት ማድረግ አይችሉም።"
+                  : error.code === "CHAT_REPORT_ALREADY_EXISTS"
+                    ? "ይህን መልዕክት ከዚህ በፊት ሪፖርት አድርገዋል።"
+                    : "ይህ መልዕክት ከእንግዲህ ሪፖርት ሊደረግ አይችልም።",
+              ),
+            });
+            return;
+          }
+
+          next(error);
+        }
+      },
+    );
+  }
 
   return router;
 }

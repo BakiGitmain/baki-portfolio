@@ -44,6 +44,13 @@ export type PartnerChatSocketResult<T> =
   | PartnerChatSocketFailure;
 
 type ServerToClientEvents = {
+  "admin:chat-reports:changed": (
+    payload: {
+      reportId: string;
+      createdAt: string;
+    },
+  ) => void;
+
   "admin:reports:changed": (
     payload: {
       reportId:

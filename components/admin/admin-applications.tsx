@@ -517,6 +517,9 @@ export default function AdminApplications() {
           fatherName:
             "የአባት ስም",
 
+          referredBy:
+            "የጋበዘው አጋር",
+
           email:
             "Email",
 
@@ -664,6 +667,9 @@ export default function AdminApplications() {
 
           fatherName:
             "Father's Name",
+
+          referredBy:
+            "Referred by",
 
           email:
             "Email",
@@ -1797,6 +1803,14 @@ export default function AdminApplications() {
                         activeTab={detailTab}
                         onTabChange={setDetailTab}
                         language={language}
+                        applicationId={selected.id}
+                        onRefresh={async () => {
+                          const refreshed = await getAdminApplicationInsight(
+                            selected.id,
+                            language,
+                          );
+                          setInsight(refreshed);
+                        }}
                       />
                     </div>
                   )}
@@ -1871,6 +1885,15 @@ export default function AdminApplications() {
                           selected.address
                         }
                       />
+
+                      {selected.referredBy && (
+                        <InfoItem
+                          label={
+                            copy.referredBy
+                          }
+                          value={`${selected.referredBy.name} — ${selected.referredBy.partnerId}`}
+                        />
+                      )}
                     </div>
                   </section>
 

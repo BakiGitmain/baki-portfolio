@@ -18,12 +18,15 @@ import Image from "next/image";
 import {
   completeRepresentativeTraining,
   getCurrentRepresentative,
+  getRepresentativeAttention,
   getRepresentativeDashboard,
   getRepresentativeReports,
   getRepresentativeResources,
   getRepresentativeTraining,
   logoutRepresentative,
   markRepresentativeRepliesRead,
+  RepresentativeApiError,
+  type RepresentativeAttention,
   type RepresentativeDashboardData,
   type RepresentativeReportsResult,
   type RepresentativeResource,
@@ -35,9 +38,19 @@ import RepresentativeReportCenter from "@/components/representative/representati
 
 import RepresentativeProfileSettings from "@/components/representative/representative-profile-settings";
 
+import RepresentativePrograms from "@/components/representative/representative-programs";
+
+import NotificationBadge from "@/components/representative/notification-badge";
+
+import PartnerRankBadge from "@/components/representative/partner-rank-badge";
+import RepresentativeSuspendedScreen, {
+  type RepresentativeSuspension,
+} from "@/components/representative/representative-suspended-screen";
+
 import {
   getRepresentativeProfile,
   getRepresentativePrograms,
+  markRepresentativeProgramNotificationsRead,
   type RepresentativeProfile,
   type RepresentativeProgram,
 } from "@/lib/representative-profile-api";
@@ -89,6 +102,13 @@ const REPRESENTATIVE_PORTAL_COPY = {
     switchDark: "Switch to dark mode",
     openNavigation: "Open navigation",
     closeNavigation: "Close navigation",
+    notifications: "Notifications",
+    unread: "Unread",
+    trainingNotStarted: "You haven't started your training yet.",
+    topPartners: "Top Partners",
+    verifiedSales: "Verified sales",
+    reportsLabel: "Reports",
+    rank: "Rank",
     partnerId: "Partner ID",
     workspace: "Your workspace",
     commission: "Your commission",
@@ -118,7 +138,7 @@ const REPRESENTATIVE_PORTAL_COPY = {
     pages: {
       dashboard: "Everything you need to find prospects, build confidence and move qualified leads forward.",
       reports: "Send a short work report and review replies from the admin.",
-      programs: "Track the active goals assigned to you using real report and training progress.",
+      programs: "See your challenge, what to do, your progress, deadline, and reward in one place.",
       training: "Sharpen your sales knowledge and learn how to represent Baki Digital professionally.",
       chat: "Talk with Baki Digital partners and admins in real time.",
       resources: "Quick access to sales rules, pricing guidance and useful material while speaking with prospects.",
@@ -180,6 +200,13 @@ const REPRESENTATIVE_PORTAL_COPY = {
     switchDark: "ወደ ጨለማ ገጽታ ቀይር",
     openNavigation: "የገጽ መምረጫውን ክፈት",
     closeNavigation: "የገጽ መምረጫውን ዝጋ",
+    notifications: "ማሳወቂያዎች",
+    unread: "ያልተነበበ",
+    trainingNotStarted: "ሥልጠናዎን ገና አልጀመሩም።",
+    topPartners: "ከፍተኛ አጋሮች",
+    verifiedSales: "የተረጋገጡ ሽያጮች",
+    reportsLabel: "ሪፖርቶች",
+    rank: "ደረጃ",
     partnerId: "የአጋር መለያ",
     workspace: "የሥራ ቦታዎ",
     commission: "ኮሚሽንዎ",
@@ -196,7 +223,7 @@ const REPRESENTATIVE_PORTAL_COPY = {
       reports: "ሪፖርቶች",
       reportsDescription: "መልዕክቶች እና ምላሾች",
       programs: "ፕሮግራሞች",
-      programsDescription: "ንቁ ግቦች",
+      programsDescription: "ፈተናዎችና ሽልማቶች",
       training: "ትምህርት",
       trainingDescription: "የሥልጠና ክፍሎች",
       chat: "ውይይት",
@@ -209,7 +236,7 @@ const REPRESENTATIVE_PORTAL_COPY = {
     pages: {
       dashboard: "ተስማሚ ደንበኞችን ለማግኘት፣ እምነትዎን ለማጠናከር እና ብቁ ፍላጎቶችን ወደፊት ለማራመድ የሚያስፈልግዎ ሁሉ።",
       reports: "አጭር የሥራ ሪፖርት ይላኩ እና የአስተዳዳሪ ምላሾችን ይመልከቱ።",
-      programs: "የተመደቡልዎትን ንቁ የፕሮግራም ግቦች በሪፖርትና በሥልጠና እድገትዎ ይከታተሉ።",
+      programs: "ፈተናዎን፣ ምን ማድረግ እንዳለብዎ፣ እድገትዎን፣ የመጨረሻ ቀኑን እና ሽልማቱን በአንድ ቦታ ይመልከቱ።",
       training: "የሽያጭ እውቀትዎን ያጠናክሩ እና Baki Digitalን በሙያዊ መንገድ መወከል ይማሩ።",
       chat: "ከBaki Digital አጋሮች እና አስተዳዳሪዎች ጋር በቀጥታ ይወያዩ።",
       resources: "ከደንበኞች ጋር ሲነጋገሩ የሽያጭ ደንቦችን፣ የዋጋ መመሪያን እና ጠቃሚ ማጣቀሻዎችን በፍጥነት ያግኙ።",
@@ -1129,6 +1156,27 @@ export default function RepresentativePortal() {
     );
 
   const [
+    attention,
+    setAttention,
+  ] =
+    useState<RepresentativeAttention>({
+      chat:
+        0,
+
+      reports:
+        0,
+
+      programs:
+        0,
+
+      training:
+        0,
+
+      total:
+        0,
+    });
+
+  const [
     activeTab,
     setActiveTab,
   ] =
@@ -1151,6 +1199,8 @@ export default function RepresentativePortal() {
     useState(
       "",
     );
+
+  const [suspension, setSuspension] = useState<RepresentativeSuspension | null>(null);
 
   const [
     menuOpen,
@@ -1264,6 +1314,7 @@ export default function RepresentativePortal() {
       trainingResult,
       resourcesResult,
       programsResult,
+      attentionResult,
     ] =
       await Promise.all([
         getRepresentativeDashboard(),
@@ -1275,6 +1326,8 @@ export default function RepresentativePortal() {
         getRepresentativeResources(),
 
         getRepresentativePrograms(),
+
+        getRepresentativeAttention(),
       ]);
 
     setDashboard(
@@ -1295,6 +1348,10 @@ export default function RepresentativePortal() {
 
     setPrograms(
       programsResult,
+    );
+
+    setAttention(
+      attentionResult,
     );
   }
 
@@ -1342,6 +1399,7 @@ export default function RepresentativePortal() {
               resourcesResult,
               profileResult,
               programsResult,
+              attentionResult,
             ] =
               await Promise.all([
                 getRepresentativeDashboard(),
@@ -1355,6 +1413,8 @@ export default function RepresentativePortal() {
                 getRepresentativeProfile(),
 
                 getRepresentativePrograms(),
+
+                getRepresentativeAttention(),
               ]);
 
             if (
@@ -1400,6 +1460,10 @@ export default function RepresentativePortal() {
               programsResult,
             );
 
+            setAttention(
+              attentionResult,
+            );
+
             setLoading(
               false,
             );
@@ -1412,6 +1476,16 @@ export default function RepresentativePortal() {
             if (
               cancelled
             ) {
+              return;
+            }
+
+            if (
+              loadError instanceof RepresentativeApiError &&
+              loadError.code === "ACCOUNT_SUSPENDED" &&
+              loadError.suspension
+            ) {
+              setSuspension(loadError.suspension);
+              setLoading(false);
               return;
             }
 
@@ -1595,10 +1669,25 @@ export default function RepresentativePortal() {
     if (
       tab ===
         "reports" &&
-      reportData
-        .unreadReplyCount >
+      attention.reports >
         0
     ) {
+      setAttention(
+        (
+          current,
+        ) => ({
+          ...current,
+          reports:
+            0,
+          total:
+            Math.max(
+              0,
+              current.total -
+                current.reports,
+            ),
+        }),
+      );
+
       void markRepresentativeRepliesRead()
         .then(
           () =>
@@ -1608,6 +1697,16 @@ export default function RepresentativePortal() {
           (
             readError,
           ) => {
+            void getRepresentativeAttention()
+              .then(
+                setAttention,
+              )
+              .catch(
+                () => {
+                  // The original read error below remains the useful message.
+                },
+              );
+
             setError(
               readError instanceof
                 Error
@@ -1616,6 +1715,54 @@ export default function RepresentativePortal() {
                     "am"
                   ? "ምላሾቹን እንደተነበቡ ማስቀመጥ አልተቻለም።"
                   : "Unable to mark replies as read.",
+            );
+          },
+        );
+    }
+
+    if (
+      tab ===
+        "programs" &&
+      attention.programs >
+        0
+    ) {
+      setAttention(
+        (
+          current,
+        ) => ({
+          ...current,
+          programs:
+            0,
+          total:
+            Math.max(
+              0,
+              current.total -
+                current.programs,
+            ),
+        }),
+      );
+
+      void markRepresentativeProgramNotificationsRead()
+        .catch(
+          (
+            readError,
+          ) => {
+            void getRepresentativeAttention()
+              .then(
+                setAttention,
+              )
+              .catch(
+                () => {
+                  // The original read error below remains the useful message.
+                },
+              );
+
+            setError(
+              readError instanceof Error
+                ? readError.message
+                : language === "am"
+                  ? "የፕሮግራም ማሳወቂያዎችን እንደተነበቡ ማስቀመጥ አልተቻለም።"
+                  : "Unable to mark Program notifications as read.",
             );
           },
         );
@@ -1727,6 +1874,12 @@ export default function RepresentativePortal() {
         )
       : 0;
 
+  const globalAttentionTotal =
+    chatUnreadCount +
+    attention.reports +
+    attention.programs +
+    attention.training;
+
   /* =======================================================
      LOADING
      ======================================================= */
@@ -1757,6 +1910,16 @@ export default function RepresentativePortal() {
   if (
     !user
   ) {
+    if (suspension) {
+      return (
+        <RepresentativeSuspendedScreen
+          suspension={suspension}
+          language={language}
+          onLogout={() => void logout()}
+        />
+      );
+    }
+
     return null;
   }
 
@@ -1847,7 +2010,12 @@ export default function RepresentativePortal() {
 
           <button
             type="button"
-            aria-label={text.openNavigation}
+            aria-label={
+              globalAttentionTotal >
+              0
+                ? `${text.openNavigation}. ${globalAttentionTotal} ${text.notifications.toLowerCase()}.`
+                : text.openNavigation
+            }
             onClick={() =>
               setMenuOpen(
                 (
@@ -1856,13 +2024,19 @@ export default function RepresentativePortal() {
                   !current,
               )
             }
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--portal-border)] bg-[var(--portal-surface)]"
+            className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--portal-border)] bg-[var(--portal-surface)]"
           >
             <span className="h-[17px] w-[17px]">
               {menuOpen
                 ? <CloseIcon />
                 : <MenuIcon />}
             </span>
+
+            <NotificationBadge
+              count={globalAttentionTotal}
+              label={`${globalAttentionTotal} ${text.notifications.toLowerCase()}`}
+              className="absolute -right-2.5 -top-2.5"
+            />
           </button>
         </div>
       </header>
@@ -1943,6 +2117,17 @@ export default function RepresentativePortal() {
                     item.key ===
                     activeTab;
 
+                  const itemUnreadCount =
+                    item.key === "chat"
+                      ? chatUnreadCount
+                      : item.key === "reports"
+                        ? attention.reports
+                        : item.key === "programs"
+                          ? attention.programs
+                          : item.key === "training"
+                            ? attention.training
+                            : 0;
+
                   return (
                     <button
                       key={
@@ -1988,39 +2173,12 @@ export default function RepresentativePortal() {
                         </span>
                       </span>
 
-                      {(
-                        item.key ===
-                          "reports" &&
-                        reportData
-                          .unreadReplyCount >
-                          0
-                      ) ||
-                      (
-                        item.key ===
-                          "chat" &&
-                        chatUnreadCount >
-                          0
-                      ) ? (
-                        <span
-                          role="status"
-                          aria-label={`${
-                            item.key ===
-                            "chat"
-                              ? chatUnreadCount
-                              : reportData
-                                  .unreadReplyCount
-                          } unread ${item.label.toLowerCase()} items`}
-                          className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 py-1 text-[9px] font-black leading-none text-white shadow-[0_0_0_4px_rgba(239,68,68,0.1)]"
-                        >
-                          {Math.min(
-                            item.key ===
-                              "chat"
-                              ? chatUnreadCount
-                              : reportData
-                                  .unreadReplyCount,
-                            99,
-                          )}
-                        </span>
+                      {itemUnreadCount > 0 ? (
+                        <NotificationBadge
+                          count={itemUnreadCount}
+                          label={`${itemUnreadCount} ${text.unread.toLowerCase()} ${item.label.toLowerCase()}`}
+                          className="ml-auto"
+                        />
                       ) : active ? (
                         <span className="ml-auto h-1.5 w-1.5 rounded-full bg-[var(--portal-green)]" />
                       ) : null}
@@ -2373,6 +2531,12 @@ export default function RepresentativePortal() {
                             {text.modules}
                           </span>
                         </div>
+
+                        {attention.training > 0 && (
+                          <p className="mt-3 rounded-xl border border-red-500/15 bg-red-500/5 px-3 py-2 text-[7px] font-bold leading-4 text-red-500">
+                            {text.trainingNotStarted}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </section>
@@ -2554,6 +2718,106 @@ export default function RepresentativePortal() {
                           : "Active Partner account"}
                       </span>
                     </article>
+                  </div>
+
+                  <div className="mt-5 grid gap-5 xl:grid-cols-[0.8fr_1.2fr]">
+                    <section className="rounded-[24px] border border-[var(--portal-border)] bg-[var(--portal-surface)] p-5 shadow-[0_12px_40px_var(--portal-shadow)] sm:p-6">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <span className="text-[7px] font-black uppercase tracking-[0.16em] text-[var(--portal-green)]">
+                            {language === "am" ? "አፈጻጸም" : "Performance"}
+                          </span>
+                          <h2 className="mt-1.5 text-[16px] font-black tracking-[-0.04em]">
+                            {language === "am" ? "የእርስዎ ደረጃ" : "Your partner rank"}
+                          </h2>
+                        </div>
+                        <PartnerRankBadge
+                          rank={dashboard.performance.rank}
+                          language={language}
+                        />
+                      </div>
+
+                      <div className="mt-5 grid grid-cols-3 gap-2">
+                        {[
+                          [text.verifiedSales, dashboard.performance.verifiedSales],
+                          [text.reportsLabel, dashboard.performance.reports],
+                          [text.rank, language === "am"
+                            ? dashboard.performance.rank === "EXPERT" ? "ኤክስፐርት" : dashboard.performance.rank === "PRO" ? "ፕሮ" : "ኖብ"
+                            : dashboard.performance.rank],
+                        ].map(([label, value]) => (
+                          <div
+                            key={label}
+                            className="min-w-0 rounded-[15px] bg-[var(--portal-surface-2)] px-3 py-3.5 text-center"
+                          >
+                            <strong className="block truncate text-[15px] font-black text-[var(--portal-green)]">
+                              {value}
+                            </strong>
+                            <span className="mt-1 block text-[7px] font-bold text-[var(--portal-muted)]">
+                              {label}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+
+                      <p className="mt-4 text-[8px] leading-5 text-[var(--portal-muted)]">
+                        {language === "am"
+                          ? "ሪፖርቶች በራስ-ሰር ይቆጠራሉ፤ የተረጋገጡ ሽያጮችን አስተዳዳሪ ይጨምራል።"
+                          : "Reports are counted automatically. Verified sales are added by Baki/admin after confirmation."}
+                      </p>
+                    </section>
+
+                    <section className="rounded-[24px] border border-[var(--portal-border)] bg-[var(--portal-surface)] p-5 shadow-[0_12px_40px_var(--portal-shadow)] sm:p-6">
+                      <div>
+                        <span className="text-[7px] font-black uppercase tracking-[0.16em] text-[var(--portal-green)]">
+                          {text.topPartners}
+                        </span>
+                        <h2 className="mt-1.5 text-[16px] font-black tracking-[-0.04em]">
+                          {language === "am" ? "የሽያጭ መሪዎች" : "Sales leaderboard"}
+                        </h2>
+                      </div>
+
+                      <div className="mt-4 space-y-2">
+                        {dashboard.topPartners.map((partner) => (
+                          <div
+                            key={`${partner.position}-${partner.name}`}
+                            className="flex min-w-0 items-center gap-3 rounded-[15px] bg-[var(--portal-surface-2)] px-3 py-3"
+                          >
+                            <strong className="w-6 shrink-0 text-center text-[11px] font-black text-[var(--portal-green)]">
+                              #{partner.position}
+                            </strong>
+                            <span className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--portal-green-soft)] text-[10px] font-black text-[var(--portal-green)]">
+                              {partner.avatarUrl ? (
+                                <Image
+                                  src={partner.avatarUrl}
+                                  alt={`${partner.name} ${language === "am" ? "መገለጫ ምስል" : "avatar"}`}
+                                  fill
+                                  sizes="36px"
+                                  className="object-cover"
+                                />
+                              ) : (
+                                partner.name.charAt(0).toUpperCase()
+                              )}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="flex min-w-0 flex-wrap items-center gap-2">
+                                <strong className="truncate text-[10px] font-black">
+                                  {partner.name}
+                                </strong>
+                                <PartnerRankBadge
+                                  rank={partner.rank}
+                                  language={language}
+                                />
+                              </span>
+                              <span className="mt-1 block text-[7px] text-[var(--portal-muted)]">
+                                {partner.verifiedSales} {partner.verifiedSales === 1
+                                  ? language === "am" ? "ሽያጭ" : "sale"
+                                  : language === "am" ? "ሽያጮች" : "sales"} · {partner.reports} {text.reportsLabel.toLowerCase()}
+                              </span>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
                   </div>
 
                   {/* RECENT + RULES */}
@@ -2752,6 +3016,23 @@ export default function RepresentativePortal() {
                 ============================================= */}
 
             {activeTab ===
+              "programs" && (
+              <div className="mt-7">
+                <RepresentativePrograms
+                  programs={
+                    programs
+                  }
+                  language={
+                    language
+                  }
+                  onRefresh={
+                    loadPortalData
+                  }
+                />
+              </div>
+            )}
+
+            {false && activeTab ===
               "programs" && (
               <div className="mt-7 grid gap-5 lg:grid-cols-2">
                 {programs.map(
@@ -3219,6 +3500,9 @@ export default function RepresentativePortal() {
 
                               name:
                                 updated.effectiveName,
+
+                              email:
+                                updated.email,
                             }
                           : current,
                     );

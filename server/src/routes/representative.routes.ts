@@ -24,6 +24,24 @@ import {
 } from "../services/application-email.service.js";
 
 import {
+  syncRepresentativeProgramCompletions,
+} from "../services/partner-program.service.js";
+
+import {
+  calculatePartnerRank,
+  getPartnerPerformance,
+  listTopPartners,
+} from "../services/partner-performance.service.js";
+
+import {
+  recordPartnerActivity,
+} from "../services/partner-activity.service.js";
+
+import {
+  getRepresentativeAttention,
+} from "../services/representative-attention.service.js";
+
+import {
   emitAdminReportsChanged,
 } from "../socket/partner-chat.socket.js";
 
@@ -386,6 +404,46 @@ async function notifyAdminOfNewReport(
 }
 
 /* =========================================================
+   REPRESENTATIVE ATTENTION SUMMARY
+   ========================================================= */
+
+router.get(
+  "/attention",
+
+  async (
+    req,
+    res,
+    next,
+  ) => {
+    try {
+      const attention =
+        await getRepresentativeAttention({
+          representativeId:
+            req.auth!.id,
+
+          sessionVersion:
+            req.auth!
+              .sessionVersion ??
+            0,
+        });
+
+      res.json({
+        success:
+          true,
+
+        attention,
+      });
+    } catch (
+      error
+    ) {
+      next(
+        error,
+      );
+    }
+  },
+);
+
+/* =========================================================
    DASHBOARD
    ========================================================= */
 
@@ -405,6 +463,8 @@ router.get(
         reportResult,
         trainingResult,
         recentResult,
+        performance,
+        topPartners,
       ] =
         await Promise.all([
           db.query(
@@ -496,6 +556,14 @@ router.get(
               representativeId,
             ],
           ),
+
+          getPartnerPerformance(
+            representativeId,
+          ),
+
+          listTopPartners(
+            5,
+          ),
         ]);
 
       const reports =
@@ -567,6 +635,10 @@ router.get(
                     : null,
               }),
             ),
+
+          performance,
+
+          topPartners,
         },
       });
     } catch (
@@ -699,6 +771,14 @@ router.get(
             [
               representativeId,
             ],
+          ),
+
+          getPartnerPerformance(
+            representativeId,
+          ),
+
+          listTopPartners(
+            5,
           ),
         ]);
 
@@ -903,6 +983,64 @@ router.post(
       const createdReport =
         result.rows[0];
 
+      try {
+        const performance =
+          await getPartnerPerformance(
+            req.auth!.id,
+          );
+
+        const previousRank =
+          calculatePartnerRank(
+            performance.verifiedSales,
+            Math.max(
+              0,
+              performance.reports -
+                1,
+            ),
+          );
+
+        if (
+          previousRank !==
+          performance.rank
+        ) {
+          await recordPartnerActivity({
+            eventType:
+              "partner.rank_changed_due_to_metrics",
+
+            actorType:
+              "representative",
+
+            representativeId:
+              req.auth!.id,
+
+            metadata: {
+              label:
+                `${previousRank} → ${performance.rank}`,
+
+              previousRank,
+
+              rank:
+                performance.rank,
+
+              verifiedSales:
+                performance.verifiedSales,
+
+              reports:
+                performance.reports,
+            },
+          });
+        }
+      } catch (
+        performanceError
+      ) {
+        console.error(
+          "Unable to refresh Partner rank after report:",
+          performanceError instanceof Error
+            ? performanceError.message
+            : "Unknown Partner performance error.",
+        );
+      }
+
       emitAdminReportsChanged({
         reportId:
           createdReport.id,
@@ -934,6 +1072,21 @@ router.post(
               "Report በተሳካ ሁኔታ ተልኳል።",
           },
         });
+
+      try {
+        await syncRepresentativeProgramCompletions(
+          req.auth!.id,
+        );
+      } catch (
+        error
+      ) {
+        console.error(
+          "Unable to refresh Program progress after report:",
+          error instanceof Error
+            ? error.message
+            : "Unknown Program progress error.",
+        );
+      }
 
       // The success response is already committed. Waiting here keeps
       // serverless runtimes alive for delivery without coupling email

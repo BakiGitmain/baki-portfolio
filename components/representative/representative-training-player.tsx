@@ -38,7 +38,13 @@ import TrainingVideoPlayer from "@/components/representative/training-video-play
 
 import {
   getCurrentRepresentative,
+  logoutRepresentative,
+  RepresentativeApiError,
 } from "@/lib/representative-api";
+
+import RepresentativeSuspendedScreen, {
+  type RepresentativeSuspension,
+} from "@/components/representative/representative-suspended-screen";
 
 import {
   getRepresentativeTrainingCourses,
@@ -873,6 +879,8 @@ export default function RepresentativeTrainingPlayer() {
       "",
     );
 
+  const [suspension, setSuspension] = useState<RepresentativeSuspension | null>(null);
+
   const [
     mobileContentsOpen,
     setMobileContentsOpen,
@@ -1000,6 +1008,15 @@ export default function RepresentativeTrainingPlayer() {
             if (
               cancelled
             ) {
+              return;
+            }
+
+            if (
+              loadError instanceof RepresentativeApiError &&
+              loadError.code === "ACCOUNT_SUSPENDED" &&
+              loadError.suspension
+            ) {
+              setSuspension(loadError.suspension);
               return;
             }
 
@@ -1524,6 +1541,21 @@ export default function RepresentativeTrainingPlayer() {
           </p>
         </div>
       </main>
+    );
+  }
+
+  if (suspension) {
+    return (
+      <RepresentativeSuspendedScreen
+        suspension={suspension}
+        language={language}
+        onLogout={() => {
+          void logoutRepresentative().finally(() => {
+            router.replace("/representative/login");
+            router.refresh();
+          });
+        }}
+      />
     );
   }
 

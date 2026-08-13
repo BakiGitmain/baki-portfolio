@@ -270,10 +270,26 @@ router.post(
                 must_change_password,
                 failed_login_attempts,
                 locked_until,
-                session_version
-              FROM sales_representatives
+                session_version,
+                active_ban.reason AS ban_reason,
+                active_ban.banned_until,
+                active_ban.is_permanent AS ban_is_permanent
+              FROM sales_representatives representative
+              LEFT JOIN LATERAL (
+                SELECT ban.reason, ban.banned_until, ban.is_permanent
+                FROM partner_bans ban
+                WHERE
+                  ban.representative_id = representative.id
+                  AND ban.ended_at IS NULL
+                  AND (
+                    ban.is_permanent = TRUE
+                    OR ban.banned_until > NOW()
+                  )
+                ORDER BY ban.started_at DESC
+                LIMIT 1
+              ) active_ban ON TRUE
               WHERE
-                LOWER(username) =
+                LOWER(representative.username) =
                 LOWER($1)
               LIMIT 1
             `,
@@ -627,6 +643,26 @@ router.post(
             "/admin/dashboard",
         });
 
+        return;
+      }
+
+      if (
+        representative
+          ?.ban_reason
+      ) {
+        res.status(403).json({
+          success: false,
+          code: "ACCOUNT_SUSPENDED",
+          message: {
+            en: "Your Partner account is temporarily unavailable.",
+            am: "የPartner መለያዎ ለጊዜው ታግዷል።",
+          },
+          suspension: {
+            reason: representative.ban_reason,
+            bannedUntil: representative.banned_until ?? null,
+            isPermanent: Boolean(representative.ban_is_permanent),
+          },
+        });
         return;
       }
 

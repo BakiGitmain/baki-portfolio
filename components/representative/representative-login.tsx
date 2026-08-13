@@ -13,7 +13,12 @@ import {
 import {
   getCurrentRepresentative,
   loginRepresentative,
+  RepresentativeApiError,
 } from "@/lib/representative-api";
+
+import RepresentativeSuspendedScreen, {
+  type RepresentativeSuspension,
+} from "@/components/representative/representative-suspended-screen";
 
 import {
   useLanguage,
@@ -135,6 +140,8 @@ export default function RepresentativeLogin() {
   ] =
     useState("");
 
+  const [suspension, setSuspension] = useState<RepresentativeSuspension | null>(null);
+
   const copy =
     language ===
     "am"
@@ -240,10 +247,18 @@ export default function RepresentativeLogin() {
           },
         )
         .catch(
-          () => {
+          (sessionError) => {
             if (
               !cancelled
             ) {
+              if (
+                sessionError instanceof RepresentativeApiError &&
+                sessionError.code === "ACCOUNT_SUSPENDED" &&
+                sessionError.suspension
+              ) {
+                setSuspension(sessionError.suspension);
+              }
+
               setChecking(
                 false,
               );
@@ -311,6 +326,16 @@ export default function RepresentativeLogin() {
     } catch (
       loginError
     ) {
+      if (
+        loginError instanceof RepresentativeApiError &&
+        loginError.code === "ACCOUNT_SUSPENDED" &&
+        loginError.suspension
+      ) {
+        setSuspension(loginError.suspension);
+        setLoading(false);
+        return;
+      }
+
       setError(
         loginError instanceof
           Error
@@ -331,6 +356,19 @@ export default function RepresentativeLogin() {
       <main className="flex min-h-screen items-center justify-center bg-[#f7f8f3]">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-black/10 border-t-[#426c2b]" />
       </main>
+    );
+  }
+
+  if (suspension) {
+    return (
+      <RepresentativeSuspendedScreen
+        suspension={suspension}
+        language={language}
+        onLogout={() => {
+          setSuspension(null);
+          setPassword("");
+        }}
+      />
     );
   }
 

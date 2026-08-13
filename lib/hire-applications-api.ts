@@ -124,6 +124,9 @@ export type SubmitHireApplicationInput = {
 
   acceptedRules:
     true;
+
+  referralCode?:
+    string;
 };
 
 export type SubmittedHireApplication = {
@@ -556,6 +559,9 @@ export async function submitHireApplication(
 
             acceptedRules:
               input.acceptedRules,
+
+            referralCode:
+              input.referralCode,
           }),
       },
     );

@@ -85,6 +85,16 @@ export type AdminApplication = {
 
   updatedAt:
     string;
+
+  referredBy:
+    | {
+        name:
+          string;
+
+        partnerId:
+          string;
+      }
+    | null;
 };
 
 export type ApplicationsSummary = {
@@ -206,6 +216,54 @@ export type AdminApplicationInsight = {
 
     activePrograms:
       number;
+  } | null;
+
+  performance: {
+    verifiedSales:
+      number;
+
+    reports:
+      number;
+
+    rank:
+      "NOOB" |
+      "PRO" |
+      "EXPERT";
+
+    sales:
+      Array<{
+        id:
+          string;
+
+        reference:
+          string |
+          null;
+
+        note:
+          string;
+
+        status:
+          "active" |
+          "reversed";
+
+        addedAt:
+          string;
+
+        reversedAt:
+          string |
+          null;
+
+        reversalNote:
+          string;
+
+        addedByName:
+          string |
+          null;
+
+        reversedByName:
+          string |
+          null;
+      }>;
   } | null;
 
   reports:
@@ -348,7 +406,12 @@ export type AdminApplicationInsight = {
           targetType:
             "reports" |
             "lessons" |
-            "course_completion";
+            "course_completion" |
+            "leads_submitted" |
+            "qualified_lead" |
+            "confirmed_sale" |
+            "partner_referral" |
+            "custom_challenge";
 
           targetValue:
             number;
@@ -858,4 +921,113 @@ export async function getAdminApplicationInsight(
     };
 
   return result.insight;
+}
+
+export async function addAdminVerifiedSale(
+  applicationId:
+    string,
+
+  language:
+    Language,
+
+  input?: {
+    reference?:
+      string;
+
+    note?:
+      string;
+  },
+) {
+  const response =
+    await fetch(
+      `${getApiUrl()}/api/admin/applications/${encodeURIComponent(
+        applicationId,
+      )}/verified-sales`,
+      {
+        method:
+          "POST",
+
+        credentials:
+          "include",
+
+        headers: {
+          Accept:
+            "application/json",
+
+          "Content-Type":
+            "application/json",
+        },
+
+        body:
+          JSON.stringify(
+            input ??
+            {},
+          ),
+      },
+    );
+
+  if (
+    !response.ok
+  ) {
+    throw new Error(
+      await getApiError(
+        response,
+        language,
+      ),
+    );
+  }
+}
+
+export async function reverseAdminVerifiedSale(
+  applicationId:
+    string,
+
+  saleId:
+    string,
+
+  language:
+    Language,
+
+  note =
+    "",
+) {
+  const response =
+    await fetch(
+      `${getApiUrl()}/api/admin/applications/${encodeURIComponent(
+        applicationId,
+      )}/verified-sales/${encodeURIComponent(
+        saleId,
+      )}/reverse`,
+      {
+        method:
+          "POST",
+
+        credentials:
+          "include",
+
+        headers: {
+          Accept:
+            "application/json",
+
+          "Content-Type":
+            "application/json",
+        },
+
+        body:
+          JSON.stringify({
+            note,
+          }),
+      },
+    );
+
+  if (
+    !response.ok
+  ) {
+    throw new Error(
+      await getApiError(
+        response,
+        language,
+      ),
+    );
+  }
 }

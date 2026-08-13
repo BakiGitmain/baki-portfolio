@@ -2272,6 +2272,17 @@ export default function HireApplication() {
 
             acceptedRules:
               true,
+
+            referralCode:
+              typeof window !==
+              "undefined"
+                ? new URLSearchParams(
+                    window.location.search,
+                  ).get(
+                    "ref",
+                  ) ??
+                  undefined
+                : undefined,
           },
 
           language,

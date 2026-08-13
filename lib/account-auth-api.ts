@@ -33,6 +33,32 @@ export type AccountLoginResponse = {
     string;
 };
 
+export class AccountLoginError extends Error {
+  code?: string;
+  suspension?: {
+    reason: string;
+    bannedUntil: string | null;
+    isPermanent: boolean;
+  };
+
+  constructor(
+    message: string,
+    options?: {
+      code?: string;
+      suspension?: {
+        reason: string;
+        bannedUntil: string | null;
+        isPermanent: boolean;
+      };
+    },
+  ) {
+    super(message);
+    this.name = "AccountLoginError";
+    this.code = options?.code;
+    this.suspension = options?.suspension;
+  }
+}
+
 /* =========================================================
    API URL
    ========================================================= */
@@ -60,7 +86,7 @@ function getApiUrl() {
    ERROR
    ========================================================= */
 
-async function getErrorMessage(
+async function getLoginError(
   response:
     Response,
 ) {
@@ -73,7 +99,16 @@ async function getErrorMessage(
         ?.message ===
       "string"
     ) {
-      return body.message;
+      return new AccountLoginError(body.message, {
+        code: typeof body?.code === "string" ? body.code : undefined,
+        suspension: body?.suspension && typeof body.suspension.reason === "string"
+          ? {
+              reason: body.suspension.reason,
+              bannedUntil: typeof body.suspension.bannedUntil === "string" ? body.suspension.bannedUntil : null,
+              isPermanent: Boolean(body.suspension.isPermanent),
+            }
+          : undefined,
+      });
     }
 
     if (
@@ -82,15 +117,22 @@ async function getErrorMessage(
         ?.en ===
       "string"
     ) {
-      return body
-        .message
-        .en;
+      return new AccountLoginError(body.message.en, {
+        code: typeof body?.code === "string" ? body.code : undefined,
+        suspension: body?.suspension && typeof body.suspension.reason === "string"
+          ? {
+              reason: body.suspension.reason,
+              bannedUntil: typeof body.suspension.bannedUntil === "string" ? body.suspension.bannedUntil : null,
+              isPermanent: Boolean(body.suspension.isPermanent),
+            }
+          : undefined,
+      });
     }
   } catch {
     //
   }
 
-  return "Unable to sign in.";
+  return new AccountLoginError("Unable to sign in.");
 }
 
 /* =========================================================
@@ -134,11 +176,7 @@ export async function loginAccount(
   if (
     !response.ok
   ) {
-    throw new Error(
-      await getErrorMessage(
-        response,
-      ),
-    );
+    throw await getLoginError(response);
   }
 
   return response.json();

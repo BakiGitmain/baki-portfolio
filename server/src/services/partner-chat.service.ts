@@ -14,6 +14,14 @@ import {
   env,
 } from "../config/env.js";
 
+import {
+  representativeAvatarUrl,
+} from "./profile-avatar.service.js";
+
+import {
+  calculatePartnerRank,
+} from "./partner-performance.service.js";
+
 export const PARTNER_CHAT_ROOM_SLUG =
   "baki-digital-partners";
 
@@ -40,9 +48,20 @@ export type ChatIdentity = {
   publicKey:
     string;
 
+  avatarUrl:
+    string |
+    null;
+
   sessionVersion:
     number |
     null;
+
+  performance:
+    | {
+        verifiedSales: number;
+        reports: number;
+      }
+    | null;
 };
 
 export type ChatParticipant = {
@@ -60,6 +79,14 @@ export type ChatParticipant = {
 
   avatarUrl:
     string | null;
+
+  performance:
+    | {
+        rank: "NOOB" | "PRO" | "EXPERT";
+        verifiedSales: number;
+        reports: number;
+      }
+    | null;
 };
 
 export type PartnerChatMessage = {
@@ -192,7 +219,18 @@ export function toChatParticipant(
       identity.role,
 
     avatarUrl:
-      null,
+      identity.avatarUrl,
+
+    performance:
+      identity.performance
+        ? {
+            ...identity.performance,
+            rank: calculatePartnerRank(
+              identity.performance.verifiedSales,
+              identity.performance.reports,
+            ),
+          }
+        : null,
   };
 }
 
@@ -231,7 +269,35 @@ function participantFromRow(
         : "representative",
 
     avatarUrl:
-      null,
+      representativeAvatarUrl({
+        publicId:
+          row[`${prefix}_avatar_public_id`] as
+            | string
+            | null,
+
+        version:
+          row[`${prefix}_avatar_version`] as
+            | number
+            | string
+            | null,
+
+        format:
+          row[`${prefix}_avatar_format`] as
+            | string
+            | null,
+      }),
+
+    performance:
+      row[`${prefix}_type`] === "admin"
+        ? null
+        : {
+            verifiedSales: Number(row[`${prefix}_verified_sales`] ?? 0),
+            reports: Number(row[`${prefix}_reports`] ?? 0),
+            rank: calculatePartnerRank(
+              Number(row[`${prefix}_verified_sales`] ?? 0),
+              Number(row[`${prefix}_reports`] ?? 0),
+            ),
+          },
   };
 }
 
@@ -327,14 +393,43 @@ function mapMessageRow(
 }
 
 const messageSelect = `
+  WITH participant_stats AS (
+    SELECT
+      representative.id,
+      COALESCE(sale_totals.verified_sales, 0)::int AS verified_sales,
+      COALESCE(report_totals.reports, 0)::int AS reports
+    FROM sales_representatives representative
+    LEFT JOIN (
+      SELECT representative_id, COUNT(*)::int AS verified_sales
+      FROM partner_verified_sales
+      WHERE status = 'active'
+      GROUP BY representative_id
+    ) sale_totals
+      ON sale_totals.representative_id = representative.id
+    LEFT JOIN (
+      SELECT representative_id, COUNT(*)::int AS reports
+      FROM representative_reports
+      GROUP BY representative_id
+    ) report_totals
+      ON report_totals.representative_id = representative.id
+  )
   SELECT
     message.id,
     message.client_message_id,
     message.message,
     message.sender_type,
     message.sender_public_key,
-    message.sender_display_name,
-    message.sender_reference,
+    COALESCE(
+      NULLIF(TRIM(sender_representative.display_name), ''),
+      sender_representative.name,
+      message.sender_display_name
+    ) AS sender_display_name,
+    COALESCE(sender_representative.username, message.sender_reference) AS sender_reference,
+    sender_representative.avatar_public_id AS sender_avatar_public_id,
+    sender_representative.avatar_format AS sender_avatar_format,
+    sender_representative.avatar_version AS sender_avatar_version,
+    sender_stats.verified_sales AS sender_verified_sales,
+    sender_stats.reports AS sender_reports,
     message.edited_at,
     message.deleted_at,
     message.created_at,
@@ -344,14 +439,35 @@ const messageSelect = `
     reply.message AS reply_message,
     reply.sender_type AS reply_sender_type,
     reply.sender_public_key AS reply_sender_public_key,
-    reply.sender_display_name AS reply_sender_display_name,
-    reply.sender_reference AS reply_sender_reference,
+    COALESCE(
+      NULLIF(TRIM(reply_representative.display_name), ''),
+      reply_representative.name,
+      reply.sender_display_name
+    ) AS reply_sender_display_name,
+    COALESCE(reply_representative.username, reply.sender_reference) AS reply_sender_reference,
+    reply_representative.avatar_public_id AS reply_sender_avatar_public_id,
+    reply_representative.avatar_format AS reply_sender_avatar_format,
+    reply_representative.avatar_version AS reply_sender_avatar_version,
+    reply_stats.verified_sales AS reply_sender_verified_sales,
+    reply_stats.reports AS reply_sender_reports,
     reply.deleted_at AS reply_deleted_at
 
   FROM partner_chat_messages message
 
   LEFT JOIN partner_chat_messages reply
     ON reply.id = message.reply_to_message_id
+
+  LEFT JOIN sales_representatives sender_representative
+    ON sender_representative.id = message.representative_id
+
+  LEFT JOIN sales_representatives reply_representative
+    ON reply_representative.id = reply.representative_id
+
+  LEFT JOIN participant_stats sender_stats
+    ON sender_stats.id = sender_representative.id
+
+  LEFT JOIN participant_stats reply_stats
+    ON reply_stats.id = reply_representative.id
 `;
 
 async function getRoomRow() {

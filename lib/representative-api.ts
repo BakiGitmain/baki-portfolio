@@ -183,6 +183,59 @@ export type RepresentativeDashboardData = {
         string | null;
     } | null;
   }>;
+
+  performance: {
+    verifiedSales:
+      number;
+
+    reports:
+      number;
+
+    rank:
+      "NOOB" |
+      "PRO" |
+      "EXPERT";
+  };
+
+  topPartners: Array<{
+    position:
+      number;
+
+    name:
+      string;
+
+    avatarUrl:
+      string |
+      null;
+
+    verifiedSales:
+      number;
+
+    reports:
+      number;
+
+    rank:
+      "NOOB" |
+      "PRO" |
+      "EXPERT";
+  }>;
+};
+
+export type RepresentativeAttention = {
+  chat:
+    number;
+
+  reports:
+    number;
+
+  programs:
+    number;
+
+  training:
+    number;
+
+  total:
+    number;
 };
 
 export type CreateRepresentativeReportInput = {
@@ -200,6 +253,12 @@ export class RepresentativeApiError extends Error {
   nextReportAt?:
     string;
 
+  suspension?: {
+    reason: string;
+    bannedUntil: string | null;
+    isPermanent: boolean;
+  };
+
   constructor(
     message:
       string,
@@ -213,6 +272,12 @@ export class RepresentativeApiError extends Error {
 
       nextReportAt?:
         string;
+
+      suspension?: {
+        reason: string;
+        bannedUntil: string | null;
+        isPermanent: boolean;
+      };
     },
   ) {
     super(
@@ -231,6 +296,9 @@ export class RepresentativeApiError extends Error {
 
     this.nextReportAt =
       options?.nextReportAt;
+
+    this.suspension =
+      options?.suspension;
   }
 }
 
@@ -332,6 +400,19 @@ async function getApiError(
             ?.nextReportAt ===
           "string"
             ? body.nextReportAt
+            : undefined,
+
+        suspension:
+          body?.suspension &&
+          typeof body.suspension.reason === "string"
+            ? {
+                reason: body.suspension.reason,
+                bannedUntil:
+                  typeof body.suspension.bannedUntil === "string"
+                    ? body.suspension.bannedUntil
+                    : null,
+                isPermanent: Boolean(body.suspension.isPermanent),
+              }
             : undefined,
       },
     );
@@ -570,6 +651,21 @@ export async function getRepresentativeDashboard() {
     );
 
   return result.dashboard;
+}
+
+export async function getRepresentativeAttention() {
+  const result =
+    await apiRequest<{
+      success:
+        true;
+
+      attention:
+        RepresentativeAttention;
+    }>(
+      "/api/representative/attention",
+    );
+
+  return result.attention;
 }
 
 /* =========================================================

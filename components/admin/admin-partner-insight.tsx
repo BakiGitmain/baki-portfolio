@@ -1,10 +1,30 @@
 "use client";
 
+import {
+  useEffect,
+  useState,
+} from "react";
+
 import Image from "next/image";
 
 import type {
   AdminApplicationInsight,
 } from "@/lib/admin-applications-api";
+
+import {
+  addAdminVerifiedSale,
+  reverseAdminVerifiedSale,
+} from "@/lib/admin-applications-api";
+
+import PartnerRankBadge from "@/components/representative/partner-rank-badge";
+import BanPartnerDialog from "@/components/admin/ban-partner-dialog";
+import ConfirmDestructiveDialog from "@/components/admin/confirm-destructive-dialog";
+
+import {
+  getPartnerModeration,
+  unbanAdminPartner,
+  type PartnerModerationProfile,
+} from "@/lib/admin-partner-moderation-api";
 
 export type AdminPartnerDetailTab =
   | "overview"
@@ -84,17 +104,120 @@ export default function AdminPartnerInsight({
   activeTab,
   onTabChange,
   language,
+  applicationId,
+  onRefresh,
 }: {
   insight: AdminApplicationInsight;
   activeTab: AdminPartnerDetailTab;
   onTabChange: (tab: AdminPartnerDetailTab) => void;
   language: "en" | "am";
+  applicationId: string;
+  onRefresh: () => Promise<void>;
 }) {
   const representative = insight.representative;
+  const representativeId = representative?.id;
   const summary = insight.summary;
+  const performance = insight.performance;
+  const [savingSale, setSavingSale] = useState(false);
+  const [saleError, setSaleError] = useState("");
+  const [moderation, setModeration] = useState<PartnerModerationProfile | null>(null);
+  const [moderationError, setModerationError] = useState("");
+  const [banOpen, setBanOpen] = useState(false);
+  const [unbanOpen, setUnbanOpen] = useState(false);
+  const [moderationBusy, setModerationBusy] = useState(false);
 
-  if (!representative || !summary) {
+  async function refreshModeration() {
+    if (!representativeId) return;
+    try {
+      setModeration(await getPartnerModeration(representative.id, language));
+      setModerationError("");
+    } catch (error) {
+      setModerationError(error instanceof Error ? error.message : "Unable to load Partner access status.");
+    }
+  }
+
+  useEffect(() => {
+    if (!representativeId) return;
+    const currentRepresentativeId = representativeId;
+    let cancelled = false;
+
+    void getPartnerModeration(currentRepresentativeId, language)
+      .then((result) => {
+        if (!cancelled) {
+          setModeration(result);
+          setModerationError("");
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) setModerationError(error instanceof Error ? error.message : "Unable to load Partner access status.");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [representativeId, language]);
+
+  if (!representative || !summary || !performance) {
     return null;
+  }
+
+  async function addSale() {
+    if (savingSale) return;
+
+    setSavingSale(true);
+    setSaleError("");
+
+    try {
+      await addAdminVerifiedSale(applicationId, language);
+      await onRefresh();
+    } catch (error) {
+      setSaleError(
+        error instanceof Error
+          ? error.message
+          : language === "am"
+            ? "የተረጋገጠ ሽያጭ ማከል አልተቻለም።"
+            : "Unable to add the verified sale.",
+      );
+    } finally {
+      setSavingSale(false);
+    }
+  }
+
+  async function reverseSale(saleId: string) {
+    if (savingSale) return;
+
+    setSavingSale(true);
+    setSaleError("");
+
+    try {
+      await reverseAdminVerifiedSale(applicationId, saleId, language);
+      await onRefresh();
+    } catch (error) {
+      setSaleError(
+        error instanceof Error
+          ? error.message
+          : language === "am"
+            ? "የተረጋገጠውን ሽያጭ መቀልበስ አልተቻለም።"
+            : "Unable to reverse the verified sale.",
+      );
+    } finally {
+      setSavingSale(false);
+    }
+  }
+
+  async function unban() {
+    if (!representative) return;
+    setModerationBusy(true);
+    setModerationError("");
+    try {
+      await unbanAdminPartner(representative.id, language);
+      setUnbanOpen(false);
+      await Promise.all([refreshModeration(), onRefresh()]);
+    } catch (error) {
+      setModerationError(error instanceof Error ? error.message : "Unable to restore Partner access.");
+    } finally {
+      setModerationBusy(false);
+    }
   }
 
   return (
@@ -136,6 +259,19 @@ export default function AdminPartnerInsight({
                 >
                   {representative.active ? "Active" : "Inactive"}
                 </span>
+
+                {moderation?.active && (
+                  <span className="rounded-full bg-red-50 px-2 py-1 text-[9px] font-extrabold text-red-650">
+                    {moderation.active.isPermanent
+                      ? language === "am" ? "ቋሚ እገዳ" : "Banned"
+                      : language === "am" ? "ጊዜያዊ እገዳ" : "Temporarily banned"}
+                  </span>
+                )}
+
+                <PartnerRankBadge
+                  rank={performance.rank}
+                  language={language}
+                />
               </div>
 
               <p className="mt-1 truncate text-[10px] text-black/48">
@@ -211,6 +347,172 @@ export default function AdminPartnerInsight({
           </nav>
         </div>
       </section>
+
+      {activeTab === "overview" && (
+        <div className="space-y-4">
+        <section className="rounded-[20px] border border-black/[0.055] bg-white p-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <span className="text-[9px] font-black uppercase tracking-[0.13em] text-[#638d46]">
+                {language === "am" ? "አፈጻጸም" : "Performance"}
+              </span>
+              <h4 className="mt-1.5 text-[15px] font-black tracking-[-0.035em] text-[#252a22]">
+                {language === "am" ? "የአጋር ደረጃ" : "Partner standing"}
+              </h4>
+            </div>
+            <PartnerRankBadge rank={performance.rank} language={language} />
+          </div>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-[16px] bg-[#f6f8f3] p-4">
+              <span className="text-[9px] font-bold text-black/42">
+                {language === "am" ? "የተረጋገጡ ሽያጮች" : "Verified sales"}
+              </span>
+              <strong className="mt-2 block text-[24px] font-black text-[#426c2b]">
+                {performance.verifiedSales}
+              </strong>
+            </div>
+            <div className="rounded-[16px] bg-[#f6f8f3] p-4">
+              <span className="text-[9px] font-bold text-black/42">
+                {language === "am" ? "ሪፖርቶች" : "Reports"}
+              </span>
+              <strong className="mt-2 block text-[24px] font-black text-[#426c2b]">
+                {performance.reports}
+              </strong>
+              <span className="mt-1 block text-[8px] text-black/35">
+                {language === "am" ? "በራስ-ሰር የተቆጠረ" : "Automatically calculated"}
+              </span>
+            </div>
+            <div className="rounded-[16px] bg-[#f6f8f3] p-4">
+              <span className="text-[9px] font-bold text-black/42">
+                {language === "am" ? "ደረጃ" : "Rank"}
+              </span>
+              <div className="mt-3">
+                <PartnerRankBadge rank={performance.rank} language={language} />
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={savingSale || performance.verifiedSales === 0}
+              onClick={() => {
+                const latestActive = performance.sales.find((sale) => sale.status === "active");
+                if (latestActive) void reverseSale(latestActive.id);
+              }}
+              aria-label={language === "am" ? "የቅርብ ጊዜውን ሽያጭ ቀልብስ" : "Reverse latest verified sale"}
+              className="h-10 rounded-xl border border-black/10 px-4 text-[11px] font-black text-black/45 disabled:opacity-35"
+            >
+              −
+            </button>
+            <span className="min-w-10 text-center text-[16px] font-black text-[#2b3228]">
+              {performance.verifiedSales}
+            </span>
+            <button
+              type="button"
+              disabled={savingSale}
+              onClick={() => void addSale()}
+              className="h-10 rounded-xl bg-[#426c2b] px-4 text-[10px] font-extrabold text-white disabled:opacity-50"
+            >
+              {savingSale
+                ? language === "am" ? "በማስቀመጥ ላይ…" : "Saving…"
+                : language === "am" ? "+ ሽያጭ ጨምር" : "+ Add Sale"}
+            </button>
+          </div>
+
+          {saleError && (
+            <p role="alert" className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-[10px] text-red-600">
+              {saleError}
+            </p>
+          )}
+
+          {performance.sales.length > 0 && (
+            <div className="mt-5 space-y-2 border-t border-black/[0.055] pt-4">
+              {performance.sales.slice(0, 8).map((sale) => (
+                <div
+                  key={sale.id}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-[13px] bg-[#f7f9f5] px-3.5 py-3"
+                >
+                  <div>
+                    <strong className="block text-[10px] text-[#30372d]">
+                      {sale.reference || (language === "am" ? "የተረጋገጠ ሽያጭ" : "Verified sale")}
+                    </strong>
+                    <span className="mt-1 block text-[8px] text-black/38">
+                      {formatDate(sale.addedAt, language)} · {sale.status}
+                    </span>
+                  </div>
+                  {sale.status === "active" && (
+                    <button
+                      type="button"
+                      disabled={savingSale}
+                      onClick={() => void reverseSale(sale.id)}
+                      className="rounded-lg border border-red-200 px-2.5 py-1.5 text-[9px] font-extrabold text-red-600 disabled:opacity-50"
+                    >
+                      {language === "am" ? "ሽያጩን ቀልብስ" : "Reverse sale"}
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="rounded-[20px] border border-black/[0.055] bg-white p-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <span className="text-[9px] font-black uppercase tracking-[0.13em] text-[#638d46]">
+                {language === "am" ? "የመለያ መዳረሻ" : "Account access"}
+              </span>
+              <h4 className="mt-1.5 text-[15px] font-black tracking-[-0.035em] text-[#252a22]">
+                {moderation?.active
+                  ? language === "am" ? "Partnerው ታግዷል" : "Partner access is suspended"
+                  : language === "am" ? "Partnerው መዳረሻ አለው" : "Partner access is active"}
+              </h4>
+              <p className="mt-2 max-w-[650px] text-[10px] leading-5 text-black/48">
+                {moderation?.active
+                  ? `${moderation.active.reason} · ${moderation.active.isPermanent ? (language === "am" ? "ቋሚ" : "Permanent") : formatDate(moderation.active.bannedUntil, language)}`
+                  : language === "am"
+                    ? "Portal እና Partner Chat መዳረሻው ክፍት ነው።"
+                    : "Portal and Partner Chat access are available."}
+              </p>
+            </div>
+            {moderation?.active ? (
+              <button type="button" onClick={() => setUnbanOpen(true)} className="h-10 rounded-xl border border-[#6f9d52]/25 bg-[#f2f8ed] px-4 text-[10px] font-extrabold text-[#426c2b]">
+                {language === "am" ? "እገዳ አንሳ" : "Unban Partner"}
+              </button>
+            ) : (
+              <button type="button" onClick={() => setBanOpen(true)} className="h-10 rounded-xl border border-red-200 bg-red-50 px-4 text-[10px] font-extrabold text-red-650">
+                {language === "am" ? "Partner እገድ" : "Ban Partner"}
+              </button>
+            )}
+          </div>
+
+          {moderationError && <p role="alert" className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-[10px] text-red-650">{moderationError}</p>}
+
+          {moderation && moderation.history.length > 0 && (
+            <div className="mt-5 border-t border-black/[0.055] pt-4">
+              <h5 className="text-[10px] font-black text-[#30372d]">{language === "am" ? "የእገዳ ታሪክ" : "Ban history"}</h5>
+              <div className="mt-2 space-y-2">
+                {moderation.history.slice(0, 8).map((ban) => (
+                  <div key={ban.id} className="flex flex-col gap-2 rounded-[13px] bg-[#f7f9f5] px-3.5 py-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <strong className="block text-[10px] text-[#30372d]">{ban.reason}</strong>
+                      <span className="mt-1 block text-[8px] text-black/38">{ban.bannedByName || "Admin"} · {formatDate(ban.startedAt, language)}</span>
+                    </div>
+                    <span className={`shrink-0 rounded-full px-2 py-1 text-[8px] font-extrabold ${!ban.endedAt ? "bg-red-50 text-red-650" : "bg-black/[0.05] text-black/45"}`}>
+                      {!ban.endedAt
+                        ? ban.isPermanent ? (language === "am" ? "ቋሚ" : "Permanent") : (language === "am" ? "ንቁ" : "Active")
+                        : ban.endReason === "expired" ? (language === "am" ? "ጊዜው አልቋል" : "Expired") : (language === "am" ? "ተነስቷል" : "Unbanned")}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+        </div>
+      )}
 
       {activeTab === "activity" && (
         <section className="space-y-2.5">
@@ -485,6 +787,28 @@ export default function AdminPartnerInsight({
           )}
         </section>
       )}
+
+      <BanPartnerDialog
+        open={banOpen}
+        representativeId={representative.id}
+        partnerName={representative.effectiveName}
+        language={language}
+        onClose={() => setBanOpen(false)}
+        onBanned={async () => {
+          await Promise.all([refreshModeration(), onRefresh()]);
+        }}
+      />
+
+      <ConfirmDestructiveDialog
+        open={unbanOpen}
+        title={language === "am" ? "የPartner መዳረሻ ይመለስ?" : "Restore Partner access?"}
+        description={language === "am" ? "የPortal እና Partner Chat መዳረሻው ወዲያውኑ ይመለሳል።" : "Portal and Partner Chat access will be restored immediately."}
+        confirmLabel={language === "am" ? "እገዳ አንሳ" : "Unban Partner"}
+        cancelLabel={language === "am" ? "ይቅር" : "Cancel"}
+        busy={moderationBusy}
+        onClose={() => setUnbanOpen(false)}
+        onConfirm={() => void unban()}
+      />
     </div>
   );
 }

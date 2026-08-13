@@ -1903,6 +1903,8 @@ Home is the partner's overview. It can show:
 - the currently active assigned Program and its measured targets
 - report totals, admin replies and unread reply counts
 - recent reports
+- verified sales, submitted reports and the backend-calculated Noob / Pro / Expert rank
+- a Top Partners list ordered by verified sales first and reports second
 
 Explain these as summaries, not as money already earned or as personalized facts you can see.
 
@@ -1913,6 +1915,17 @@ The Partner ID is the representative's account/reference identifier. It helps id
 The dashboard is for orientation. Partners use the dedicated sections to send a report, learn, inspect program goals, chat, open approved sales references, or manage profile preferences.
 
 Never claim to know the current user's actual progress, Partner ID, reports or unread counts unless that state is supplied in the request.
+
+PARTNER RANKS
+
+- Every new partner begins at Noob.
+- Pro requires BOTH at least 1 admin-verified sale and at least 10 submitted reports.
+- Expert requires BOTH more than 5 admin-verified sales (6 or more) and at least 25 submitted reports.
+- Reports are counted automatically from submitted Reports. Partners cannot type or change the count.
+- Only an authorized admin can add or reverse a verified sale. Partners cannot add their own sales or choose a rank.
+- If a verified sale is reversed and the requirements are no longer met, the rank recalculates automatically.
+
+Top Partners is a simple leaderboard. It shows public-facing partner names, avatars, ranks, verified-sale totals and report totals. It does not expose email, phone or private application information. Ordering is verified sales descending, then reports descending, with a stable name/account tie breaker.
 `;
 
 /* =========================================================
@@ -1976,6 +1989,8 @@ A lesson without a video can be completed with the visible "Complete lesson" act
 
 Training/course progress represents completed lessons compared with the available lessons. It is learning progress, not a score, payment or guaranteed sales result.
 
+A new partner can see a red 1 beside Learn because they have not started training. It clears only after genuine lesson progress is saved; merely opening Learn does not clear it. That 1 also contributes to the combined notification number on the mobile menu.
+
 If progress does not save, suggest reopening the lesson, checking the connection and trying again. If it still fails, ask for the visible error rather than claiming access to the account.
 `;
 
@@ -1986,37 +2001,47 @@ If progress does not save, suggest reopening the lesson, checking the connection
 const PARTNER_PROGRAMS_CONTEXT = `
 USER-FACING PARTNER PROGRAMS
 
-Programs are time-bound goals Baki can assign to all active Sales Partners or selected partners. They give a partner a clear measurable target for a specific start and end date.
+Programs are simple challenges or goals Baki can assign to all Sales Partners or selected partners. A Program answers four questions: what do I do, how much have I done, what can I earn, and when does it end?
 
-The partner workspace currently shows active Programs assigned to that partner. Each Program can show its title, description, end date, overall progress and individual targets.
+A Program card shows the challenge, instructions, progress, deadline, reward, and submission history. Statuses use plain language: Upcoming, Active, Completed, and Expired.
 
-CURRENT TARGET TYPES
+AUTOMATIC GOALS
 
-- reports submitted during the Program dates
-- lessons completed during the Program dates
-- completion of a specified course during the Program dates
+- reports submitted
+- lessons completed
+- course completed
+- leads submitted
 
-Only qualifying activity inside the Program period contributes to that Program's target.
+These use trusted workspace activity and update without an admin manually approving every report or lesson.
 
-EXAMPLE
+VERIFIED CHALLENGES
 
-If a target says "Reports submitted 1/5," the target is 5 eligible reports and 1 has counted so far during the Program period. Reaching 5/5 completes that target. The overall percentage summarizes progress across the Program's targets and stops at 100%.
+- Qualified lead: a genuine prospect with a real need and real interest. The partner submits the customer details, and an admin approves or rejects them. A random name or uninterested contact is not a qualified lead.
+- Confirmed sale: counts only after the customer agreement or sale is confirmed AND the qualifying customer payment has cleared. A lead alone never counts as a sale.
+- Partner referral: the partner shares their referral link. An application alone does not finish the challenge. The applicant must be accepted and activate their Partner account.
+- Custom challenge: the partner submits a short explanation and, when useful, a public link. An admin verifies it.
 
-An active Program is one whose active date period is currently running and which is assigned to that partner. Programs also have start/end dates and lifecycle states, but the partner's current list is focused on active assigned Programs.
+For verified challenges, the normal flow is: partner submits -> Pending Review -> admin approves or rejects -> approved work updates progress. A rejected submission does not increase progress, and the partner can see the rejection reason.
 
-IMPORTANT LIMITS
+REWARDS
 
-The current Programs feature does NOT promise:
+Programs may offer:
 
-- cash rewards or bonuses
-- automatic payment
-- proof uploads
-- a partner submission for admin approval
-- manual approval of goal completion
+- bonus commission on the next qualifying sale or the sale related to the challenge
+- a fixed ETB bonus
+- recognition with no financial payment
 
-Progress comes from the qualifying Reports and Learn activity already recorded by the workspace. If someone asks what they "get," explain that the current benefit is a clear goal and visible progress; do not invent a reward.
+A +5% Program commission reward means +5 PERCENTAGE POINTS. If the normal qualifying rate is 20%, the rewarded rate is 25%, not 21%. It does not permanently change the partner's normal commission.
 
-If they still do not understand, use a simple analogy: a Program is like a target card for a limited period, and qualifying actions move its counter toward the goal.
+Reward statuses are Locked, Earned, Approved, and Paid or Applied. Completing every required goal makes the reward Earned. An admin still approves it. Fixed money is marked Paid manually; a commission bonus is marked Applied manually to one qualifying sale. The system tracks rewards but does not send money automatically. Multiple Program commission bonuses are not automatically stacked on one sale.
+
+Only qualifying activity inside the Program dates contributes. If a target says 1/5, one eligible action has counted toward a target of five. Overall progress summarizes all required goals and stops at 100%.
+
+Simple explanation: "Programs are challenges or goals Baki gives Sales Partners. You see what to do, submit proof when needed, follow your progress, and earn the listed reward after Baki verifies completion."
+
+When the entire Program reaches completed status, the partner receives one completion email. The email names the Program and completed goal, includes an earned reward only when one exists, and is not sent for every small progress update. Repeated refreshes or recalculations do not intentionally send duplicate completion emails.
+
+Never expose database details, internal admin notes, private records, or anti-fraud checks.
 `;
 
 /* =========================================================
@@ -2040,13 +2065,27 @@ CURRENT USER-FACING BEHAVIOR
 
 Partners can edit or delete their own available messages. Do not promise that a user can edit another person's message.
 
-The partner's saved display name is used in Partner Chat. The current chat uses participant initials for its avatar-style circles; it does not currently receive the saved profile-picture image.
+The partner's saved display name is used in Partner Chat. If a participant has a saved profile picture, Chat shows that picture. Otherwise it shows a letter fallback based on the display name. This applies to representatives and admins, with a fallback when an admin has no picture.
 
 MESSAGE RETENTION
 
 Chat messages are kept for 7 days. Older messages are automatically removed so the space stays focused on recent communication. Therefore "Are messages saved?" should be answered: yes, temporarily for 7 days, not as permanent history.
 
 If older messages are gone, explain the 7-day retention first. Do not describe storage, cleanup jobs, sockets, database queries or other implementation details.
+
+SAFE CHAT PROFILES
+
+A partner can select a visible Chat avatar or display name to open a compact profile card. For a Sales Partner it shows only the current avatar/display name, Partner ID, rank, verified-sale total and submitted-report total. It never shows email, phone, application documents or other private account data. An admin card is simpler and clearly identifies the participant as a Baki Digital admin.
+
+MESSAGE REPORTING
+
+An accepted partner can report another participant's available message from that profile card. They choose a reason such as spam, harassment, scam, inappropriate content, threats or other, and may add a short note. A partner cannot report their own message or repeatedly report the same message.
+
+The report preserves the relevant message for authorized admin review even if normal Chat retention later removes the conversation. The reporting partner's identity is visible only to authorized admins and is not disclosed to the reported participant. Baki AI cannot see whether a particular report was submitted or how an admin decided it.
+
+ACCOUNT SUSPENSION
+
+An authorized admin may temporarily or permanently restrict a Partner account when moderation or account-safety action is required. The Partner sees a professional notice with the reason. A temporary notice shows when access restores and the system restores access automatically after that time. A permanent restriction requires an authorized admin to restore access. Do not claim to know whether the current user is suspended unless the state is supplied in the request, and never claim Baki AI can remove a restriction.
 `;
 
 /* =========================================================
@@ -2092,12 +2131,14 @@ EDITABLE PROFILE INFORMATION
 
 - Display name: can be changed or left blank to use the verified legal name. The effective display name appears in the portal and Partner Chat.
 - Profile picture: choose Add picture or Replace picture, then select an image. The upload happens immediately when it succeeds; the separate Save profile button is not required for the picture. Remove is available when a picture exists.
-- Language preference: choose English or Amharic, then use Save profile. The saved preference follows the partner account across devices; browser storage is only a quick fallback.
+- Language preference: choose English or Amharic and it saves immediately. The saved preference follows the partner account across devices; browser storage remains a quick fallback. Save profile is only for Public Profile fields such as Display name.
 - Portal theme: Light or Dark can be selected in Profile.
 
 PASSWORD / SECURITY
 
-Profile contains "Change password," which opens the account security flow. A normal password change asks for the current password, a new password and confirmation. The new password must contain at least 6 characters. First-login password setup is a separate flow using the temporary credential from the partner's own acceptance email.
+Profile contains Change password and Change email. A normal password change asks for the current password, a new password and confirmation. The new password must contain at least 6 characters. First-login password setup is a separate flow using the temporary credential from the partner's own acceptance email.
+
+Change email is a two-email verification flow. First, the partner requests a 4-digit code sent to the current email and verifies it. Then they enter the new email and verify a different 4-digit code sent there. The account email changes only after both addresses are verified. Codes expire after 10 minutes, resend has a short cooldown, and too many wrong attempts require a new code. Explain this as protection against an unauthorized or mistyped email; never ask for a code in Baki AI chat and never describe internal code storage.
 
 Never ask the user to paste a password or temporary credential into Baki AI chat.
 `;
@@ -2109,16 +2150,18 @@ Never ask the user to paste a password or temporary credential into Baki AI chat
 const PARTNER_NOTIFICATIONS_CONTEXT = `
 USER-FACING PARTNER NOTIFICATION BADGES
 
-A small red numeric badge in the Partner navigation means there is unread/new information in that section.
+A small red numeric badge in the Partner navigation means there is unread/new information or a required next step in that section. The mobile hamburger shows the combined total across supported sections.
 
 Currently:
 
 - Reports badge = unread admin replies
+- Programs badge = new assignments, approved/rejected submissions, completed Programs, or approved rewards
 - Chat badge = unread chat messages
+- Learn badge = 1 while a partner has not genuinely started training; it clears after real lesson progress is saved, not merely when Learn is opened
 
-The number is the unread count, not the total number of reports or messages. Opening the relevant section marks the available items as read, so the badge can clear or decrease after the state refreshes.
+The menu total is Chat + Reports + Programs + Learn attention. For example, Chat 2 and Learn 1 produces a menu total of 3. The number is not the partner's total reports or total chat history. Opening Chat, Reports or Programs can mark their readable items as read; Learn clears only from actual saved training progress.
 
-The Partner navigation visually caps the displayed number at 99. Do not say every navigation item has a badge; current badges are for Reports and Chat.
+Badge text visually caps at 99+. Do not say every navigation item always has a badge; only supported sections with a count above zero show one.
 
 If a notification disappeared after the user opened the section, that normally means the item was marked read. Never invent the user's actual unread count.
 `;
@@ -2889,6 +2932,20 @@ function isPartnerWorkspaceIntent(
 
       /\brecent reports.*dashboard\b/,
 
+      /\b(?:my )?rank\b/,
+
+      /\b(?:noob|pro|expert)\b/,
+
+      /\bhow do i become (?:pro|expert)\b/,
+
+      /\bwho adds (?:my )?sales\b/,
+
+      /\breports counted automatically\b/,
+
+      /\btop partners\b/,
+
+      /\bleaderboard\b/,
+
       /የአጋር (?:መለያ|የሥራ ቦታ)/,
     ],
   );
@@ -3025,6 +3082,24 @@ function isPartnerProgramsIntent(
 
       /\bwhat is this (?:goal|target|challenge)\b/,
 
+      /\b(?:qualified lead|confirmed sale|partner referral|referral link|custom challenge)\b/,
+
+      /\b(?:program|challenge) reward\b/,
+
+      /\b(?:bonus commission|percentage points)\b/,
+
+      /\bwhen do i get (?:my |the )?reward\b/,
+
+      /\bhow does baki know i did it\b/,
+
+      /\bwhat is (?:a )?challenge\b/,
+
+      /\bhow do i (?:finish|complete) (?:one|it|a (?:program|challenge))\b/,
+
+      /\bhow do referrals work\b/,
+
+      /\breferral challenge\b/,
+
       /\bwhat does (?:this|the) (?:goal|target) mean\b/,
 
       /\bprogram.*\b\d+\s*\/\s*\d+\b/,
@@ -3034,6 +3109,10 @@ function isPartnerProgramsIntent(
       /\blessons completed\s+\d+\s*\/\s*\d+\b/,
 
       /\bwhat happens.*(?:finish|complete).*program goal\b/,
+
+      /\b(?:program|challenge) completion email\b/,
+
+      /\bwhy did i get (?:a )?program.*email\b/,
 
       /ፕሮግራም|የፕሮግራም ግብ/,
     ],
@@ -3151,6 +3230,14 @@ function isPartnerProfileIntent(
 
       /\bchange (?:my )?password\b/,
 
+      /\bchange (?:my )?email\b/,
+
+      /\bverify (?:my )?(?:current|new )?email\b/,
+
+      /\b(?:email|verification) code\b/,
+
+      /\btwo email codes\b/,
+
       /\baccount security\b/,
 
       /\baccount settings\b/,
@@ -3175,15 +3262,19 @@ function isPartnerNotificationsIntent(
 
       /\bnotification badge\b/,
 
-      /\bnumber (?:beside|next to|on) (?:chat|reports?)\b/,
+      /\bnumber (?:beside|next to|on) (?:the )?(?:mobile )?(?:chat|reports?|programs?|learn|menu|hamburger)(?: menu)?\b/,
+
+      /\bnumber on (?:the )?(?:mobile )?(?:menu|hamburger)(?: menu)?\b/,
+
+      /\bwhy is learn showing (?:a )?(?:red )?1\b/,
 
       /\bwhat does (?:the )?red \d+ mean\b/,
 
       /\bwhy did my notification disappear\b/,
 
-      /\bnotification.*(?:chat|reports?)\b/,
+      /\bnotification.*(?:chat|reports?|programs?|learn|menu)\b/,
 
-      /\b(?:chat|reports?) notification\b/,
+      /\b(?:chat|reports?|programs?|learn|menu) notification\b/,
 
       /\bbadge (?:clear|cleared|disappear|disappeared|decrease|decreased)\b/,
 

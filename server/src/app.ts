@@ -14,6 +14,7 @@ import representativeAuthRouter from "./routes/representative-auth.routes.js";
 import representativeTrainingRouter from "./routes/representative-training.routes.js";
 import representativeChatRouter from "./routes/representative-chat.routes.js";
 import representativeProfileRouter from "./routes/representative-profile.routes.js";
+import representativeEmailChangeRouter from "./routes/representative-email-change.routes.js";
 import representativeProgramsRouter from "./routes/representative-programs.routes.js";
 import representativeRouter from "./routes/representative.routes.js";
 
@@ -43,6 +44,8 @@ import adminReportsRouter from "./routes/admin-reports.routes.js";
 import adminChatRouter from "./routes/admin-chat.routes.js";
 import adminDashboardRouter from "./routes/admin-dashboard.routes.js";
 import adminProgramsRouter from "./routes/admin-programs.routes.js";
+import adminPartnerModerationRouter from "./routes/admin-partner-moderation.routes.js";
+import adminChatReportsRouter from "./routes/admin-chat-reports.routes.js";
 
 import applicationsRouter from "./routes/applications.routes.js";
 
@@ -299,6 +302,11 @@ app.use(
 );
 
 app.use(
+  "/api/representative/profile/email-change",
+  representativeEmailChangeRouter,
+);
+
+app.use(
   "/api/representative/profile",
   representativeProfileRouter,
 );
@@ -368,6 +376,16 @@ app.use(
 app.use(
   "/api/admin/chat",
   adminChatRouter,
+);
+
+app.use(
+  "/api/admin/chat-reports",
+  adminChatReportsRouter,
+);
+
+app.use(
+  "/api/admin/partners",
+  adminPartnerModerationRouter,
 );
 
 app.use(

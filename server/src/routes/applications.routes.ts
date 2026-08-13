@@ -527,6 +527,14 @@ const applicationSchema =
         z.literal(
           true,
         ),
+
+      referralCode:
+        z
+          .string()
+          .trim()
+          .max(32)
+          .regex(/^PS-\d{4,}$/i)
+          .optional(),
     })
     .superRefine(
       (
@@ -939,11 +947,70 @@ router.post(
         );
 
       /* ===================================================
+         REFERRAL ATTRIBUTION
+
+         Only an active Partner ID from the application URL is
+         accepted. Matching applicant/referrer contact details are
+         treated as a self-referral and are not attributed.
+         =================================================== */
+
+      let referringRepresentativeId:
+        string |
+        null =
+        null;
+
+      if (
+        input.referralCode
+      ) {
+        const referrerResult =
+          await db.query(
+            `
+              SELECT
+                id,
+                email_normalized,
+                phone_normalized
+              FROM sales_representatives
+              WHERE
+                is_active = TRUE
+                AND LOWER(username) = LOWER($1::varchar)
+              LIMIT 1
+            `,
+            [
+              input.referralCode,
+            ],
+          );
+
+        const referrer =
+          referrerResult.rows[0];
+
+        if (
+          referrer &&
+          referrer.email_normalized !==
+            emailNormalized &&
+          referrer.phone_normalized !==
+            phoneNormalized
+        ) {
+          referringRepresentativeId =
+            referrer.id;
+        }
+      }
+
+      /* ===================================================
          INSERT
          =================================================== */
 
-      const result =
-        await db.query(
+      const client =
+        await db.connect();
+
+      let result;
+
+      try {
+        await client.query(
+          "BEGIN",
+        );
+
+        result =
+          await client.query(
           `
             INSERT INTO sales_representative_applications (
               full_name,
@@ -1051,6 +1118,51 @@ router.post(
             userAgentHash,
           ],
         );
+
+        const savedApplication =
+          result.rows[0];
+
+        if (
+          referringRepresentativeId
+        ) {
+          await client.query(
+            `
+              INSERT INTO partner_referrals (
+                referring_representative_id,
+                application_id,
+                status,
+                attributed_at
+              )
+              VALUES (
+                $1::uuid,
+                $2::uuid,
+                'attributed',
+                NOW()
+              )
+              ON CONFLICT (application_id)
+              DO NOTHING
+            `,
+            [
+              referringRepresentativeId,
+              savedApplication.id,
+            ],
+          );
+        }
+
+        await client.query(
+          "COMMIT",
+        );
+      } catch (
+        error
+      ) {
+        await client.query(
+          "ROLLBACK",
+        );
+
+        throw error;
+      } finally {
+        client.release();
+      }
 
       const application =
         result.rows[0];

@@ -21,11 +21,23 @@ import {
 
 import {
   listRepresentativePrograms,
+  syncRepresentativeProgramCompletions,
 } from "../services/partner-program.service.js";
 
 import {
   recordPartnerActivity,
 } from "../services/partner-activity.service.js";
+
+import {
+  addPartnerVerifiedSale,
+  getPartnerPerformance,
+  getPartnerVerifiedSales,
+  reversePartnerVerifiedSale,
+} from "../services/partner-performance.service.js";
+
+import {
+  representativeAvatarUrl,
+} from "../services/profile-avatar.service.js";
 
 import {
   sendApplicationRejectedEmail,
@@ -128,6 +140,14 @@ type ApplicationRow = {
 
   updated_at:
     Date;
+
+  referrer_name?:
+    string |
+    null;
+
+  referrer_partner_id?:
+    string |
+    null;
 };
 
 /* =========================================================
@@ -259,6 +279,18 @@ function mapApplication(
 
     updatedAt:
       row.updated_at,
+
+    referredBy:
+      row.referrer_partner_id
+        ? {
+            name:
+              row.referrer_name ??
+              "Sales Partner",
+
+            partnerId:
+              row.referrer_partner_id,
+          }
+        : null,
   };
 }
 
@@ -338,6 +370,37 @@ const documentSideSchema =
     "front",
     "back",
   ]);
+
+const verifiedSaleSchema =
+  z
+    .object({
+      reference:
+        z
+          .string()
+          .trim()
+          .max(160)
+          .optional(),
+
+      note:
+        z
+          .string()
+          .trim()
+          .max(2000)
+          .optional(),
+    })
+    .strict();
+
+const reverseVerifiedSaleSchema =
+  z
+    .object({
+      note:
+        z
+          .string()
+          .trim()
+          .max(2000)
+          .optional(),
+    })
+    .strict();
 
 /* =========================================================
    REQUIRE ADMIN
@@ -564,6 +627,27 @@ router.get(
               reviewed_at,
               reviewed_by_admin_id,
 
+              (
+                SELECT COALESCE(
+                  NULLIF(TRIM(referrer.display_name), ''),
+                  referrer.name
+                )
+                FROM partner_referrals referral
+                INNER JOIN sales_representatives referrer
+                  ON referrer.id = referral.referring_representative_id
+                WHERE referral.application_id = sales_representative_applications.id
+                LIMIT 1
+              ) AS referrer_name,
+
+              (
+                SELECT referrer.username
+                FROM partner_referrals referral
+                INNER JOIN sales_representatives referrer
+                  ON referrer.id = referral.referring_representative_id
+                WHERE referral.application_id = sales_representative_applications.id
+                LIMIT 1
+              ) AS referrer_partner_id,
+
               created_at,
               updated_at
             FROM sales_representative_applications
@@ -661,6 +745,260 @@ router.get(
 );
 
 /* =========================================================
+   VERIFIED PARTNER SALES
+   ========================================================= */
+
+router.post(
+  "/:id/verified-sales",
+
+  async (
+    req,
+    res,
+    next,
+  ) => {
+    const parsedId =
+      idSchema.safeParse(
+        req.params.id,
+      );
+
+    const parsedBody =
+      verifiedSaleSchema.safeParse(
+        req.body ??
+        {},
+      );
+
+    if (
+      !parsedId.success ||
+      !parsedBody.success
+    ) {
+      errorResponse(
+        res,
+        400,
+        "INVALID_VERIFIED_SALE",
+        "Check the verified sale details and try again.",
+        "የተረጋገጠውን የሽያጭ መረጃ ያረጋግጡና እንደገና ይሞክሩ።",
+      );
+
+      return;
+    }
+
+    try {
+      const representativeResult =
+        await db.query<{
+          id:
+            string;
+        }>(
+          `
+            SELECT id
+            FROM sales_representatives
+            WHERE application_id = $1::uuid
+            LIMIT 1
+          `,
+          [
+            parsedId.data,
+          ],
+        );
+
+      const representative =
+        representativeResult.rows[0];
+
+      if (
+        !representative
+      ) {
+        errorResponse(
+          res,
+          404,
+          "PARTNER_NOT_FOUND",
+          "Partner account not found.",
+          "የአጋር መለያው አልተገኘም።",
+        );
+
+        return;
+      }
+
+      const performance =
+        await addPartnerVerifiedSale({
+          representativeId:
+            representative.id,
+
+          adminId:
+            req.auth!.id,
+
+          reference:
+            parsedBody.data.reference,
+
+          note:
+            parsedBody.data.note,
+        });
+
+      res.status(201).json({
+        success:
+          true,
+
+        performance,
+      });
+    } catch (
+      error
+    ) {
+      if (
+        (
+          error as {
+            code?:
+              string;
+          }
+        ).code ===
+        "23505"
+      ) {
+        errorResponse(
+          res,
+          409,
+          "SALE_REFERENCE_EXISTS",
+          "That active sale reference is already recorded for this partner.",
+          "ይህ የሽያጭ ማጣቀሻ ለዚህ አጋር አስቀድሞ ተመዝግቧል።",
+        );
+
+        return;
+      }
+
+      next(
+        error,
+      );
+    }
+  },
+);
+
+router.post(
+  "/:id/verified-sales/:saleId/reverse",
+
+  async (
+    req,
+    res,
+    next,
+  ) => {
+    const parsedId =
+      idSchema.safeParse(
+        req.params.id,
+      );
+
+    const parsedSaleId =
+      idSchema.safeParse(
+        req.params.saleId,
+      );
+
+    const parsedBody =
+      reverseVerifiedSaleSchema.safeParse(
+        req.body ??
+        {},
+      );
+
+    if (
+      !parsedId.success ||
+      !parsedSaleId.success ||
+      !parsedBody.success
+    ) {
+      errorResponse(
+        res,
+        400,
+        "INVALID_VERIFIED_SALE",
+        "The verified sale information is invalid.",
+        "የተረጋገጠው የሽያጭ መረጃ ትክክል አይደለም።",
+      );
+
+      return;
+    }
+
+    try {
+      const representativeResult =
+        await db.query<{
+          id:
+            string;
+        }>(
+          `
+            SELECT id
+            FROM sales_representatives
+            WHERE application_id = $1::uuid
+            LIMIT 1
+          `,
+          [
+            parsedId.data,
+          ],
+        );
+
+      const representative =
+        representativeResult.rows[0];
+
+      if (
+        !representative
+      ) {
+        errorResponse(
+          res,
+          404,
+          "PARTNER_NOT_FOUND",
+          "Partner account not found.",
+          "የአጋር መለያው አልተገኘም።",
+        );
+
+        return;
+      }
+
+      const performance =
+        await reversePartnerVerifiedSale({
+          representativeId:
+            representative.id,
+
+          saleId:
+            parsedSaleId.data,
+
+          adminId:
+            req.auth!.id,
+
+          note:
+            parsedBody.data.note,
+        });
+
+      res.json({
+        success:
+          true,
+
+        performance,
+      });
+    } catch (
+      error
+    ) {
+      const status =
+        Number(
+          (
+            error as {
+              status?:
+                number;
+            }
+          ).status ??
+          0,
+        );
+
+      if (
+        status ===
+        409
+      ) {
+        errorResponse(
+          res,
+          409,
+          "SALE_ALREADY_REVERSED",
+          "Verified sale not found or already reversed.",
+          "የተረጋገጠው ሽያጭ አልተገኘም ወይም አስቀድሞ ተቀልብሷል።",
+        );
+
+        return;
+      }
+
+      next(
+        error,
+      );
+    }
+  },
+);
+
+/* =========================================================
    APPLICATION / PARTNER OPERATIONAL DETAIL
    ========================================================= */
 
@@ -736,6 +1074,9 @@ router.get(
             summary:
               null,
 
+            performance:
+              null,
+
             reports: [],
 
             training: [],
@@ -762,6 +1103,8 @@ router.get(
         trainingResult,
         activityResult,
         programs,
+        performance,
+        verifiedSales,
       ] =
         await Promise.all([
           db.query(
@@ -929,6 +1272,14 @@ router.get(
               activeOnly:
                 false,
             },
+          ),
+
+          getPartnerPerformance(
+            representative.id,
+          ),
+
+          getPartnerVerifiedSales(
+            representative.id,
           ),
         ]);
 
@@ -1161,43 +1512,19 @@ router.get(
         ).length;
 
       const avatarUrl =
-        representative
-          .avatar_public_id
-          ? cloudinary.url(
-              representative
-                .avatar_public_id,
-              {
-                secure:
-                  true,
+        representativeAvatarUrl({
+          publicId:
+            representative
+              .avatar_public_id,
 
-                version:
-                  representative
-                    .avatar_version ??
-                  undefined,
+          version:
+            representative
+              .avatar_version,
 
-                format:
-                  representative
-                    .avatar_format ??
-                  undefined,
-
-                transformation: [
-                  {
-                    width:
-                      512,
-
-                    height:
-                      512,
-
-                    crop:
-                      "fill",
-
-                    gravity:
-                      "auto",
-                  },
-                ],
-              },
-            )
-          : null;
+          format:
+            representative
+              .avatar_format,
+        });
 
       const lastReportAt =
         reportResult.rows[0]
@@ -1357,6 +1684,12 @@ router.get(
               ).length,
           },
 
+          performance: {
+            ...performance,
+            sales:
+              verifiedSales,
+          },
+
           reports:
             reportResult.rows.map(
               (
@@ -1507,6 +1840,27 @@ router.get(
 
               reviewed_at,
               reviewed_by_admin_id,
+
+              (
+                SELECT COALESCE(
+                  NULLIF(TRIM(referrer.display_name), ''),
+                  referrer.name
+                )
+                FROM partner_referrals referral
+                INNER JOIN sales_representatives referrer
+                  ON referrer.id = referral.referring_representative_id
+                WHERE referral.application_id = sales_representative_applications.id
+                LIMIT 1
+              ) AS referrer_name,
+
+              (
+                SELECT referrer.username
+                FROM partner_referrals referral
+                INNER JOIN sales_representatives referrer
+                  ON referrer.id = referral.referring_representative_id
+                WHERE referral.application_id = sales_representative_applications.id
+                LIMIT 1
+              ) AS referrer_partner_id,
 
               created_at,
               updated_at
@@ -1944,6 +2298,27 @@ router.patch(
               reviewed_at,
               reviewed_by_admin_id,
 
+              (
+                SELECT COALESCE(
+                  NULLIF(TRIM(referrer.display_name), ''),
+                  referrer.name
+                )
+                FROM partner_referrals referral
+                INNER JOIN sales_representatives referrer
+                  ON referrer.id = referral.referring_representative_id
+                WHERE referral.application_id = sales_representative_applications.id
+                LIMIT 1
+              ) AS referrer_name,
+
+              (
+                SELECT referrer.username
+                FROM partner_referrals referral
+                INNER JOIN sales_representatives referrer
+                  ON referrer.id = referral.referring_representative_id
+                WHERE referral.application_id = sales_representative_applications.id
+                LIMIT 1
+              ) AS referrer_partner_id,
+
               created_at,
               updated_at
           `,
@@ -1981,6 +2356,49 @@ router.patch(
       const statusChanged =
         previousStatus !==
         row.status;
+
+      if (
+        statusChanged &&
+        row.status ===
+          "rejected"
+      ) {
+        const referralResult = await db.query(
+          `
+            UPDATE partner_referrals
+            SET
+              status = 'rejected',
+              reviewed_by_admin_id = $2::uuid,
+              updated_at = NOW()
+            WHERE
+              application_id = $1::uuid
+              AND status IN ('attributed', 'accepted', 'activated')
+            RETURNING referring_representative_id
+          `,
+          [
+            row.id,
+            adminId,
+          ],
+        );
+
+        const referringRepresentativeId =
+          referralResult.rows[0]
+            ?.referring_representative_id;
+
+        if (referringRepresentativeId) {
+          try {
+            await syncRepresentativeProgramCompletions(
+              referringRepresentativeId,
+            );
+          } catch (error) {
+            console.error(
+              "Unable to refresh referral Program progress after rejection:",
+              error instanceof Error
+                ? error.message
+                : "Unknown referral Program error.",
+            );
+          }
+        }
+      }
 
       let emailSent:
         boolean |

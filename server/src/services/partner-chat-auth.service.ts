@@ -23,6 +23,10 @@ import {
   type ChatRole,
 } from "./partner-chat.service.js";
 
+import {
+  representativeAvatarUrl,
+} from "./profile-avatar.service.js";
+
 const CHAT_TOKEN_AUDIENCE =
   "baki-partner-chat";
 
@@ -194,7 +198,13 @@ export async function loadChatIdentity({
           admin.id,
         ),
 
+      avatarUrl:
+        null,
+
       sessionVersion:
+        null,
+
+      performance:
         null,
     };
   }
@@ -209,7 +219,22 @@ export async function loadChatIdentity({
               representative.name
             ) AS name,
             representative.username,
-          representative.session_version
+            representative.session_version,
+            representative.avatar_public_id,
+            representative.avatar_format,
+            representative.avatar_version,
+            (
+              SELECT COUNT(*)::int
+              FROM partner_verified_sales sale
+              WHERE
+                sale.representative_id = representative.id
+                AND sale.status = 'active'
+            ) AS verified_sales,
+            (
+              SELECT COUNT(*)::int
+              FROM representative_reports report
+              WHERE report.representative_id = representative.id
+            ) AS reports
         FROM sales_representatives representative
         INNER JOIN sales_representative_applications application
           ON application.id = representative.application_id
@@ -218,6 +243,17 @@ export async function loadChatIdentity({
           AND representative.is_active = TRUE
           AND representative.must_change_password = FALSE
           AND application.status = 'accepted'
+          AND NOT EXISTS (
+            SELECT 1
+            FROM partner_bans ban
+            WHERE
+              ban.representative_id = representative.id
+              AND ban.ended_at IS NULL
+              AND (
+                ban.is_permanent = TRUE
+                OR ban.banned_until > NOW()
+              )
+          )
         LIMIT 1
       `,
       [
@@ -265,11 +301,39 @@ export async function loadChatIdentity({
         representative.id,
       ),
 
+    avatarUrl:
+      representativeAvatarUrl({
+        publicId:
+          representative.avatar_public_id,
+
+        version:
+          representative.avatar_version,
+
+        format:
+          representative.avatar_format,
+      }),
+
     sessionVersion:
       Number(
         representative
           .session_version,
       ),
+
+    performance: {
+      verifiedSales:
+        Number(
+          representative
+            .verified_sales ??
+          0,
+        ),
+
+      reports:
+        Number(
+          representative
+            .reports ??
+          0,
+        ),
+    },
   };
 }
 
