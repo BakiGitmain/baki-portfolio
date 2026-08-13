@@ -572,6 +572,9 @@ export async function createPartnerChatSocketServer(
     new Server(
       httpServer,
       {
+        path:
+          "/socket.io",
+
         cors: {
           origin:
             env.FRONTEND_URL,
@@ -586,6 +589,7 @@ export async function createPartnerChatSocketServer(
         },
 
         transports: [
+          "polling",
           "websocket",
         ],
 
@@ -603,6 +607,10 @@ export async function createPartnerChatSocketServer(
 
   activeChatServer =
     io;
+
+  console.info(
+    "Partner Chat socket server initialized.",
+  );
 
   let distributedRealtimeReady =
     false;
@@ -684,6 +692,17 @@ export async function createPartnerChatSocketServer(
             "production" &&
           !distributedRealtimeReady
         ) {
+          console.warn(
+            "Partner Chat socket authentication rejected.",
+            {
+              code:
+                "CHAT_REALTIME_UNAVAILABLE",
+              origin:
+                socket.handshake.headers.origin ??
+                "unknown",
+            },
+          );
+
           next(
             new Error(
               "CHAT_REALTIME_UNAVAILABLE",
@@ -705,6 +724,17 @@ export async function createPartnerChatSocketServer(
         if (
           !token
         ) {
+          console.warn(
+            "Partner Chat socket authentication rejected.",
+            {
+              code:
+                "CHAT_AUTH_REQUIRED",
+              origin:
+                socket.handshake.headers.origin ??
+                "unknown",
+            },
+          );
+
           next(
             new Error(
               "CHAT_AUTH_REQUIRED",
@@ -722,6 +752,17 @@ export async function createPartnerChatSocketServer(
         if (
           !identity
         ) {
+          console.warn(
+            "Partner Chat socket authentication rejected.",
+            {
+              code:
+                "CHAT_AUTH_INVALID",
+              origin:
+                socket.handshake.headers.origin ??
+                "unknown",
+            },
+          );
+
           next(
             new Error(
               "CHAT_AUTH_INVALID",
@@ -916,6 +957,19 @@ export async function createPartnerChatSocketServer(
       const socket =
         rawSocket as ChatSocket;
 
+      console.info(
+        "Partner Chat socket connected.",
+        {
+          origin:
+            socket.handshake.headers.origin ??
+            "unknown",
+          role:
+            socket.data.identity.role,
+          transport:
+            socket.conn.transport.name,
+        },
+      );
+
       let identity =
         socket.data.identity;
 
@@ -967,6 +1021,22 @@ export async function createPartnerChatSocketServer(
 
       await socket.join(
         rooms,
+      );
+
+      socket.on(
+        "disconnect",
+        (
+          reason,
+        ) => {
+          console.info(
+            "Partner Chat socket disconnected.",
+            {
+              reason,
+              role:
+                socket.data.identity.role,
+            },
+          );
+        },
       );
 
       schedulePresenceBroadcast();

@@ -692,7 +692,16 @@ export default function PartnerChat({
             const handleConnectError =
               () => {
                 setConnectionState(
-                  "offline",
+                  socket.active
+                    ? "reconnecting"
+                    : "offline",
+                );
+              };
+
+            const handleReconnectAttempt =
+              () => {
+                setConnectionState(
+                  "reconnecting",
                 );
               };
 
@@ -834,6 +843,10 @@ export default function PartnerChat({
               "connect_error",
               handleConnectError,
             );
+            socket.io.on(
+              "reconnect_attempt",
+              handleReconnectAttempt,
+            );
             socket.on(
               "chat:message:new",
               handleNewMessage,
@@ -872,6 +885,10 @@ export default function PartnerChat({
                 socket.off(
                   "connect_error",
                   handleConnectError,
+                );
+                socket.io.off(
+                  "reconnect_attempt",
+                  handleReconnectAttempt,
                 );
                 socket.off(
                   "chat:message:new",

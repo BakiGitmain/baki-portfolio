@@ -2,7 +2,9 @@ import {
   createServer,
 } from "node:http";
 
-import app from "./app.js";
+import {
+  app,
+} from "./app.js";
 
 import {
   env,
@@ -21,15 +23,19 @@ await createPartnerChatSocketServer(
   httpServer,
 );
 
-httpServer.listen(
-  env.PORT,
-  () => {
-    console.log(
-      `🚀 Server running on http://localhost:${env.PORT}`,
-    );
+if (!process.env.VERCEL) {
+  httpServer.listen(
+    env.PORT,
+    () => {
+      console.log(
+        `Server running on http://localhost:${env.PORT}`,
+      );
 
-    console.log(
-      `Environment: ${env.NODE_ENV}`,
-    );
-  },
-);
+      console.log(
+        `Environment: ${env.NODE_ENV}`,
+      );
+    },
+  );
+}
+
+export default httpServer;

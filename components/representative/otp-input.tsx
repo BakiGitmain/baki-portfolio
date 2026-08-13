@@ -198,8 +198,8 @@ export default function OtpInput({
             aria-invalid={invalid}
             className={`h-14 w-12 rounded-[15px] border bg-[var(--portal-surface-2)] text-center text-[20px] font-black text-[var(--portal-text)] outline-none transition focus:ring-4 sm:h-16 sm:w-14 ${
               invalid
-                ? "border-red-400 focus:border-red-400 focus:ring-red-500/10"
-                : "border-[var(--portal-border)] focus:border-[var(--portal-green)]/40 focus:ring-[var(--portal-green)]/10"
+                ? "border-red-400 focus:border-red-400 focus:ring-red-500/10"    
+                : "border-[var(--portal-border)] focus:border-[var(--portal-green)]/40 focus:ring-[var(--portal-green)]/10"       
             }`}
             onFocus={(
               event,

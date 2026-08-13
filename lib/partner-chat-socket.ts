@@ -277,10 +277,14 @@ function createConnection(
         io(
           getSocketUrl(),
           {
+            path:
+              "/socket.io",
+
             autoConnect:
               false,
 
             transports: [
+              "polling",
               "websocket",
             ],
 
