@@ -2,6 +2,10 @@
 
 import Image from "next/image";
 
+import {
+  StaggerGroup,
+  StaggerItem,
+} from "@/components/motion/reveal";
 import { useLanguage } from "@/components/providers/language-provider";
 
 import { contactConfig } from "@/lib/contact";
@@ -268,8 +272,12 @@ export default function Footer() {
 
   return (
     <footer className="portfolio-footer">
-      <div className="footer-shell">
-        <div className="footer-main">
+      <StaggerGroup
+        className="footer-shell"
+        stagger={0.07}
+      >
+        <StaggerItem distance={14}>
+          <div className="footer-main">
           <div className="footer-brand">
             <button
               type="button"
@@ -416,9 +424,11 @@ export default function Footer() {
               </span>
             </div>
           </div>
-        </div>
+          </div>
+        </StaggerItem>
 
-        <div className="footer-bottom">
+        <StaggerItem distance={10}>
+          <div className="footer-bottom">
           <p>
             © {year} Baki.{" "}
             {copy.rights}
@@ -437,8 +447,9 @@ export default function Footer() {
 
             {copy.ending}
           </p>
-        </div>
-      </div>
+          </div>
+        </StaggerItem>
+      </StaggerGroup>
     </footer>
   );
 }

@@ -8,7 +8,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
-    "test": "npm run build --silent && node --test dist/services/moderation-policy.test.js",
+    "test": "npm run build --silent && node --test dist/services/moderation-policy.test.js dist/services/contact-email.service.test.js dist/routes/contact.routes.test.js",
     "db:migrate": "tsx src/scripts/migrate.ts",
     "admin:seed": "tsx src/scripts/seed-admin.ts"
   },

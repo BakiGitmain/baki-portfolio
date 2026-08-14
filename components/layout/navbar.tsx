@@ -8,6 +8,11 @@ import {
 } from "react";
 
 import {
+  AnimatePresence,
+  m,
+} from "motion/react";
+
+import {
   usePathname,
   useRouter,
 } from "next/navigation";
@@ -17,7 +22,13 @@ import ExperienceModeToggle from "@/components/layout/experience-mode-toggle";
 import HeaderAccountMenu from "@/components/layout/header-account-menu";
 
 import LanguageToggle from "@/components/layout/language-toggle";
+import {
+  PREMIUM_EASE,
+} from "@/components/motion/motion-config";
 import { useLanguage } from "@/components/providers/language-provider";
+import {
+  useLoading,
+} from "@/components/providers/loading-provider";
 
 const sectionIds = [
   "home",
@@ -84,6 +95,10 @@ export default function Navbar() {
 
   const { copy } =
     useLanguage();
+
+  const {
+    hasRevealed,
+  } = useLoading();
 
   const [
     menuOpen,
@@ -531,7 +546,23 @@ export default function Navbar() {
   }, [menuOpen]);
 
   return (
-    <header
+    <m.header
+      initial={{
+        opacity: 0,
+        y: -10,
+      }}
+      animate={
+        hasRevealed
+          ? {
+              opacity: 1,
+              y: 0,
+            }
+          : undefined
+      }
+      transition={{
+        duration: 0.42,
+        ease: PREMIUM_EASE,
+      }}
       className={`sticky top-0 z-[100] border-b transition-all duration-500 ${
         isScrolled
           ? "border-black/[0.07] bg-[#f8f8f4]/90 shadow-[0_12px_40px_rgba(28,42,20,0.07)] backdrop-blur-2xl"
@@ -836,29 +867,66 @@ export default function Navbar() {
           MOBILE NAVIGATION
          ========================================== */}
 
-      <div
-        className={`absolute inset-x-0 top-full overflow-hidden border-b border-black/[0.07] bg-[#f8f8f4]/98 shadow-[0_25px_50px_rgba(24,35,18,0.12)] backdrop-blur-2xl transition-all duration-500 xl:hidden ${
-          menuOpen
-            ? "pointer-events-auto max-h-[650px] translate-y-0 opacity-100"
-            : "pointer-events-none max-h-0 -translate-y-3 opacity-0"
-        }`}
+      <AnimatePresence
+        initial={false}
       >
-        <div className="mx-auto flex max-w-[1500px] flex-col px-4 py-4 sm:px-8">
+        {menuOpen && (
+          <m.div
+            className="absolute inset-x-0 top-full overflow-hidden border-b border-black/[0.07] bg-[#f8f8f4]/98 shadow-[0_25px_50px_rgba(24,35,18,0.12)] backdrop-blur-2xl xl:hidden"
+            initial={{
+              opacity: 0,
+              y: -10,
+            }}
+            animate={{
+              opacity: 1,
+              y: 0,
+            }}
+            exit={{
+              opacity: 0,
+              y: -8,
+            }}
+            transition={{
+              duration: 0.26,
+              ease: PREMIUM_EASE,
+            }}
+          >
+            <div className="mx-auto flex max-w-[1500px] flex-col px-4 py-4 sm:px-8">
           {navigationLinks.map(
-            (link) => {
+            (
+              link,
+              index,
+            ) => {
               const active =
                 isHomePage &&
                 activeSection ===
                   link.id;
 
               return (
-                <button
+                <m.button
                   key={link.id}
                   type="button"
                   onClick={() => {
                     handleNavigation(
                       link.id,
                     );
+                  }}
+                  initial={{
+                    opacity: 0,
+                    x: -7,
+                  }}
+                  animate={{
+                    opacity: 1,
+                    x: 0,
+                  }}
+                  exit={{
+                    opacity: 0,
+                    x: -4,
+                  }}
+                  transition={{
+                    delay:
+                      index * 0.025,
+                    duration: 0.24,
+                    ease: PREMIUM_EASE,
                   }}
                   className={`group flex w-full cursor-pointer items-center justify-between rounded-xl px-4 py-3.5 text-left text-base font-semibold transition-all duration-300 ${
                     active
@@ -882,7 +950,7 @@ export default function Navbar() {
                   >
                     →
                   </span>
-                </button>
+                </m.button>
               );
             },
           )}
@@ -890,12 +958,31 @@ export default function Navbar() {
           {/* MOBILE CONTACT */}
 
 {/* MOBILE GET HIRED */}
-<button
+<m.button
   type="button"
   onClick={() => {
     handleNavigation(
       "hire",
     );
+  }}
+  initial={{
+    opacity: 0,
+    y: 6,
+  }}
+  animate={{
+    opacity: 1,
+    y: 0,
+  }}
+  exit={{
+    opacity: 0,
+    y: 4,
+  }}
+  transition={{
+    delay:
+      navigationLinks.length *
+      0.025,
+    duration: 0.24,
+    ease: PREMIUM_EASE,
   }}
             className={`
               group
@@ -944,9 +1031,11 @@ export default function Navbar() {
             >
               →
             </span>
-          </button>
-        </div>
-      </div>
-    </header>
+          </m.button>
+            </div>
+          </m.div>
+        )}
+      </AnimatePresence>
+    </m.header>
   );
 }

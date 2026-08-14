@@ -1,13 +1,46 @@
 "use client";
 
 import {
+  useEffect,
+  useRef,
   useState,
+  type ChangeEvent,
   type FormEvent,
+  type ReactNode,
 } from "react";
+
+import {
+  AnimatePresence,
+  m,
+} from "motion/react";
+
+import AnimatedHeading from "@/components/motion/animated-heading";
+import {
+  CONTROLLED_SPRING,
+  PREMIUM_EASE,
+} from "@/components/motion/motion-config";
+import {
+  EyebrowAccent,
+  Reveal,
+  StaggerGroup,
+  StaggerItem,
+} from "@/components/motion/reveal";
 
 import { useLanguage } from "@/components/providers/language-provider";
 
+import {
+  submitContactInquiry,
+  validateContactInquiry,
+  type ContactField,
+  type ContactInquiryInput,
+  type ContactValidationErrors,
+} from "@/lib/contact-api";
+
 import { contactConfig } from "@/lib/contact";
+
+/* =========================================================
+   ICONS
+   ========================================================= */
 
 function MailIcon() {
   return (
@@ -126,11 +159,399 @@ function SendIcon() {
   );
 }
 
+function CheckIcon() {
+  return (
+    <m.svg
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      initial={{
+        opacity: 0,
+        scale: 0.78,
+      }}
+      animate={{
+        opacity: 1,
+        scale: 1,
+      }}
+      transition={CONTROLLED_SPRING}
+    >
+      <m.circle
+        cx="12"
+        cy="12"
+        r="9"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        initial={{
+          pathLength: 0,
+        }}
+        animate={{
+          pathLength: 1,
+        }}
+        transition={{
+          duration: 0.42,
+          ease: PREMIUM_EASE,
+        }}
+      />
+
+      <m.path
+        d="M8 12.2L10.7 15L16.3 9.4"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        initial={{
+          pathLength: 0,
+        }}
+        animate={{
+          pathLength: 1,
+        }}
+        transition={{
+          delay: 0.16,
+          duration: 0.34,
+          ease: PREMIUM_EASE,
+        }}
+      />
+    </m.svg>
+  );
+}
+
+/* =========================================================
+   COPY
+   ========================================================= */
+
+const CONTACT_COPY = {
+  en: {
+    eyebrow:
+      "GET IN TOUCH",
+
+    titleStart:
+      "Let’s Talk About",
+
+    titleAccent:
+      "Your",
+
+    titleEnd:
+      "Project.",
+
+    description:
+      "Have an idea, redesign or full product in mind? Tell me what you want to build and I’ll get back to you.",
+
+    email:
+      "Email",
+
+    messaging:
+      "Telegram / WhatsApp",
+
+    location:
+      "Work Location",
+
+    response:
+      "Response Time",
+
+    name:
+      "Name",
+
+    namePlaceholder:
+      "Enter your name",
+
+    emailLabel:
+      "Email",
+
+    emailPlaceholder:
+      "Enter your email",
+
+    mobileNumber:
+      "Mobile Number",
+
+    mobileNumberPlaceholder:
+      "+251...",
+
+    projectType:
+      "Project Type",
+
+    projectPlaceholder:
+      "Select project type",
+
+    budget:
+      "Budget Range",
+
+    budgetPlaceholder:
+      "Select budget range",
+
+    message:
+      "Message",
+
+    messagePlaceholder:
+      "Tell me about your project, goals and any specific requirements...",
+
+    send:
+      "Send Message",
+
+    sending:
+      "Sending...",
+
+    success:
+      "Message sent! I’ll get back to you as soon as possible.",
+
+    timeout:
+      "Sending took longer than expected. Please try again.",
+
+    deliveryUnavailable:
+      "Unable to send your message. Please try again.",
+
+    honeypot:
+      "Company website",
+  },
+
+  am: {
+    eyebrow:
+      "ያግኙኝ",
+
+    titleStart:
+      "ስለ",
+
+    titleAccent:
+      "ፕሮጀክትዎ",
+
+    titleEnd:
+      "እንነጋገር።",
+
+    description:
+      "የድረ ገጽ ሐሳብ፣ ዳግም ንድፍ ወይም ሙሉ የድር ምርት አለዎት? ምን መገንባት እንደሚፈልጉ ይንገሩኝ፤ በቅርቡ እመልስልዎታለሁ።",
+
+    email:
+      "ኢሜይል",
+
+    messaging:
+      "ቴሌግራም / ዋትስአፕ",
+
+    location:
+      "የሥራ ቦታ",
+
+    response:
+      "የምላሽ ጊዜ",
+
+    name:
+      "ስም",
+
+    namePlaceholder:
+      "ስምዎን ያስገቡ",
+
+    emailLabel:
+      "ኢሜይል",
+
+    emailPlaceholder:
+      "ኢሜይልዎን ያስገቡ",
+
+    mobileNumber:
+      "የሞባይል ቁጥር",
+
+    mobileNumberPlaceholder:
+      "+251...",
+
+    projectType:
+      "የፕሮጀክት ዓይነት",
+
+    projectPlaceholder:
+      "የፕሮጀክት ዓይነት ይምረጡ",
+
+    budget:
+      "የበጀት መጠን",
+
+    budgetPlaceholder:
+      "የበጀት መጠን ይምረጡ",
+
+    message:
+      "መልዕክት",
+
+    messagePlaceholder:
+      "ስለፕሮጀክትዎ፣ ግቦቹ እና የሚፈልጉት ነገር ይንገሩኝ...",
+
+    send:
+      "መልዕክት ላክ",
+
+    sending:
+      "በመላክ ላይ...",
+
+    success:
+      "መልዕክትዎ ተልኳል! በተቻለ ፍጥነት እመልስልዎታለሁ።",
+
+    timeout:
+      "መላኩ ከተጠበቀው በላይ ጊዜ ወሰደ። እባክዎ እንደገና ይሞክሩ።",
+
+    deliveryUnavailable:
+      "መልዕክትዎን መላክ አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
+
+    honeypot:
+      "የድርጅት ድረ ገጽ",
+  },
+} as const;
+
+const PROJECT_OPTIONS = {
+  en: [
+    {
+      value:
+        "full-stack-website",
+      label:
+        "Full-stack Website",
+    },
+    {
+      value:
+        "landing-page",
+      label:
+        "Landing Page",
+    },
+    {
+      value:
+        "web-application",
+      label:
+        "Web Application",
+    },
+    {
+      value:
+        "admin-dashboard",
+      label:
+        "Admin Dashboard",
+    },
+    {
+      value:
+        "ui-ux-redesign",
+      label:
+        "UI/UX Redesign",
+    },
+    {
+      value:
+        "other",
+      label:
+        "Other",
+    },
+  ],
+
+  am: [
+    {
+      value:
+        "full-stack-website",
+      label:
+        "ሙሉ-ስታክ ድረ ገጽ",
+    },
+    {
+      value:
+        "landing-page",
+      label:
+        "ላንዲንግ ፔጅ",
+    },
+    {
+      value:
+        "web-application",
+      label:
+        "የድር መተግበሪያ",
+    },
+    {
+      value:
+        "admin-dashboard",
+      label:
+        "የአስተዳዳሪ ዳሽቦርድ",
+    },
+    {
+      value:
+        "ui-ux-redesign",
+      label:
+        "የUI/UX ዳግም ንድፍ",
+    },
+    {
+      value:
+        "other",
+      label:
+        "ሌላ",
+    },
+  ],
+} as const;
+
+const BUDGET_OPTIONS = {
+  en: [
+    {
+      value:
+        "etb-35000-50000",
+      label:
+        "ETB 35,000 – 50,000",
+    },
+    {
+      value:
+        "etb-50000-80000",
+      label:
+        "ETB 50,000 – 80,000",
+    },
+    {
+      value:
+        "etb-80000-100000-plus",
+      label:
+        "ETB 80,000 – 100,000+",
+    },
+    {
+      value:
+        "discuss",
+      label:
+        "Let’s Discuss",
+    },
+  ],
+
+  am: [
+    {
+      value:
+        "etb-35000-50000",
+      label:
+        "ETB 35,000 – 50,000",
+    },
+    {
+      value:
+        "etb-50000-80000",
+      label:
+        "ETB 50,000 – 80,000",
+    },
+    {
+      value:
+        "etb-80000-100000-plus",
+      label:
+        "ETB 80,000 – 100,000+",
+    },
+    {
+      value:
+        "discuss",
+      label:
+        "እንወያይበት",
+    },
+  ],
+} as const;
+
+const CONTACT_FIELD_ORDER:
+  readonly ContactField[] = [
+    "name",
+    "email",
+    "mobileNumber",
+    "projectType",
+    "budget",
+    "message",
+  ];
+
+const REQUEST_TIMEOUT_MS =
+  15_000;
+
+/* =========================================================
+   CONTACT CARDS
+   ========================================================= */
+
 type ContactCardProps = {
-  icon: React.ReactNode;
-  title: string;
-  value: string;
-  href?: string;
+  icon:
+    ReactNode;
+
+  title:
+    string;
+
+  value:
+    string;
+
+  href?:
+    string;
 };
 
 function ContactCard({
@@ -163,17 +584,23 @@ function ContactCard({
     </>
   );
 
-  if (href) {
+  if (
+    href
+  ) {
     return (
       <a
         href={href}
         target={
-          href.startsWith("http")
+          href.startsWith(
+            "http",
+          )
             ? "_blank"
             : undefined
         }
         rel={
-          href.startsWith("http")
+          href.startsWith(
+            "http",
+          )
             ? "noreferrer"
             : undefined
         }
@@ -191,216 +618,367 @@ function ContactCard({
   );
 }
 
+function isConfiguredPublicValue(
+  value:
+    string,
+) {
+  return Boolean(
+    value &&
+    !value.includes(
+      "YOUR_",
+    ),
+  );
+}
+
+/* =========================================================
+   FORM
+   ========================================================= */
+
+type SubmissionStatus = {
+  kind:
+    | "submitting"
+    | "success"
+    | "error";
+
+  message:
+    string;
+} | null;
+
 export default function ContactSection() {
-  const { language } =
+  const {
+    language,
+  } =
     useLanguage();
 
-  const [
-    status,
-    setStatus,
-  ] = useState("");
-
   const copy =
-    language === "am"
-      ? {
-          eyebrow:
-            "GET IN TOUCH",
+    CONTACT_COPY[
+      language
+    ];
 
-          titleStart:
-            "ስለ",
+  const [
+    fieldErrors,
+    setFieldErrors,
+  ] =
+    useState<ContactValidationErrors>(
+      {},
+    );
 
-          titleAccent:
-            "ፕሮጀክትዎ",
+  const [
+    submissionStatus,
+    setSubmissionStatus,
+  ] =
+    useState<SubmissionStatus>(
+      null,
+    );
 
-          titleEnd:
-            "እንነጋገር።",
+  const activeRequest =
+    useRef<AbortController | null>(
+      null,
+    );
 
-          description:
-            "Idea ወይም project ካለዎት formውን ይሙሉ። ስለሚፈልጉት solution በዝርዝር እንነጋገራለን።",
+  useEffect(
+    () => () => {
+      activeRequest
+        .current
+        ?.abort();
+    },
+    [],
+  );
 
-          email:
-            "Email",
+  const isSubmitting =
+    submissionStatus
+      ?.kind ===
+    "submitting";
 
-          telegram:
-            "Telegram / WhatsApp",
+  const emailConfigured =
+    isConfiguredPublicValue(
+      contactConfig.email,
+    );
 
-          location:
-            "Work Location",
+  const telegramConfigured =
+    isConfiguredPublicValue(
+      contactConfig.telegramUrl,
+    );
 
-          response:
-            "Response Time",
+  const whatsappConfigured =
+    isConfiguredPublicValue(
+      contactConfig.whatsappUrl,
+    );
 
-          name:
-            "ስምዎ",
+  const messagingHref =
+    telegramConfigured
+      ? contactConfig
+          .telegramUrl
+      : whatsappConfigured
+        ? contactConfig
+            .whatsappUrl
+        : undefined;
 
-          namePlaceholder:
-            "ስምዎን ያስገቡ",
+  function clearFieldError(
+    event:
+      ChangeEvent<
+        HTMLInputElement |
+        HTMLSelectElement |
+        HTMLTextAreaElement
+      >,
+  ) {
+    const field =
+      event.currentTarget
+        .name as
+        ContactField;
 
-          emailLabel:
-            "Emailዎ",
+    if (
+      !CONTACT_FIELD_ORDER.includes(
+        field,
+      )
+    ) {
+      return;
+    }
 
-          emailPlaceholder:
-            "Emailዎን ያስገቡ",
-
-          projectType:
-            "Project Type",
-
-          projectPlaceholder:
-            "Project type ይምረጡ",
-
-          budget:
-            "Budget Range",
-
-          budgetPlaceholder:
-            "Budget ይምረጡ",
-
-          message:
-            "Message",
-
-          messagePlaceholder:
-            "ስለ projectዎ፣ goals እና requirements ይንገሩኝ...",
-
-          send:
-            "Send Message",
-
-          configuration:
-            "በlib/contact.ts ውስጥ እውነተኛ emailዎን ያስገቡ።",
+    setFieldErrors(
+      (
+        current,
+      ) => {
+        if (
+          !current[
+            field
+          ]
+        ) {
+          return current;
         }
-      : {
-          eyebrow:
-            "GET IN TOUCH",
 
-          titleStart:
-            "Let’s Talk About",
-
-          titleAccent:
-            "Your",
-
-          titleEnd:
-            "Project.",
-
-          description:
-            "Have an idea, redesign or full product in mind? Tell me what you want to build and I’ll get back to you.",
-
-          email:
-            "Email",
-
-          telegram:
-            "Telegram / WhatsApp",
-
-          location:
-            "Work Location",
-
-          response:
-            "Response Time",
-
-          name:
-            "Your Name",
-
-          namePlaceholder:
-            "Enter your name",
-
-          emailLabel:
-            "Your Email",
-
-          emailPlaceholder:
-            "Enter your email",
-
-          projectType:
-            "Project Type",
-
-          projectPlaceholder:
-            "Select project type",
-
-          budget:
-            "Budget Range",
-
-          budgetPlaceholder:
-            "Select budget range",
-
-          message:
-            "Message",
-
-          messagePlaceholder:
-            "Tell me about your project, goals and any specific requirements...",
-
-          send:
-            "Send Message",
-
-          configuration:
-            "Add your real email inside lib/contact.ts first.",
+        const next = {
+          ...current,
         };
 
-  function handleSubmit(
-    event: FormEvent<HTMLFormElement>,
+        delete next[
+          field
+        ];
+
+        return next;
+      },
+    );
+
+    if (
+      submissionStatus
+        ?.kind !==
+      "submitting"
+    ) {
+      setSubmissionStatus(
+        null,
+      );
+    }
+  }
+
+  async function handleSubmit(
+    event:
+      FormEvent<HTMLFormElement>,
   ) {
     event.preventDefault();
 
     if (
-      !contactConfig.email ||
-      contactConfig.email.includes(
-        "YOUR_",
-      )
+      isSubmitting
     ) {
-      setStatus(
-        copy.configuration,
-      );
-
       return;
     }
 
     const form =
+      event.currentTarget;
+
+    const formData =
       new FormData(
-        event.currentTarget,
+        form,
       );
 
-    const name =
-      String(
-        form.get("name") ?? "",
+    const input:
+      ContactInquiryInput = {
+      name:
+        String(
+          formData.get(
+            "name",
+          ) ??
+            "",
+        ),
+
+      email:
+        String(
+          formData.get(
+            "email",
+          ) ??
+            "",
+        ),
+
+      mobileNumber:
+        String(
+          formData.get(
+            "mobileNumber",
+          ) ??
+            "",
+        ),
+
+      projectType:
+        String(
+          formData.get(
+            "projectType",
+          ) ??
+            "",
+        ),
+
+      budget:
+        String(
+          formData.get(
+            "budget",
+          ) ??
+            "",
+        ),
+
+      message:
+        String(
+          formData.get(
+            "message",
+          ) ??
+            "",
+        ),
+
+      companyWebsite:
+        String(
+          formData.get(
+            "companyWebsite",
+          ) ??
+            "",
+        ),
+    };
+
+    const errors =
+      validateContactInquiry(
+        input,
+        language,
       );
 
-    const email =
-      String(
-        form.get("email") ?? "",
+    if (
+      Object.keys(
+        errors,
+      ).length >
+      0
+    ) {
+      setFieldErrors(
+        errors,
       );
 
-    const projectType =
-      String(
-        form.get(
-          "projectType",
-        ) ?? "",
+      setSubmissionStatus(
+        null,
       );
 
-    const budget =
-      String(
-        form.get("budget") ?? "",
+      const firstError =
+        CONTACT_FIELD_ORDER
+          .find(
+            (
+              field,
+            ) =>
+              Boolean(
+                errors[
+                  field
+                ],
+              ),
+          );
+
+      if (
+        firstError
+      ) {
+        const field =
+          form.elements
+            .namedItem(
+              firstError,
+            );
+
+        if (
+          field instanceof
+            HTMLElement
+        ) {
+          field.focus();
+        }
+      }
+
+      return;
+    }
+
+    setFieldErrors(
+      {},
+    );
+
+    setSubmissionStatus({
+      kind:
+        "submitting",
+
+      message:
+        "",
+    });
+
+    const controller =
+      new AbortController();
+
+    activeRequest.current =
+      controller;
+
+    const timeoutId =
+      window.setTimeout(
+        () => {
+          controller.abort();
+        },
+        REQUEST_TIMEOUT_MS,
       );
 
-    const message =
-      String(
-        form.get("message") ?? "",
+    try {
+      const message =
+        await submitContactInquiry(
+          input,
+          language,
+          controller.signal,
+        );
+
+      form.reset();
+
+      setSubmissionStatus({
+        kind:
+          "success",
+
+        message:
+          message ??
+          copy.success,
+      });
+    } catch (
+      error
+    ) {
+      const message =
+        controller.signal
+          .aborted
+          ? copy.timeout
+          : error instanceof
+                Error &&
+              error.message
+            ? error.message
+            : copy.deliveryUnavailable;
+
+      setSubmissionStatus({
+        kind:
+          "error",
+
+        message,
+      });
+    } finally {
+      window.clearTimeout(
+        timeoutId,
       );
 
-    const subject =
-      encodeURIComponent(
-        `Portfolio inquiry from ${name}`,
-      );
-
-    const body =
-      encodeURIComponent(
-        [
-          `Name: ${name}`,
-          `Email: ${email}`,
-          `Project type: ${projectType}`,
-          `Budget: ${budget}`,
-          "",
-          "Project details:",
-          message,
-        ].join("\n"),
-      );
-
-    window.location.href =
-      `mailto:${contactConfig.email}?subject=${subject}&body=${body}`;
+      if (
+        activeRequest
+          .current ===
+        controller
+      ) {
+        activeRequest.current =
+          null;
+      }
+    }
   }
 
   return (
@@ -410,253 +988,561 @@ export default function ContactSection() {
     >
       <div className="contact-shell">
         <div className="contact-intro">
-          <div className="contact-eyebrow">
-            <span />
+          <Reveal
+            direction="right"
+            distance={14}
+            className="contact-eyebrow"
+          >
+            <EyebrowAccent shape="dot" />
 
             {copy.eyebrow}
-          </div>
+          </Reveal>
 
-          <h2>
-            {copy.titleStart}{" "}
+          <AnimatedHeading
+            language={language}
+            segments={[
+              {
+                text:
+                  `${copy.titleStart} `,
+              },
+              {
+                accent: true,
+                text:
+                  `${copy.titleAccent} `,
+              },
+              {
+                text:
+                  copy.titleEnd,
+              },
+            ]}
+          />
 
-            <span>
-              {copy.titleAccent}
-            </span>{" "}
+          <Reveal
+            direction="right"
+            distance={18}
+            delay={0.08}
+            className="contact-title-line"
+          />
 
-            {copy.titleEnd}
-          </h2>
+          <Reveal
+            delay={0.12}
+            className="contact-description"
+          >
+            <p>
+              {copy.description}
+            </p>
+          </Reveal>
 
-          <div className="contact-title-line" />
+          <StaggerGroup
+            className="contact-method-grid"
+            delay={0.1}
+          >
+            <StaggerItem distance={16}>
+              <ContactCard
+                icon={
+                  <MailIcon />
+                }
+                title={
+                  copy.email
+                }
+                value={
+                  contactConfig.email
+                }
+                href={
+                  emailConfigured
+                    ? `mailto:${contactConfig.email}`
+                    : undefined
+                }
+              />
+            </StaggerItem>
 
-          <p className="contact-description">
-            {copy.description}
-          </p>
+            <StaggerItem distance={20}>
+              <ContactCard
+                icon={
+                  <ChatIcon />
+                }
+                title={
+                  copy.messaging
+                }
+                value={
+                  copy.messaging
+                }
+                href={
+                  messagingHref
+                }
+              />
+            </StaggerItem>
 
-          <div className="contact-method-grid">
-            <ContactCard
-              icon={
-                <MailIcon />
-              }
-              title={
-                copy.email
-              }
-              value={
-                contactConfig.email
-              }
-              href={
-                contactConfig.email.includes(
-                  "YOUR_",
-                )
-                  ? undefined
-                  : `mailto:${contactConfig.email}`
-              }
-            />
+            <StaggerItem distance={24}>
+              <ContactCard
+                icon={
+                  <LocationIcon />
+                }
+                title={
+                  copy.location
+                }
+                value={
+                  contactConfig.location
+                }
+              />
+            </StaggerItem>
 
-            <ContactCard
-              icon={
-                <ChatIcon />
-              }
-              title={
-                copy.telegram
-              }
-              value="Telegram / WhatsApp"
-              href={
-                contactConfig.telegramUrl.includes(
-                  "YOUR_",
-                )
-                  ? undefined
-                  : contactConfig.telegramUrl
-              }
-            />
-
-            <ContactCard
-              icon={
-                <LocationIcon />
-              }
-              title={
-                copy.location
-              }
-              value={
-                contactConfig.location
-              }
-            />
-
-            <ContactCard
-              icon={
-                <ClockIcon />
-              }
-              title={
-                copy.response
-              }
-              value={
-                contactConfig.responseTime
-              }
-            />
-          </div>
+            <StaggerItem distance={28}>
+              <ContactCard
+                icon={
+                  <ClockIcon />
+                }
+                title={
+                  copy.response
+                }
+                value={
+                  contactConfig.responseTime
+                }
+              />
+            </StaggerItem>
+          </StaggerGroup>
         </div>
 
-        <form
-          onSubmit={
-            handleSubmit
-          }
-          className="contact-form"
+        <StaggerGroup
+          className="min-w-0"
+          delay={0.04}
+          stagger={0.055}
         >
+          <form
+            onSubmit={
+              handleSubmit
+            }
+            className="contact-form"
+            noValidate
+            aria-busy={
+              isSubmitting
+            }
+          >
+          <div
+            className="contact-honeypot"
+            aria-hidden="true"
+          >
+            <label htmlFor="contact-company-website">
+              {copy.honeypot}
+            </label>
+
+            <input
+              id="contact-company-website"
+              name="companyWebsite"
+              type="text"
+              tabIndex={-1}
+              autoComplete="off"
+              disabled={
+                isSubmitting
+              }
+            />
+          </div>
+
           <div className="contact-form-grid">
-            <label className="contact-field">
-              <span>
+            <StaggerItem
+              className="contact-field"
+              distance={14}
+            >
+              <label htmlFor="contact-name">
                 {copy.name}
-              </span>
+              </label>
 
               <input
+                id="contact-name"
                 name="name"
+                type="text"
                 required
+                minLength={2}
+                maxLength={100}
                 autoComplete="name"
                 placeholder={
                   copy.namePlaceholder
                 }
-              />
-            </label>
-
-            <label className="contact-field">
-              <span>
-                {
-                  copy.emailLabel
+                disabled={
+                  isSubmitting
                 }
-              </span>
+                aria-invalid={
+                  Boolean(
+                    fieldErrors.name,
+                  )
+                }
+                aria-describedby={
+                  fieldErrors.name
+                    ? "contact-name-error"
+                    : undefined
+                }
+                onChange={
+                  clearFieldError
+                }
+              />
+
+              {fieldErrors.name && (
+                <p
+                  id="contact-name-error"
+                  className="contact-field-error"
+                >
+                  {fieldErrors.name}
+                </p>
+              )}
+            </StaggerItem>
+
+            <StaggerItem
+              className="contact-field"
+              distance={16}
+            >
+              <label htmlFor="contact-email">
+                {copy.emailLabel}
+              </label>
 
               <input
+                id="contact-email"
                 name="email"
                 type="email"
                 required
+                maxLength={254}
+                inputMode="email"
                 autoComplete="email"
+                spellCheck={false}
                 placeholder={
                   copy.emailPlaceholder
                 }
-              />
-            </label>
-
-            <label className="contact-field">
-              <span>
-                {
-                  copy.projectType
+                disabled={
+                  isSubmitting
                 }
-              </span>
+                aria-invalid={
+                  Boolean(
+                    fieldErrors.email,
+                  )
+                }
+                aria-describedby={
+                  fieldErrors.email
+                    ? "contact-email-error"
+                    : undefined
+                }
+                onChange={
+                  clearFieldError
+                }
+              />
+
+              {fieldErrors.email && (
+                <p
+                  id="contact-email-error"
+                  className="contact-field-error"
+                >
+                  {fieldErrors.email}
+                </p>
+              )}
+            </StaggerItem>
+
+            <StaggerItem
+              className="contact-field"
+              distance={18}
+            >
+              <label htmlFor="contact-mobile-number">
+                {copy.mobileNumber}
+              </label>
+
+              <input
+                id="contact-mobile-number"
+                name="mobileNumber"
+                type="tel"
+                required
+                maxLength={30}
+                inputMode="tel"
+                autoComplete="tel"
+                placeholder={
+                  copy.mobileNumberPlaceholder
+                }
+                disabled={
+                  isSubmitting
+                }
+                aria-invalid={
+                  Boolean(
+                    fieldErrors.mobileNumber,
+                  )
+                }
+                aria-describedby={
+                  fieldErrors.mobileNumber
+                    ? "contact-mobile-number-error"
+                    : undefined
+                }
+                onChange={
+                  clearFieldError
+                }
+              />
+
+              {fieldErrors.mobileNumber && (
+                <p
+                  id="contact-mobile-number-error"
+                  className="contact-field-error"
+                >
+                  {fieldErrors.mobileNumber}
+                </p>
+              )}
+            </StaggerItem>
+
+            <StaggerItem
+              className="contact-field"
+              distance={20}
+            >
+              <label htmlFor="contact-project-type">
+                {copy.projectType}
+              </label>
 
               <select
+                id="contact-project-type"
                 name="projectType"
                 required
                 defaultValue=""
+                disabled={
+                  isSubmitting
+                }
+                aria-invalid={
+                  Boolean(
+                    fieldErrors
+                      .projectType,
+                  )
+                }
+                aria-describedby={
+                  fieldErrors
+                    .projectType
+                    ? "contact-project-type-error"
+                    : undefined
+                }
+                onChange={
+                  clearFieldError
+                }
               >
                 <option
                   value=""
                   disabled
                 >
-                  {
-                    copy.projectPlaceholder
-                  }
+                  {copy.projectPlaceholder}
                 </option>
 
-                <option value="Full-stack website">
-                  Full-stack Website
-                </option>
-
-                <option value="Landing page">
-                  Landing Page
-                </option>
-
-                <option value="Web application">
-                  Web Application
-                </option>
-
-                <option value="Admin dashboard">
-                  Admin Dashboard
-                </option>
-
-                <option value="Redesign">
-                  UI/UX Redesign
-                </option>
-
-                <option value="Other">
-                  Other
-                </option>
+                {PROJECT_OPTIONS[
+                  language
+                ].map(
+                  (
+                    option,
+                  ) => (
+                    <option
+                      key={
+                        option.value
+                      }
+                      value={
+                        option.value
+                      }
+                    >
+                      {option.label}
+                    </option>
+                  ),
+                )}
               </select>
-            </label>
 
-            <label className="contact-field">
-              <span>
+              {fieldErrors.projectType && (
+                <p
+                  id="contact-project-type-error"
+                  className="contact-field-error"
+                >
+                  {fieldErrors.projectType}
+                </p>
+              )}
+            </StaggerItem>
+
+            <StaggerItem
+              className="contact-field"
+              distance={22}
+            >
+              <label htmlFor="contact-budget">
                 {copy.budget}
-              </span>
+              </label>
 
               <select
+                id="contact-budget"
                 name="budget"
                 required
                 defaultValue=""
+                disabled={
+                  isSubmitting
+                }
+                aria-invalid={
+                  Boolean(
+                    fieldErrors.budget,
+                  )
+                }
+                aria-describedby={
+                  fieldErrors.budget
+                    ? "contact-budget-error"
+                    : undefined
+                }
+                onChange={
+                  clearFieldError
+                }
               >
                 <option
                   value=""
                   disabled
                 >
-                  {
-                    copy.budgetPlaceholder
-                  }
+                  {copy.budgetPlaceholder}
                 </option>
 
-                <option value="Starter">
-                  Starter Project
-                </option>
-
-                <option value="Standard">
-                  Standard Project
-                </option>
-
-                <option value="Advanced">
-                  Advanced Project
-                </option>
-
-                <option value="Discuss">
-                  Let&apos;s Discuss
-                </option>
+                {BUDGET_OPTIONS[
+                  language
+                ].map(
+                  (
+                    option,
+                  ) => (
+                    <option
+                      key={
+                        option.value
+                      }
+                      value={
+                        option.value
+                      }
+                    >
+                      {option.label}
+                    </option>
+                  ),
+                )}
               </select>
-            </label>
+
+              {fieldErrors.budget && (
+                <p
+                  id="contact-budget-error"
+                  className="contact-field-error"
+                >
+                  {fieldErrors.budget}
+                </p>
+              )}
+            </StaggerItem>
           </div>
 
-          <label className="contact-field contact-field--message">
-            <span>
+          <StaggerItem
+            className="contact-field contact-field--message"
+            distance={24}
+          >
+            <label htmlFor="contact-message">
               {copy.message}
-            </span>
+            </label>
 
             <textarea
+              id="contact-message"
               name="message"
               required
+              minLength={20}
+              maxLength={3000}
               rows={7}
               placeholder={
                 copy.messagePlaceholder
               }
+              disabled={
+                isSubmitting
+              }
+              aria-invalid={
+                Boolean(
+                  fieldErrors.message,
+                )
+              }
+              aria-describedby={
+                fieldErrors.message
+                  ? "contact-message-error"
+                  : undefined
+              }
+              onChange={
+                clearFieldError
+              }
             />
-          </label>
 
-          <button
-            type="submit"
-            className="contact-submit"
-          >
-            <span>
-              <SendIcon />
-            </span>
+            {fieldErrors.message && (
+              <p
+                id="contact-message-error"
+                className="contact-field-error"
+              >
+                {fieldErrors.message}
+              </p>
+            )}
+          </StaggerItem>
 
-            {
-              copy.send
-            }
-          </button>
-
-          {status && (
-            <p
-              role="status"
-              className="contact-status"
+          <StaggerItem distance={26}>
+            <m.button
+              type="submit"
+              className="contact-submit"
+              disabled={
+                isSubmitting
+              }
+              whileTap={{
+                scale: 0.98,
+              }}
+              transition={CONTROLLED_SPRING}
             >
-              {status}
-            </p>
-          )}
-        </form>
+              <span
+                className={
+                  isSubmitting
+                    ? "contact-submit-spinner"
+                    : undefined
+                }
+              >
+                {!isSubmitting && (
+                  <SendIcon />
+                )}
+              </span>
+
+              {isSubmitting
+                ? copy.sending
+                : copy.send}
+            </m.button>
+          </StaggerItem>
+
+          <div
+            className="contact-status-region"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            <AnimatePresence
+              initial={false}
+              mode="wait"
+            >
+              {submissionStatus &&
+                submissionStatus.kind !==
+                  "submitting" && (
+                  <m.p
+                    key={`${submissionStatus.kind}-${submissionStatus.message}`}
+                    role="status"
+                    initial={{
+                      opacity: 0,
+                      y: 6,
+                    }}
+                    animate={{
+                      opacity: 1,
+                      y: 0,
+                    }}
+                    exit={{
+                      opacity: 0,
+                      y: -4,
+                    }}
+                    transition={{
+                      duration: 0.32,
+                      ease: PREMIUM_EASE,
+                    }}
+                    className={`contact-status contact-status--${submissionStatus.kind}`}
+                  >
+                    {submissionStatus.kind ===
+                      "success" && (
+                      <span className="contact-status-icon">
+                        <CheckIcon />
+                      </span>
+                    )}
+
+                    <span>
+                      {submissionStatus.message}
+                    </span>
+                  </m.p>
+                )}
+            </AnimatePresence>
+          </div>
+          </form>
+        </StaggerGroup>
       </div>
     </section>
   );

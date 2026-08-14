@@ -1,0 +1,101 @@
+{
+  "downloadFileName": "Eyosiyas-Daniel-CV.pdf",
+  "identity": {
+    "fullName": "Eyosiyas Daniel",
+    "knownAs": "Baki",
+    "title": "Full-Stack Web Developer",
+    "brand": "Baki Digital"
+  },
+  "summary": "Full-stack web developer focused on building modern, production-ready websites, web applications and business systems. Experienced across responsive frontend development, backend APIs, databases, authentication, deployment and AI-powered web features.",
+  "highlights": [
+    {
+      "value": "4+ years",
+      "label": "Web-development experience"
+    },
+    {
+      "value": "20+",
+      "label": "Website and web-app projects"
+    },
+    {
+      "value": "2",
+      "label": "Production web projects"
+    }
+  ],
+  "contact": {
+    "portfolioLabel": "bakidigital.com",
+    "portfolioUrl": "https://bakidigital.com",
+    "email": null,
+    "phoneLabel": "+251 936 363 094",
+    "phoneUrl": "tel:+251936363094",
+    "location": "Remote / Worldwide",
+    "linkedinLabel": null,
+    "linkedinUrl": null,
+    "githubLabel": null,
+    "githubUrl": null
+  },
+  "skills": [
+    {
+      "category": "Frontend",
+      "items": ["React", "Next.js", "TypeScript", "JavaScript", "Tailwind CSS", "HTML", "CSS", "Responsive UI"]
+    },
+    {
+      "category": "Backend",
+      "items": ["Node.js", "Express.js", "REST APIs", "Authentication", "Role-Based Access", "Validation", "Secure Sessions"]
+    },
+    {
+      "category": "Data",
+      "items": ["PostgreSQL", "Neon", "SQL", "MongoDB", "Prisma", "Schema Design", "Migrations"]
+    },
+    {
+      "category": "Cloud & Tools",
+      "items": ["Git", "Vercel", "Render", "Cloudinary", "Deployment Debugging", "Production Configuration"]
+    },
+    {
+      "category": "AI & Product",
+      "items": ["OpenAI API", "AI Integrations", "Admin Dashboards", "Email Systems", "Accessibility", "EN / AM i18n"]
+    }
+  ],
+  "developmentBackground": {
+    "title": "Independent Development Background",
+    "duration": "4+ years",
+    "bullets": [
+      "Web-development experience spanning frontend, backend, databases, authentication, security, deployment and full-stack architecture.",
+      "Built more than 30 programming and development projects overall, including more than 20 websites and web applications.",
+      "Two web projects are currently in production and publicly viewable. Project totals include learning, practice, personal and production work - they are not client totals."
+    ]
+  },
+  "projects": [
+    {
+      "name": "Baki Digital",
+      "type": "Portfolio & Business Platform",
+      "description": "Full-stack portfolio and business platform with project publishing, a sales-partner application and training workflow, private partner programs and real-time chat, Baki AI, analytics and site-health monitoring.",
+      "technologies": ["Next.js", "TypeScript", "Express.js", "PostgreSQL", "Socket.IO", "OpenAI API"],
+      "urlLabel": "bakidigital.com",
+      "url": "https://bakidigital.com"
+    },
+    {
+      "name": "Gym House",
+      "type": "Full-Stack Gym Management Platform",
+      "description": "Gym management platform combining a premium fitness website with customer accounts, membership tracking, protected admin access, customer management, plans and automated account workflows.",
+      "technologies": ["Next.js", "TypeScript", "Express.js", "PostgreSQL", "Neon", "Cloudinary"],
+      "urlLabel": "gym-house-nu.vercel.app",
+      "url": "https://gym-house-nu.vercel.app/"
+    },
+    {
+      "name": "Maya Burger",
+      "type": "Full-Stack Restaurant Web Application",
+      "description": "Responsive restaurant application with QR-based access, digital ordering, backend-powered content, administrative management and cloud-based image handling.",
+      "technologies": ["Next.js", "TypeScript", "Express.js", "PostgreSQL", "Neon", "Cloudinary"],
+      "urlLabel": "maya-burger.vercel.app",
+      "url": "https://maya-burger.vercel.app/"
+    }
+  ],
+  "education": [],
+  "languages": ["English", "Amharic"],
+  "todo": {
+    "email": "Add an intentional public professional email before including it in the CV.",
+    "education": "Add verified school, program and date information before enabling the Education section.",
+    "linkedin": "Replace the current placeholder with an intentional public LinkedIn profile before including it.",
+    "github": "Add only if the current public source-code privacy policy is intentionally changed."
+  }
+}

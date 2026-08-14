@@ -505,6 +505,10 @@ export default function ExperienceModeToggle() {
   function handleModeChange(
     nextMode: ExperienceMode,
   ) {
+    if (nextMode === mode) {
+      return;
+    }
+
     if (
       nextMode === "performance"
     ) {

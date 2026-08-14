@@ -1,7 +1,20 @@
 "use client";
 
 import AboutScene from "@/components/home/about-scene";
+import AnimatedCounter from "@/components/motion/animated-counter";
+import AnimatedHeading from "@/components/motion/animated-heading";
+import {
+  EyebrowAccent,
+  Reveal,
+  StaggerGroup,
+  StaggerItem,
+} from "@/components/motion/reveal";
+import SubtleParallax from "@/components/motion/subtle-parallax";
 import { useLanguage } from "@/components/providers/language-provider";
+import {
+  CV_DOWNLOAD_PATH,
+  cvData,
+} from "@/lib/cv-data";
 
 function DownloadIcon() {
   return (
@@ -121,7 +134,9 @@ export default function About() {
 
           <div className="relative min-h-[540px] lg:hidden">
             {/* 3D SCENE BEHIND / RIGHT */}
-            <div
+            <Reveal
+              direction="none"
+              delay={0.2}
               className="
                 absolute
                 bottom-0
@@ -152,7 +167,7 @@ export default function About() {
               >
                 <AboutScene />
               </div>
-            </div>
+            </Reveal>
 
             {/* EXTRA EDGE FADE */}
             <div
@@ -206,15 +221,35 @@ export default function About() {
                 sm:pt-10
               "
             >
-              <div className="mb-4 flex items-center gap-2">
-                <span className="h-px w-5 shrink-0 bg-[#426c2b]" />
+              <Reveal
+                direction="right"
+                distance={14}
+                className="mb-4 flex items-center gap-2"
+              >
+                <EyebrowAccent className="h-px w-5 shrink-0 bg-[#426c2b]" />
 
                 <p className="text-[8px] font-bold tracking-[0.16em] text-[#426c2b] sm:text-[10px]">
                   {text.label}
                 </p>
-              </div>
+              </Reveal>
 
-              <h2
+              <AnimatedHeading
+                language={language}
+                segments={[
+                  {
+                    breakAfter: true,
+                    text: text.titleTop,
+                  },
+                  {
+                    breakAfter: true,
+                    text: text.titleBottom,
+                  },
+                  {
+                    accent: true,
+                    text: text.titleAccent,
+                  },
+                ]}
+                delay={0.04}
                 className="
                   text-[clamp(1.95rem,8vw,2.8rem)]
                   font-semibold
@@ -224,21 +259,10 @@ export default function About() {
 
                   sm:text-[clamp(2.7rem,6vw,4rem)]
                 "
-              >
-                {text.titleTop}
+              />
 
-                <br />
-
-                {text.titleBottom}
-
-                <br />
-
-                <span className="text-[#426c2b]">
-                  {text.titleAccent}
-                </span>
-              </h2>
-
-              <p
+              <Reveal
+                delay={0.12}
                 className="
                   mt-6
                   max-w-[380px]
@@ -250,13 +274,23 @@ export default function About() {
                   sm:leading-7
                 "
               >
-                {text.description}
-              </p>
+                <p>
+                  {text.description}
+                </p>
+              </Reveal>
 
-              <a
-                href="/baki-cv.pdf"
-                download
-                className="
+              <Reveal
+                delay={0.2}
+              >
+                <a
+                  href={
+                    CV_DOWNLOAD_PATH
+                  }
+                  download={
+                    cvData.downloadFileName
+                  }
+                  aria-label={`Download ${cvData.identity.fullName}'s CV as a PDF`}
+                  className="
                   group
                   mt-6
                   inline-flex
@@ -285,13 +319,14 @@ export default function About() {
                   sm:px-4
                   sm:text-xs
                 "
-              >
-                {text.download}
+                >
+                  {text.download}
 
-                <span className="transition-transform duration-300 group-hover:translate-y-0.5">
-                  <DownloadIcon />
-                </span>
-              </a>
+                  <span className="transition-transform duration-300 group-hover:translate-y-0.5">
+                    <DownloadIcon />
+                  </span>
+                </a>
+              </Reveal>
             </div>
 
             {/* SMALL DECORATIVE TECH LABEL */}
@@ -327,7 +362,8 @@ export default function About() {
               MOBILE / TABLET STATS
              ===================================================== */}
 
-          <div
+          <StaggerGroup
+            delay={0.06}
             className="
               relative
               z-20
@@ -349,7 +385,7 @@ export default function About() {
             "
           >
             {text.stats.map((stat, index) => (
-              <div
+              <StaggerItem
                 key={stat.label}
                 className={`
                   relative
@@ -371,15 +407,17 @@ export default function About() {
                 `}
               >
                 <p className="text-lg font-bold tracking-[-0.04em] text-[#161914] sm:text-xl">
-                  {stat.value}
+                  <AnimatedCounter
+                    value={stat.value}
+                  />
                 </p>
 
                 <p className="mt-2 text-[9px] leading-4 text-black/40 sm:text-[10px]">
                   {stat.label}
                 </p>
-              </div>
+              </StaggerItem>
             ))}
-          </div>
+          </StaggerGroup>
 
           {/* =====================================================
               DESKTOP
@@ -396,34 +434,50 @@ export default function About() {
           >
             {/* DESKTOP LEFT */}
             <div className="relative z-20 flex flex-col justify-center px-14 py-16">
-              <div className="mb-6 flex items-center gap-3">
-                <span className="h-px w-8 bg-[#426c2b]" />
+              <Reveal
+                direction="right"
+                distance={18}
+                className="mb-6 flex items-center gap-3"
+              >
+                <EyebrowAccent className="h-px w-8 bg-[#426c2b]" />
 
                 <p className="text-[11px] font-bold tracking-[0.14em] text-[#426c2b]">
                   {text.label}
                 </p>
-              </div>
+              </Reveal>
 
-              <h2 className="max-w-[570px] text-[clamp(3.6rem,5vw,5.2rem)] font-semibold leading-[0.94] tracking-[-0.06em] text-[#11130f]">
-                {text.titleTop}
+              <AnimatedHeading
+                language={language}
+                segments={[
+                  {
+                    breakAfter: true,
+                    text: text.titleTop,
+                  },
+                  {
+                    breakAfter: true,
+                    text: text.titleBottom,
+                  },
+                  {
+                    accent: true,
+                    text: text.titleAccent,
+                  },
+                ]}
+                delay={0.04}
+                className="max-w-[570px] text-[clamp(3.6rem,5vw,5.2rem)] font-semibold leading-[0.94] tracking-[-0.06em] text-[#11130f]"
+              />
 
-                <br />
-
-                {text.titleBottom}
-
-                <br />
-
-                <span className="text-[#426c2b]">
-                  {text.titleAccent}
-                </span>
-              </h2>
-
-              <p className="mt-7 max-w-[520px] text-base leading-8 text-black/50">
-                {text.description}
-              </p>
+              <Reveal
+                delay={0.14}
+                className="mt-7 max-w-[520px] text-base leading-8 text-black/50"
+              >
+                <p>
+                  {text.description}
+                </p>
+              </Reveal>
 
               {/* DESKTOP STATS */}
-              <div
+              <StaggerGroup
+                delay={0.16}
                 className="
                   mt-9
                   grid
@@ -438,7 +492,7 @@ export default function About() {
                 "
               >
                 {text.stats.map((stat, index) => (
-                  <div
+                  <StaggerItem
                     key={stat.label}
                     className={`
                       min-h-[120px]
@@ -456,34 +510,53 @@ export default function About() {
                     `}
                   >
                     <p className="text-2xl font-bold tracking-[-0.04em] text-[#161914]">
-                      {stat.value}
+                      <AnimatedCounter
+                        value={stat.value}
+                      />
                     </p>
 
                     <p className="mt-2 text-xs leading-5 text-black/40">
                       {stat.label}
                     </p>
-                  </div>
+                  </StaggerItem>
                 ))}
-              </div>
+              </StaggerGroup>
             </div>
 
             {/* DESKTOP 3D */}
             <div className="relative overflow-hidden bg-[#f8f8f4]">
               <div className="pointer-events-none absolute left-1/2 top-1/2 h-[70%] w-[70%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#dcebd2]/35 blur-[90px]" />
 
-              <AboutScene />
+              <Reveal
+                direction="none"
+                delay={0.24}
+                className="h-full w-full"
+              >
+                <SubtleParallax
+                  className="h-full w-full"
+                  distance={28}
+                >
+                  <AboutScene />
+                </SubtleParallax>
+              </Reveal>
 
               <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-32 bg-gradient-to-t from-[#f8f8f4] to-transparent" />
 
-              <a
-                href="/baki-cv.pdf"
-                download
-                className="
+              <Reveal
+                direction="none"
+                delay={0.28}
+                className="absolute bottom-7 right-7 z-30"
+              >
+                <a
+                  href={
+                    CV_DOWNLOAD_PATH
+                  }
+                  download={
+                    cvData.downloadFileName
+                  }
+                  aria-label={`Download ${cvData.identity.fullName}'s CV as a PDF`}
+                  className="
                   group
-                  absolute
-                  bottom-7
-                  right-7
-                  z-30
                   inline-flex
                   h-12
                   items-center
@@ -505,13 +578,14 @@ export default function About() {
                   hover:text-[#426c2b]
                   hover:shadow-[0_20px_45px_rgba(46,76,28,0.17)]
                 "
-              >
-                {text.download}
+                >
+                  {text.download}
 
-                <span className="transition-transform duration-300 group-hover:translate-y-0.5">
-                  <DownloadIcon />
-                </span>
-              </a>
+                  <span className="transition-transform duration-300 group-hover:translate-y-0.5">
+                    <DownloadIcon />
+                  </span>
+                </a>
+              </Reveal>
             </div>
           </div>
         </div>

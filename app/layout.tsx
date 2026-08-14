@@ -22,6 +22,8 @@ import LanguageProvider from "@/components/providers/language-provider";
 
 import LoadingProvider from "@/components/providers/loading-provider";
 
+import PortfolioMotionProvider from "@/components/motion/motion-provider";
+
 import WebVitalsReporter from "@/components/performance/web-vitals-reporter";
 
 import "./globals.css";
@@ -74,11 +76,13 @@ export default function RootLayout({
         <LanguageProvider>
           <ExperienceModeProvider>
             <LoadingProvider>
-              <ExperienceShell>
-                {
-                  children
-                }
-              </ExperienceShell>
+              <PortfolioMotionProvider>
+                <ExperienceShell>
+                  {
+                    children
+                  }
+                </ExperienceShell>
+              </PortfolioMotionProvider>
               <BakiAiGlobal />
             </LoadingProvider>
           </ExperienceModeProvider>

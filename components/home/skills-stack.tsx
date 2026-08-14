@@ -6,6 +6,22 @@ import {
   type CSSProperties,
 } from "react";
 
+import {
+  m,
+} from "motion/react";
+
+import AnimatedHeading from "@/components/motion/animated-heading";
+import {
+  PREMIUM_EASE,
+  VIEWPORT_ONCE,
+} from "@/components/motion/motion-config";
+import {
+  EyebrowAccent,
+  Reveal,
+  StaggerGroup,
+  StaggerItem,
+} from "@/components/motion/reveal";
+
 import { useExperienceMode } from "@/components/providers/experience-mode-provider";
 import { useLanguage } from "@/components/providers/language-provider";
 
@@ -814,9 +830,22 @@ function SummaryCard({
           </div>
 
           <div className="skills-stack-summary-progress">
-            <span
+            <m.span
+              initial={{
+                scaleX: 0,
+              }}
+              whileInView={{
+                scaleX: 1,
+              }}
+              viewport={VIEWPORT_ONCE}
+              transition={{
+                duration: 0.72,
+                ease: PREMIUM_EASE,
+              }}
               style={{
                 width: `${category.progress}%`,
+                transformOrigin:
+                  "left center",
               }}
             />
           </div>
@@ -825,10 +854,28 @@ function SummaryCard({
 
       <div className="skills-stack-tool-list">
         {category.tools.map(
-          (tool) => (
-            <span
+          (
+            tool,
+            index,
+          ) => (
+            <m.span
               key={tool.name}
               className="skills-stack-tool-chip"
+              initial={{
+                opacity: 0,
+                scale: 0.94,
+              }}
+              whileInView={{
+                opacity: 1,
+                scale: 1,
+              }}
+              viewport={VIEWPORT_ONCE}
+              transition={{
+                delay:
+                  index * 0.035,
+                duration: 0.38,
+                ease: PREMIUM_EASE,
+              }}
             >
               {tool.image && (
                 <Image
@@ -841,7 +888,7 @@ function SummaryCard({
               )}
 
               {tool.name}
-            </span>
+            </m.span>
           ),
         )}
       </div>
@@ -1270,28 +1317,46 @@ export default function SkillsStackSection() {
 
         <header className="skills-stack-header">
           <div>
-            <div className="skills-stack-eyebrow">
-              <span />
+            <Reveal
+              direction="right"
+              distance={16}
+              className="skills-stack-eyebrow"
+            >
+              <EyebrowAccent />
 
               {copy.eyebrow}
-            </div>
+            </Reveal>
 
-            <h2>
-              {copy.titleStart}{" "}
-
-              <span>
+            <AnimatedHeading
+              language={language}
+              segments={[
                 {
-                  copy.titleAccent
-                }
-              </span>
-            </h2>
+                  text:
+                    `${copy.titleStart} `,
+                },
+                {
+                  accent: true,
+                  text:
+                    copy.titleAccent,
+                },
+              ]}
+            />
 
-            <p>
-              {copy.subtitle}
-            </p>
+            <Reveal
+              delay={0.12}
+            >
+              <p>
+                {copy.subtitle}
+              </p>
+            </Reveal>
           </div>
 
-          <div className="skills-stack-mode-pill">
+          <Reveal
+            direction="left"
+            distance={14}
+            delay={0.16}
+            className="skills-stack-mode-pill"
+          >
             <span
               className={
                 isPerformance
@@ -1303,7 +1368,7 @@ export default function SkillsStackSection() {
             {isPerformance
               ? copy.performance
               : copy.quality}
-          </div>
+          </Reveal>
         </header>
 
         {/* ==========================================
@@ -1313,37 +1378,57 @@ export default function SkillsStackSection() {
         <div className="skills-stack-map">
           {/* LEFT SIDE */}
 
-          <div className="skills-stack-side skills-stack-side--left">
+          <StaggerGroup className="skills-stack-side skills-stack-side--left">
             {categories
               .slice(0, 2)
               .map(
                 (
                   category,
                 ) => (
-                  <SummaryCard
+                  <StaggerItem
                     key={
                       category.title.en
                     }
-                    category={
-                      category
-                    }
-                  />
+                    distance={22}
+                  >
+                    <SummaryCard
+                      category={
+                        category
+                      }
+                    />
+                  </StaggerItem>
                 ),
               )}
-          </div>
+          </StaggerGroup>
 
           {/* ==========================================
               ORBIT
              ========================================== */}
 
           <div className="skills-orbit-column">
-            <div
+            <m.div
               className="skills-orbit-stage"
               data-paused={
                 activeTech
                   ? "true"
                   : "false"
               }
+              initial={{
+                opacity: 0,
+                scale:
+                  isPerformance
+                    ? 0.985
+                    : 0.96,
+              }}
+              whileInView={{
+                opacity: 1,
+                scale: 1,
+              }}
+              viewport={VIEWPORT_ONCE}
+              transition={{
+                duration: 0.72,
+                ease: PREMIUM_EASE,
+              }}
             >
               {/* ORBIT RINGS */}
 
@@ -1442,7 +1527,7 @@ export default function SkillsStackSection() {
                   BUILDING
                 </span>
               </div>
-            </div>
+            </m.div>
 
             {/* ==========================================
                 TECHNOLOGY DETAIL
@@ -1474,44 +1559,61 @@ export default function SkillsStackSection() {
 
           {/* RIGHT SIDE */}
 
-          <div className="skills-stack-side skills-stack-side--right">
+          <StaggerGroup
+            className="skills-stack-side skills-stack-side--right"
+            delay={0.08}
+          >
             {categories
               .slice(2)
               .map(
                 (
                   category,
                 ) => (
-                  <SummaryCard
+                  <StaggerItem
                     key={
                       category.title.en
                     }
-                    category={
-                      category
-                    }
-                  />
+                    distance={28}
+                  >
+                    <SummaryCard
+                      category={
+                        category
+                      }
+                    />
+                  </StaggerItem>
                 ),
               )}
-          </div>
+          </StaggerGroup>
         </div>
 
         {/* ==========================================
             MOBILE CATEGORY CARDS
            ========================================== */}
 
-        <div className="skills-stack-mobile-categories">
+        <StaggerGroup className="skills-stack-mobile-categories">
           {categories.map(
-            (category) => (
-              <SummaryCard
+            (
+              category,
+              index,
+            ) => (
+              <StaggerItem
                 key={
                   category.title.en
                 }
-                category={
-                  category
+                distance={
+                  18 +
+                  index * 3
                 }
-              />
+              >
+                <SummaryCard
+                  category={
+                    category
+                  }
+                />
+              </StaggerItem>
             ),
           )}
-        </div>
+        </StaggerGroup>
 
         {/* ==========================================
             HOW I WORK
@@ -1519,39 +1621,71 @@ export default function SkillsStackSection() {
 
         <div className="skills-work">
           <div className="skills-work-heading">
-            <h2>
-              {copy.how}{" "}
+            <AnimatedHeading
+              language={language}
+              segments={[
+                {
+                  text:
+                    `${copy.how} `,
+                },
+                {
+                  accent: true,
+                  text:
+                    copy.work,
+                },
+              ]}
+            />
 
-              <span>
-                {copy.work}
-              </span>
-            </h2>
-
-            <span className="skills-work-heading-line" />
+            <m.span
+              className="skills-work-heading-line"
+              initial={{
+                scaleX: 0,
+              }}
+              whileInView={{
+                scaleX: 1,
+              }}
+              viewport={VIEWPORT_ONCE}
+              transition={{
+                duration: 0.65,
+                ease: PREMIUM_EASE,
+              }}
+              style={{
+                transformOrigin:
+                  "left center",
+              }}
+            />
           </div>
 
-          <div className="skills-work-grid">
+          <StaggerGroup
+            className="skills-work-grid"
+            delay={0.1}
+            stagger={0.1}
+          >
             {workSteps.map(
               (
                 step,
                 index,
               ) => (
-                <WorkCard
+                <StaggerItem
                   key={
                     step.number
                   }
-                  step={
-                    step
-                  }
-                  isLast={
-                    index ===
-                    workSteps.length -
-                      1
-                  }
-                />
+                  distance={22}
+                >
+                  <WorkCard
+                    step={
+                      step
+                    }
+                    isLast={
+                      index ===
+                      workSteps.length -
+                        1
+                    }
+                  />
+                </StaggerItem>
               ),
             )}
-          </div>
+          </StaggerGroup>
         </div>
       </div>
     </section>

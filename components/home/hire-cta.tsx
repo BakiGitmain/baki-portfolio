@@ -2,6 +2,23 @@
 
 import { useRouter } from "next/navigation";
 
+import {
+  m,
+} from "motion/react";
+
+import AnimatedHeading from "@/components/motion/animated-heading";
+import {
+  CONTROLLED_SPRING,
+  PREMIUM_EASE,
+  VIEWPORT_ONCE,
+} from "@/components/motion/motion-config";
+import {
+  EyebrowAccent,
+  Reveal,
+  StaggerGroup,
+  StaggerItem,
+} from "@/components/motion/reveal";
+
 import { useExperienceMode } from "@/components/providers/experience-mode-provider";
 import { useLanguage } from "@/components/providers/language-provider";
 
@@ -352,82 +369,146 @@ export default function HireCTA() {
            ============================================= */}
 
         <div className="hire-cta-copy">
-          <div className="hire-cta-availability">
-            <span />
+          <Reveal
+            direction="right"
+            distance={14}
+            className="hire-cta-availability"
+          >
+            <EyebrowAccent shape="dot" />
 
             {copy.available}
-          </div>
+          </Reveal>
 
-          <h2>
-            {copy.titleStart}{" "}
+          <AnimatedHeading
+            language={language}
+            segments={[
+              {
+                text:
+                  `${copy.titleStart} `,
+              },
+              {
+                accent: true,
+                text:
+                  `${copy.titleAccent} `,
+              },
+              {
+                text:
+                  copy.titleEnd,
+              },
+            ]}
+            delay={0.025}
+          />
 
-            <span>
-              {copy.titleAccent}
-            </span>{" "}
-
-            {copy.titleEnd}
-          </h2>
-
-          <p>
+          <m.p
+            initial={{
+              opacity: 0,
+              y: 14,
+            }}
+            whileInView={{
+              opacity: 1,
+              y: 0,
+            }}
+            viewport={VIEWPORT_ONCE}
+            transition={{
+              delay: 0.14,
+              duration: 0.56,
+              ease: PREMIUM_EASE,
+            }}
+          >
             {copy.description}
-          </p>
+          </m.p>
 
           {/* ===========================================
               ACTIONS
              =========================================== */}
 
-          <div className="hire-cta-actions">
+          <StaggerGroup
+            className="hire-cta-actions"
+            delay={0.18}
+            stagger={0.08}
+          >
             {/* APPLY */}
 
-            <button
-              type="button"
-              onClick={
-                openApplication
-              }
-              className="hire-cta-primary"
-            >
-              <span className="hire-cta-button-icon">
-                <RocketIcon />
-              </span>
+            <StaggerItem distance={18}>
+              <m.button
+                type="button"
+                onClick={
+                  openApplication
+                }
+                whileTap={{
+                  scale: 0.98,
+                }}
+                transition={CONTROLLED_SPRING}
+                className="hire-cta-primary"
+              >
+                <span className="hire-cta-button-icon">
+                  <RocketIcon />
+                </span>
 
-              <span>
-                {copy.apply}
-              </span>
+                <span>
+                  {copy.apply}
+                </span>
 
-              <span className="hire-cta-arrow">
-                →
-              </span>
-            </button>
+                <span className="hire-cta-arrow">
+                  →
+                </span>
+              </m.button>
+            </StaggerItem>
 
             {/* MORE INFO */}
 
-            <button
-              type="button"
-              onClick={
-                openMoreInfo
-              }
-              className="hire-cta-secondary"
-            >
-              <span className="hire-cta-button-icon">
-                <InfoIcon />
-              </span>
+            <StaggerItem distance={22}>
+              <m.button
+                type="button"
+                onClick={
+                  openMoreInfo
+                }
+                whileTap={{
+                  scale: 0.98,
+                }}
+                transition={CONTROLLED_SPRING}
+                className="hire-cta-secondary"
+              >
+                <span className="hire-cta-button-icon">
+                  <InfoIcon />
+                </span>
 
-              <span>
-                {copy.moreInfo}
-              </span>
+                <span>
+                  {copy.moreInfo}
+                </span>
 
-              <span className="hire-cta-arrow">
-                →
-              </span>
-            </button>
-          </div>
+                <span className="hire-cta-arrow">
+                  →
+                </span>
+              </m.button>
+            </StaggerItem>
+          </StaggerGroup>
         </div>
 
         {/* =============================================
             VISUAL
            ============================================= */}
 
-        <div className="hire-cta-visual">
+        <m.div
+          className="hire-cta-visual"
+          initial={{
+            opacity: 0,
+            scale:
+              performanceMode
+                ? 0.99
+                : 0.96,
+          }}
+          whileInView={{
+            opacity: 1,
+            scale: 1,
+          }}
+          viewport={VIEWPORT_ONCE}
+          transition={{
+            delay: 0.24,
+            duration: 0.72,
+            ease: PREMIUM_EASE,
+          }}
+        >
           {/* ORBITS */}
 
           <div className="hire-orbit hire-orbit--outer" />
@@ -509,7 +590,7 @@ export default function HireCTA() {
               }
             </strong>
           </div>
-        </div>
+        </m.div>
       </div>
     </section>
   );

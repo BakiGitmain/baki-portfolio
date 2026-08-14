@@ -13,7 +13,8 @@ export default function BakiAiGlobal() {
 
   if (
     pathname === "/admin" ||
-    pathname.startsWith("/admin/")
+    pathname.startsWith("/admin/") ||
+    pathname === "/cv"
   ) {
     return null;
   }

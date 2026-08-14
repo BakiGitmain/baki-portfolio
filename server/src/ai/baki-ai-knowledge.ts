@@ -987,11 +987,14 @@ export const BAKI_AI_KNOWLEDGE = {
 
     methods: [
       "Phone",
-      "Website contact/message form",
+      "Live website project-inquiry form",
       "Online communication",
     ],
 
+    websiteInquiryForm:
+      "Visitors can use the Contact section to send a real project inquiry with their name, email, project type, budget range and project details. A successful submission is confirmed on the website, and the visitor should receive a concise confirmation email.",
+
     response:
-      "We don't currently have a public physical office. You can contact Baki online, through the website, or call +251936363094 when direct support is needed.",
+      "We don't currently have a public physical office. You can send a project inquiry through the website Contact form, communicate online, or call +251936363094 when direct support is needed.",
   },
 } as const;

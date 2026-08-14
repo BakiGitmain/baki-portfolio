@@ -2,255 +2,63 @@
 
 import {
   useEffect,
-  useRef,
   useState,
-  type CSSProperties,
 } from "react";
 
-import {
-  useLanguage,
-} from "@/components/providers/language-provider";
+import { useLanguage } from "@/components/providers/language-provider";
+import { useLoading } from "@/components/providers/loading-provider";
 
-import {
-  useLoading,
-  type LoadingTaskId,
-} from "@/components/providers/loading-provider";
-
-const MINIMUM_VISIBLE_TIME =
-  1100;
-
-const EXIT_DURATION =
-  950;
+const EXIT_DURATION_MS = 300;
 
 const loaderCopy = {
   en: {
-    interface:
-      "Preparing the interface...",
-
-    fonts:
-      "Loading typography...",
-
-    scene3d:
-      "Loading 3D objects...",
-
-    images:
-      "Loading project images...",
-
-    page:
-      "Connecting components...",
-
+    preparing:
+      "Preparing your experience...",
     ready:
-      "Experience ready",
-
-    degraded:
-      "Opening optimized experience...",
-
+      "Ready",
     system:
-      "AI EXPERIENCE SYSTEM",
-
+      "DIGITAL EXPERIENCE",
     network:
-      "PORTFOLIO NETWORK",
-
-    progress:
-      "Loading progress",
-
+      "BAKI DIGITAL",
     language:
       "Choose loader language",
   },
-
   am: {
-    interface:
-      "የገጽ ቅርጹን በማዘጋጀት ላይ...",
-
-    fonts:
-      "ፊደሎችን በመጫን ላይ...",
-
-    scene3d:
-      "3D እቃዎችን በመጫን ላይ...",
-
-    images:
-      "የፕሮጀክት ምስሎችን በመጫን ላይ...",
-
-    page:
-      "ኮምፖነንቶችን በማገናኘት ላይ...",
-
+    preparing:
+      "ገጹን በማዘጋጀት ላይ...",
     ready:
       "ዝግጁ ነው",
-
-    degraded:
-      "የተመቻቸውን ገጽ በመክፈት ላይ...",
-
     system:
-      "AI የተሞክሮ ስርዓት",
-
+      "ዲጂታል ተሞክሮ",
     network:
-      "የፖርትፎሊዮ ኔትወርክ",
-
-    progress:
-      "የመጫን ሂደት",
-
+      "ባኪ ዲጂታል",
     language:
       "የመጫኛ ቋንቋ ይምረጡ",
   },
 } as const;
 
-/* =========================================================
-   DISPLAYED PROGRESS
-   ========================================================= */
-
-function useDisplayedProgress(
-  target:
-    number,
-) {
-  const [
-    displayedProgress,
-    setDisplayedProgress,
-  ] =
-    useState(
-      0,
-    );
-
-  const valueRef =
-    useRef(
-      0,
-    );
-
-  useEffect(() => {
-    let animationFrame =
-      0;
-
-    function updateProgress() {
-      const current =
-        valueRef.current;
-
-      const distance =
-        target -
-        current;
-
-      if (
-        distance <=
-        0.08
-      ) {
-        valueRef.current =
-          target;
-
-        setDisplayedProgress(
-          target,
-        );
-
-        return;
-      }
-
-      const movement =
-        Math.max(
-          0.15,
-          distance *
-            0.085,
-        );
-
-      const nextValue =
-        Math.min(
-          target,
-          current +
-            movement,
-        );
-
-      valueRef.current =
-        nextValue;
-
-      setDisplayedProgress(
-        nextValue,
-      );
-
-      animationFrame =
-        window.requestAnimationFrame(
-          updateProgress,
-        );
-    }
-
-    animationFrame =
-      window.requestAnimationFrame(
-        updateProgress,
-      );
-
-    return () => {
-      window.cancelAnimationFrame(
-        animationFrame,
-      );
-    };
-  }, [
-    target,
-  ]);
-
-  return Math.round(
-    displayedProgress,
-  );
-}
-
-/* =========================================================
-   NETWORK DECORATION
-   ========================================================= */
-
 function NetworkDecoration({
   className,
 }: {
-  className:
-    string;
+  className: string;
 }) {
   const points = [
-    [
-      12,
-      246,
-    ],
-
-    [
-      76,
-      174,
-    ],
-
-    [
-      67,
-      78,
-    ],
-
-    [
-      141,
-      224,
-    ],
-
-    [
-      156,
-      42,
-    ],
-
-    [
-      201,
-      139,
-    ],
-
-    [
-      266,
-      63,
-    ],
-
-    [
-      278,
-      170,
-    ],
-
-    [
-      342,
-      74,
-    ],
+    [12, 246],
+    [76, 174],
+    [67, 78],
+    [141, 224],
+    [156, 42],
+    [201, 139],
+    [266, 63],
+    [278, 170],
+    [342, 74],
   ];
 
   return (
     <svg
       viewBox="0 0 360 300"
       fill="none"
-      className={
-        className
-      }
+      className={className}
       aria-hidden="true"
     >
       <path
@@ -265,38 +73,19 @@ function NetworkDecoration({
         strokeOpacity="0.13"
       />
 
-      <path
-        d="M141 224L156 42M201 139L278 170"
-        stroke="currentColor"
-        strokeOpacity="0.1"
-      />
-
-      {points.map(
-        ([
-          cx,
-          cy,
-        ]) => (
-          <circle
-            key={`${cx}-${cy}`}
-            cx={
-              cx
-            }
-            cy={
-              cy
-            }
-            r="5"
-            fill="currentColor"
-            fillOpacity="0.28"
-          />
-        ),
-      )}
+      {points.map(([cx, cy]) => (
+        <circle
+          key={`${cx}-${cy}`}
+          cx={cx}
+          cy={cy}
+          r="5"
+          fill="currentColor"
+          fillOpacity="0.28"
+        />
+      ))}
     </svg>
   );
 }
-
-/* =========================================================
-   ORBIT
-   ========================================================= */
 
 function OrbitLoader() {
   return (
@@ -305,7 +94,6 @@ function OrbitLoader() {
       aria-hidden="true"
     >
       <span className="loader-orbit__halo" />
-
       <span className="loader-orbit__dotted-ring" />
 
       <span className="loader-orbit__ring loader-orbit__ring--outer">
@@ -324,7 +112,6 @@ function OrbitLoader() {
 
       <div className="loader-orbit__core">
         <span className="loader-orbit__core-glow" />
-
         <span className="loader-orbit__code">
           &lt;/&gt;
         </span>
@@ -333,20 +120,9 @@ function OrbitLoader() {
   );
 }
 
-/* =========================================================
-   LOADER
-   ========================================================= */
-
 export default function SiteLoader() {
   const {
-    actualProgress,
-
-    currentTask,
-
-    allTasksResolved,
-
-    failedTasks,
-
+    initialReady,
     revealExperience,
   } = useLoading();
 
@@ -355,169 +131,70 @@ export default function SiteLoader() {
     setLanguage,
   } = useLanguage();
 
-  const [
-    isExiting,
-    setIsExiting,
-  ] =
-    useState(
-      false,
-    );
+  const [isExiting, setIsExiting] =
+    useState(false);
 
-  const [
-    isVisible,
-    setIsVisible,
-  ] =
-    useState(
-      true,
-    );
-
-  const startedAtRef =
-    useRef<number | null>(
-      null,
-    );
+  const [isVisible, setIsVisible] =
+    useState(true);
 
   useEffect(() => {
     if (
-      startedAtRef.current ===
-      null
-    ) {
-      startedAtRef.current =
-        performance.now();
-    }
-  }, []);
-
-  const targetProgress =
-    allTasksResolved
-      ? 100
-      : actualProgress;
-
-  const displayedProgress =
-    useDisplayedProgress(
-      targetProgress,
-    );
-
-  /* =======================================================
-     EXIT
-     ======================================================= */
-
-  useEffect(() => {
-    if (
-      !allTasksResolved ||
-      displayedProgress <
-        100 ||
+      !initialReady ||
       isExiting
     ) {
       return;
     }
 
-    const startedAt =
-      startedAtRef.current ??
-      performance.now();
-
-    const elapsedTime =
-      performance.now() -
-      startedAt;
-
-    const remainingMinimumTime =
-      Math.max(
-        0,
-
-        MINIMUM_VISIBLE_TIME -
-          elapsedTime,
-      );
-
-    const exitTimer =
-      window.setTimeout(
+    const frame =
+      window.requestAnimationFrame(
         () => {
           revealExperience();
-
-          setIsExiting(
-            true,
-          );
+          setIsExiting(true);
         },
-        remainingMinimumTime,
       );
 
     return () => {
-      window.clearTimeout(
-        exitTimer,
+      window.cancelAnimationFrame(
+        frame,
       );
     };
   }, [
-    allTasksResolved,
-    displayedProgress,
+    initialReady,
     isExiting,
     revealExperience,
   ]);
 
-  /* =======================================================
-     REMOVE
-     ======================================================= */
-
   useEffect(() => {
-    if (
-      !isExiting
-    ) {
+    if (!isExiting) {
       return;
     }
 
-    const hideTimer =
+    const timer =
       window.setTimeout(
         () => {
-          setIsVisible(
-            false,
-          );
+          setIsVisible(false);
         },
-        EXIT_DURATION,
+        EXIT_DURATION_MS,
       );
 
     return () => {
       window.clearTimeout(
-        hideTimer,
+        timer,
       );
     };
-  }, [
-    isExiting,
-  ]);
+  }, [isExiting]);
 
-  if (
-    !isVisible
-  ) {
+  if (!isVisible) {
     return null;
   }
 
   const copy =
-    loaderCopy[
-      language
-    ];
+    loaderCopy[language];
 
-  let statusText:
-    string;
-
-  if (
-    allTasksResolved
-  ) {
-    statusText =
-      failedTasks.length >
-      0
-        ? copy.degraded
-        : copy.ready;
-  } else {
-    const activeTask:
-      LoadingTaskId =
-        currentTask ??
-        "interface";
-
-    statusText =
-      copy[
-        activeTask
-      ];
-  }
-
-  const loaderStyle = {
-    "--loader-progress":
-      `${displayedProgress}%`,
-  } as CSSProperties;
+  const statusText =
+    initialReady
+      ? copy.ready
+      : copy.preparing;
 
   return (
     <div
@@ -526,14 +203,9 @@ export default function SiteLoader() {
           ? "site-loader--exiting"
           : ""
       }`}
-      style={
-        loaderStyle
-      }
       role="status"
       aria-live="polite"
-      aria-label={
-        statusText
-      }
+      aria-label={statusText}
     >
       <div
         className="site-loader__background-grid"
@@ -541,7 +213,6 @@ export default function SiteLoader() {
       />
 
       <NetworkDecoration className="site-loader__network site-loader__network--top-right" />
-
       <NetworkDecoration className="site-loader__network site-loader__network--bottom-left" />
 
       <div
@@ -559,20 +230,14 @@ export default function SiteLoader() {
         aria-hidden="true"
       >
         <span className="site-loader__technical-dot" />
-
-        {
-          copy.system
-        }
+        {copy.system}
       </div>
 
       <div
         className="site-loader__technical-label site-loader__technical-label--right"
         aria-hidden="true"
       >
-        {
-          copy.network
-        }
-
+        {copy.network}
         <span className="site-loader__technical-dot" />
       </div>
 
@@ -580,10 +245,7 @@ export default function SiteLoader() {
         <OrbitLoader />
 
         <div className="site-loader__brand">
-          <span>
-            BAKI
-          </span>
-
+          <span>BAKI</span>
           <span className="site-loader__brand-code">
             &lt;/&gt;
           </span>
@@ -595,15 +257,8 @@ export default function SiteLoader() {
             aria-hidden="true"
           />
 
-          <p
-            key={
-              statusText
-            }
-            className="site-loader__status"
-          >
-            {
-              statusText
-            }
+          <p className="site-loader__status">
+            {statusText}
           </p>
 
           <span
@@ -611,59 +266,19 @@ export default function SiteLoader() {
             aria-hidden="true"
           />
         </div>
-
-        <div
-          className="site-loader__progress-wrapper"
-          role="progressbar"
-          aria-label={
-            copy.progress
-          }
-          aria-valuemin={
-            0
-          }
-          aria-valuemax={
-            100
-          }
-          aria-valuenow={
-            displayedProgress
-          }
-        >
-          <div className="site-loader__progress-track">
-            <span className="site-loader__progress-fill">
-              <span className="site-loader__progress-light" />
-            </span>
-          </div>
-
-          <span className="site-loader__percentage">
-            {
-              displayedProgress
-            }
-            %
-          </span>
-        </div>
       </main>
 
       <div
         className="site-loader__languages"
         role="group"
-        aria-label={
-          copy.language
-        }
+        aria-label={copy.language}
       >
         <button
           type="button"
-          aria-pressed={
-            language ===
-            "en"
-          }
-          onClick={() =>
-            setLanguage(
-              "en",
-            )
-          }
+          aria-pressed={language === "en"}
+          onClick={() => setLanguage("en")}
           className={
-            language ===
-            "en"
+            language === "en"
               ? "site-loader__language site-loader__language--active"
               : "site-loader__language"
           }
@@ -671,24 +286,14 @@ export default function SiteLoader() {
           EN
         </button>
 
-        <span aria-hidden="true">
-          /
-        </span>
+        <span aria-hidden="true">/</span>
 
         <button
           type="button"
-          aria-pressed={
-            language ===
-            "am"
-          }
-          onClick={() =>
-            setLanguage(
-              "am",
-            )
-          }
+          aria-pressed={language === "am"}
+          onClick={() => setLanguage("am")}
           className={
-            language ===
-            "am"
+            language === "am"
               ? "site-loader__language site-loader__language--active"
               : "site-loader__language"
           }

@@ -88,19 +88,16 @@ a:focus-visible {
   min-height: 100vh;
   opacity: 0;
   pointer-events: none;
-  transform: translateY(14px) scale(0.995);
-  filter: blur(5px);
+  transform: translateY(4px);
   transition:
-    opacity 850ms cubic-bezier(0.22, 1, 0.36, 1),
-    transform 950ms cubic-bezier(0.22, 1, 0.36, 1),
-    filter 850ms cubic-bezier(0.22, 1, 0.36, 1);
+    opacity 300ms ease-out,
+    transform 300ms ease-out;
 }
 
 .experience-shell--ready {
   opacity: 1;
   pointer-events: auto;
-  transform: translateY(0) scale(1);
-  filter: blur(0);
+  transform: translateY(0);
 }
 
 /* =========================================================
@@ -110,20 +107,17 @@ a:focus-visible {
 .spline-shell {
   isolation: isolate;
   transition:
-    opacity 1200ms cubic-bezier(0.22, 1, 0.36, 1),
-    transform 1400ms cubic-bezier(0.22, 1, 0.36, 1),
-    filter 1200ms cubic-bezier(0.22, 1, 0.36, 1);
+    opacity 500ms ease-out,
+    filter 500ms ease-out;
 }
 
 .spline-shell--waiting {
   opacity: 0;
-  transform: translateY(22px) scale(0.965);
-  filter: blur(7px);
+  filter: blur(2px);
 }
 
 .spline-shell--revealed {
   opacity: 1;
-  transform: translateY(0) scale(1);
   filter: blur(0);
 }
 
@@ -186,8 +180,8 @@ a:focus-visible {
 
 .site-loader--exiting {
   pointer-events: none;
-  animation: loader-overlay-exit 950ms
-    cubic-bezier(0.76, 0, 0.24, 1) forwards;
+  animation: loader-overlay-exit 300ms
+    ease-out forwards;
 }
 
 .site-loader__background-grid {
@@ -224,8 +218,8 @@ a:focus-visible {
 }
 
 .site-loader--exiting .site-loader__content {
-  animation: loader-content-exit 680ms
-    cubic-bezier(0.76, 0, 0.24, 1) forwards;
+  animation: loader-content-exit 240ms
+    ease-out forwards;
 }
 
 /* =========================================================
@@ -1466,7 +1460,7 @@ main {
     #151914;
 }
 
-.skills-stack-header h2 span {
+.skills-stack-header h2 .motion-heading-accent {
   color:
     #4d7d31;
 }
@@ -2694,7 +2688,7 @@ main {
     #171b15;
 }
 
-.skills-work-heading h2 span {
+.skills-work-heading h2 .motion-heading-accent {
   color:
     #4d7c31;
 }
@@ -4231,7 +4225,7 @@ main {
     #171b15;
 }
 
-.hire-cta-copy h2 span {
+.hire-cta-copy h2 .motion-heading-accent {
   color:
     #80b82e;
 }
@@ -4989,7 +4983,7 @@ main {
     #171b15;
 }
 
-.contact-intro h2 span {
+.contact-intro h2 .motion-heading-accent {
   color:
     #4c7c31;
 }
@@ -5110,6 +5104,19 @@ a.contact-method-card:hover {
     );
 }
 
+a.contact-method-card:focus-visible {
+  outline:
+    2px solid
+    rgba(
+      101,
+      153,
+      55,
+      0.72
+    );
+
+  outline-offset: 3px;
+}
+
 .contact-method-icon {
   display: flex;
 
@@ -5137,6 +5144,57 @@ a.contact-method-card:hover {
 
   color:
     #628f34;
+
+  transition:
+    transform 280ms
+      cubic-bezier(
+        0.22,
+        1,
+        0.36,
+        1
+      ),
+    background-color 280ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .contact-method-card:hover {
+    transform:
+      translateY(-3px);
+
+    border-color:
+      rgba(
+        113,
+        166,
+        73,
+        0.2
+      );
+
+    background:
+      rgba(
+        248,
+        252,
+        245,
+        0.96
+      );
+
+    box-shadow:
+      0 12px 28px
+      rgba(
+        44,
+        63,
+        32,
+        0.07
+      );
+  }
+
+  .contact-method-card:hover
+    .contact-method-icon {
+    transform:
+      scale(1.05);
+
+    background:
+      #ebf6df;
+  }
 }
 
 .contact-method-icon svg {
@@ -5221,12 +5279,26 @@ a.contact-method-card:hover {
   gap: 8px;
 }
 
-.contact-field > span {
+.contact-field > label {
   font-size: 10px;
   font-weight: 750;
 
   color:
     #22261f;
+}
+
+.contact-honeypot {
+  position: absolute;
+
+  width: 1px;
+  height: 1px;
+
+  overflow: hidden;
+
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+
+  white-space: nowrap;
 }
 
 .contact-field input,
@@ -5326,6 +5398,46 @@ a.contact-method-card:hover {
   margin-top: 20px;
 }
 
+.contact-field input[aria-invalid="true"],
+.contact-field select[aria-invalid="true"],
+.contact-field textarea[aria-invalid="true"] {
+  border-color:
+    rgba(
+      180,
+      72,
+      62,
+      0.55
+    );
+
+  box-shadow:
+    0 0 0 3px
+    rgba(
+      180,
+      72,
+      62,
+      0.07
+    );
+}
+
+.contact-field input:disabled,
+.contact-field select:disabled,
+.contact-field textarea:disabled {
+  cursor: wait;
+
+  opacity: 0.66;
+}
+
+.contact-field-error {
+  margin: -2px 0 0;
+
+  color:
+    #a13f37;
+
+  font-size: 9px;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
 .contact-submit {
   display: flex;
 
@@ -5385,7 +5497,7 @@ a.contact-method-card:hover {
     box-shadow 280ms ease;
 }
 
-.contact-submit:hover {
+.contact-submit:not(:disabled):hover {
   transform:
     translateY(-2px);
 
@@ -5397,6 +5509,25 @@ a.contact-method-card:hover {
       25,
       0.23
     );
+}
+
+.contact-submit:focus-visible {
+  outline:
+    2px solid
+    rgba(
+      79,
+      124,
+      54,
+      0.78
+    );
+
+  outline-offset: 3px;
+}
+
+.contact-submit:disabled {
+  cursor: wait;
+
+  opacity: 0.72;
 }
 
 .contact-submit span {
@@ -5411,14 +5542,124 @@ a.contact-method-card:hover {
   height: 100%;
 }
 
+.contact-submit .contact-submit-spinner {
+  width: 16px;
+  height: 16px;
+
+  border:
+    2px solid
+    rgba(
+      28,
+      39,
+      14,
+      0.25
+    );
+
+  border-top-color:
+    #1c270e;
+
+  border-radius: 50%;
+
+  animation:
+    contact-submit-spin
+    700ms
+    linear
+    infinite;
+}
+
+@keyframes contact-submit-spin {
+  to {
+    transform:
+      rotate(360deg);
+  }
+}
+
+.contact-status-region {
+  min-height: 26px;
+}
+
 .contact-status {
-  margin-top: 10px;
+  display: flex;
+
+  align-items: center;
+
+  gap: 7px;
+
+  margin:
+    10px
+    0
+    0;
+
+  padding:
+    8px
+    10px;
+
+  border:
+    1px solid
+    transparent;
+
+  border-radius: 9px;
 
   font-size: 10px;
   font-weight: 650;
 
+  line-height: 1.5;
+}
+
+.contact-status--success {
+  border-color:
+    rgba(
+      88,
+      127,
+      55,
+      0.15
+    );
+
+  background:
+    rgba(
+      143,
+      207,
+      47,
+      0.08
+    );
+
   color:
     #587f37;
+}
+
+.contact-status--error {
+  border-color:
+    rgba(
+      161,
+      63,
+      55,
+      0.14
+    );
+
+  background:
+    rgba(
+      180,
+      72,
+      62,
+      0.055
+    );
+
+  color:
+    #963c35;
+}
+
+.contact-status-icon {
+  display: flex;
+
+  width: 17px;
+  height: 17px;
+
+  flex: 0 0 17px;
+}
+
+.contact-status-icon svg {
+  width: 100%;
+  height: 100%;
 }
 
 /* =========================================================
@@ -6185,6 +6426,11 @@ a.contact-method-card:hover {
   .contact-submit,
   .footer-socials a {
     transition:
+      none !important;
+  }
+
+  .contact-submit-spinner {
+    animation:
       none !important;
   }
 }

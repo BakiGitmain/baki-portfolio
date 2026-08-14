@@ -1,183 +1,191 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import Image from "next/image";
 import {
   useCallback,
   useEffect,
   useRef,
   useState,
+  type ComponentType,
 } from "react";
 
+import SplineErrorBoundary from "@/components/home/spline-error-boundary";
+import type { DeferredSplineCanvasProps } from "@/components/home/spline-canvas";
 import { useLoading } from "@/components/providers/loading-provider";
-import { useAdaptiveMobile3D } from "@/hooks/use-adaptive-mobile-3d";
-
-const Spline = dynamic(
-  () => import("@splinetool/react-spline"),
-  {
-    ssr: false,
-    loading: () => (
-      <div
-        className="h-full w-full"
-        aria-hidden="true"
-      />
-    ),
-  },
-);
+import { useDeferred3D } from "@/hooks/use-deferred-3d";
 
 const SPLINE_SCENE_URL =
   "https://prod.spline.design/Mi2blRidcGffVQCF/scene.splinecode";
 
 const FALLBACK_IMAGE_URL =
-  "/images/robot-mobile-fallback.png";
+  "/images/robot-mobile-fallback.webp";
 
-const SPLINE_TIMEOUT_MS = 45_000;
+const SPLINE_TIMEOUT_MS = 30_000;
 
 export default function RobotScene() {
-  const wrapperRef =
+  const containerRef =
     useRef<HTMLDivElement | null>(null);
 
-  /*
-   * Stores which Spline render attempt actually completed.
-   * This avoids calling setSceneLoaded(false) inside an effect.
-   */
-  const [loadedAttempt, setLoadedAttempt] =
-    useState<number | null>(null);
+  const splineWrapperRef =
+    useRef<HTMLDivElement | null>(null);
 
-  const [posterLoaded, setPosterLoaded] =
-    useState(false);
+  const [isHeroVisible, setIsHeroVisible] =
+    useState(true);
+
+  const [loadedRequest, setLoadedRequest] =
+    useState<number | null>(null);
 
   const [posterFailed, setPosterFailed] =
     useState(false);
 
-  const {
-    completeTask,
-    failTask,
-    hasRevealed,
-  } = useLoading();
+  const [SplineCanvas, setSplineCanvas] =
+    useState<ComponentType<DeferredSplineCanvasProps> | null>(
+      null,
+    );
 
-  /*
-   * IMPORTANT:
-   * We cannot use "mode" or "sceneAttempt" here because
-   * those values are returned BY this hook.
-   *
-   * The adaptive hook already checks whether mode === "3d",
-   * so this signal only needs to tell it whether a scene has
-   * successfully loaded and the website has been revealed.
-   */
+  const { markHeroReady } =
+    useLoading();
+
   const {
     mode,
-    isMobile,
-    sceneAttempt,
+    requestId,
+    shouldLoad3D,
     activateImage,
-  } = useAdaptiveMobile3D({
-    monitorEnabled:
-      loadedAttempt !== null &&
-      hasRevealed,
-  });
+  } = useDeferred3D();
 
-  /*
-   * loadedAttempt must match the current attempt.
-   *
-   * Example:
-   *
-   * attempt 0 loads:
-   * loadedAttempt = 0
-   *
-   * Quality mode remounts Spline:
-   * sceneAttempt = 1
-   * loadedAttempt = 0
-   *
-   * sceneLoaded automatically becomes false.
-   *
-   * No reset effect needed.
-   */
   const sceneLoaded =
-    mode === "3d" &&
-    loadedAttempt === sceneAttempt;
+    shouldLoad3D &&
+    SplineCanvas !== null &&
+    loadedRequest === requestId;
 
-  const handleSplineLoad =
-    useCallback(() => {
-      setLoadedAttempt(sceneAttempt);
-
-      completeTask("scene3d");
-    }, [
-      completeTask,
-      sceneAttempt,
-    ]);
-
-  /*
-   * PERFORMANCE MODE
-   *
-   * The real fallback image must load before we consider
-   * the hero's 3D loading task resolved.
-   */
   useEffect(() => {
-    if (mode !== "image") {
+    const element =
+      containerRef.current;
+
+    if (
+      !element ||
+      typeof IntersectionObserver ===
+        "undefined"
+    ) {
       return;
     }
 
-    if (posterLoaded) {
-      completeTask("scene3d");
-      return;
-    }
+    const observer =
+      new IntersectionObserver(
+        ([entry]) => {
+          setIsHeroVisible(
+            entry?.isIntersecting ??
+              true,
+          );
+        },
+        {
+          rootMargin: "160px 0px",
+          threshold: 0.01,
+        },
+      );
 
-    if (posterFailed) {
-      failTask("scene3d");
-    }
-  }, [
-    completeTask,
-    failTask,
-    mode,
-    posterFailed,
-    posterLoaded,
-  ]);
+    observer.observe(element);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
 
   /*
-   * If Spline takes too long, switch to the image.
+   * This import is the true 3D boundary. It is never executed
+   * on default mobile/Performance mode and only runs after the
+   * deferred hook grants permission.
    */
   useEffect(() => {
     if (
-      mode !== "3d" ||
+      !shouldLoad3D ||
+      SplineCanvas
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void import(
+      "@/components/home/spline-canvas"
+    )
+      .then((module) => {
+        if (!cancelled) {
+          setSplineCanvas(
+            () => module.default,
+          );
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          activateImage(
+            "module-load-failed",
+          );
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    SplineCanvas,
+    activateImage,
+    shouldLoad3D,
+  ]);
+
+  const handleSplineReady =
+    useCallback(() => {
+      setLoadedRequest(
+        requestId,
+      );
+    }, [requestId]);
+
+  const handleSplineError =
+    useCallback(() => {
+      activateImage(
+        "scene-load-failed",
+      );
+    }, [activateImage]);
+
+  useEffect(() => {
+    if (
+      !shouldLoad3D ||
+      !SplineCanvas ||
       sceneLoaded
     ) {
       return;
     }
 
     const timeout =
-      window.setTimeout(() => {
-        failTask("scene3d");
-
-        activateImage(
-          "spline-timeout",
-        );
-      }, SPLINE_TIMEOUT_MS);
+      window.setTimeout(
+        () => {
+          activateImage(
+            "spline-timeout",
+          );
+        },
+        SPLINE_TIMEOUT_MS,
+      );
 
     return () => {
-      window.clearTimeout(timeout);
+      window.clearTimeout(
+        timeout,
+      );
     };
   }, [
+    SplineCanvas,
     activateImage,
-    failTask,
-    mode,
-    sceneAttempt,
+    requestId,
     sceneLoaded,
+    shouldLoad3D,
   ]);
 
-  /*
-   * If WebGL crashes or the GPU context gets lost,
-   * immediately switch to Performance mode.
-   */
   useEffect(() => {
-    if (
-      mode !== "3d" ||
-      !sceneLoaded
-    ) {
+    if (!sceneLoaded) {
       return;
     }
 
     const canvas =
-      wrapperRef.current?.querySelector(
+      splineWrapperRef.current?.querySelector(
         "canvas",
       );
 
@@ -208,143 +216,87 @@ export default function RobotScene() {
     };
   }, [
     activateImage,
-    mode,
     sceneLoaded,
   ]);
 
-  /*
-   * Preload the fallback image on phones.
-   *
-   * This makes an automatic 3D -> image transition
-   * basically instant if the phone starts struggling.
-   */
-  const shouldRenderPoster =
-    isMobile ||
-    mode === "image";
-
-  const posterVisible =
-    mode === "image" ||
-    (
-      mode === "3d" &&
-      (
-        !sceneLoaded ||
-        !hasRevealed
-      )
-    );
-
-  if (mode === "checking") {
-    return (
-      <div
-        className="absolute inset-0"
-        aria-hidden="true"
-      />
-    );
-  }
-
   return (
-    <div className="absolute inset-0">
-      {/* ============================================
-          PERFORMANCE MODE IMAGE
-         ============================================ */}
-
-      {shouldRenderPoster && (
-        <div
-          className={`
-            absolute
-            inset-0
-            z-0
-
-            transition-all
-            duration-700
-            ease-[cubic-bezier(0.22,1,0.36,1)]
-
-            ${
-              posterVisible
-                ? "opacity-100 blur-0"
-                : "pointer-events-none opacity-0 blur-[2px]"
-            }
-          `}
-        >
-          {!posterFailed ? (
-            <div
-              className={`
-                relative
-                h-full
-                w-full
-
-                ${
-                  mode === "image"
-                    ? "robot-mobile-poster-float"
-                    : ""
-                }
-              `}
-            >
-              <Image
-                fill
-                src={FALLBACK_IMAGE_URL}
-                alt="Baki AI robot"
-                loading="eager"
-                fetchPriority="high"
-                sizes="(max-width: 767px) 100vw, 50vw"
-                draggable={false}
-                onLoad={() => {
-                  setPosterLoaded(true);
-                }}
-                onError={() => {
-                  setPosterFailed(true);
-                }}
-                className={`
-                  translate-y-[3%]
-                  scale-[1.13]
-
-                  select-none
-                  object-contain
-                  object-center
-                `}
-              />
-            </div>
-          ) : (
-            <div className="flex h-full w-full items-center justify-center">
-              <div className="flex h-28 w-28 items-center justify-center rounded-full border border-[#4b702f]/15 bg-white/70 font-mono text-2xl font-bold text-[#4b702f] shadow-sm">
-                &lt;/&gt;
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ============================================
-          QUALITY MODE — REAL SPLINE
-         ============================================ */}
-
-      {mode === "3d" && (
-        <div
-          ref={wrapperRef}
-          className={`
-            spline-shell
-            absolute
-            inset-0
-            z-10
-            overflow-hidden
-
-            ${
-              sceneLoaded &&
-              hasRevealed
-                ? "spline-shell--revealed"
-                : "spline-shell--waiting"
-            }
-          `}
-        >
-          <div className="absolute inset-0 scale-[1.12] sm:scale-[1.08] lg:translate-x-[4%] lg:scale-[1.18]">
-            <Spline
-              key={`robot-scene-${sceneAttempt}`}
-              scene={SPLINE_SCENE_URL}
-              onLoad={handleSplineLoad}
-              className="h-full w-full"
+    <div
+      ref={containerRef}
+      className="absolute inset-0"
+      data-3d-mode={mode}
+      data-3d-state={
+        sceneLoaded
+          ? "ready"
+          : shouldLoad3D
+            ? "loading"
+            : "idle"
+      }
+    >
+      <div
+        className={`absolute inset-0 z-0 transition-opacity duration-500 ease-out ${
+          sceneLoaded
+            ? "pointer-events-none opacity-0"
+            : "opacity-100"
+        }`}
+      >
+        {!posterFailed ? (
+          <div
+            className={`relative h-full w-full ${
+              mode === "quality"
+                ? "robot-mobile-poster-float"
+                : ""
+            }`}
+          >
+            <Image
+              fill
+              preload
+              src={FALLBACK_IMAGE_URL}
+              alt="Baki AI robot"
+              sizes="(max-width: 1023px) 100vw, 50vw"
+              draggable={false}
+              onLoad={markHeroReady}
+              onError={() => {
+                setPosterFailed(true);
+                markHeroReady();
+              }}
+              className="translate-y-[3%] scale-[1.13] select-none object-contain object-center"
             />
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="flex h-full w-full items-center justify-center">
+            <div className="flex h-28 w-28 items-center justify-center rounded-full border border-[#4b702f]/15 bg-white/70 font-mono text-2xl font-bold text-[#4b702f] shadow-sm">
+              &lt;/&gt;
+            </div>
+          </div>
+        )}
+      </div>
+
+      {shouldLoad3D &&
+        SplineCanvas && (
+          <div
+            ref={splineWrapperRef}
+            className={`spline-shell absolute inset-0 z-10 overflow-hidden ${
+              sceneLoaded
+                ? "spline-shell--revealed"
+                : "spline-shell--waiting"
+            }`}
+          >
+            <div className="absolute inset-0 scale-[1.12] sm:scale-[1.08] lg:translate-x-[4%] lg:scale-[1.18]">
+              <SplineErrorBoundary
+                key={`robot-boundary-${requestId}`}
+                onError={handleSplineError}
+              >
+                <SplineCanvas
+                  key={`robot-scene-${requestId}`}
+                  scene={SPLINE_SCENE_URL}
+                  active={isHeroVisible}
+                  onReady={handleSplineReady}
+                  className="h-full w-full"
+                />
+              </SplineErrorBoundary>
+            </div>
+          </div>
+        )}
 
       <style jsx global>{`
         .robot-mobile-poster-float {
@@ -353,7 +305,6 @@ export default function RobotScene() {
             5.5s
             ease-in-out
             infinite;
-
           transform-origin: 50% 58%;
           will-change: transform;
         }

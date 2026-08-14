@@ -12,41 +12,68 @@ export type ExperienceMode =
   | "performance"
   | "quality";
 
+type ExperienceModeSource =
+  | "default"
+  | "manual"
+  | "session";
+
 type ExperienceModeState = {
   mode: ExperienceMode;
-
-  /*
-   * false:
-   * the site is still allowed to automatically optimize
-   * weak mobile devices.
-   *
-   * true:
-   * the visitor explicitly selected a mode.
-   */
-  userSelected: boolean;
+  source: ExperienceModeSource;
 };
 
 type SetModeOptions = {
   persist?: boolean;
+  source?: ExperienceModeSource;
 };
 
-type ExperienceModeContextValue =
-  ExperienceModeState & {
-    setExperienceMode: (
-      mode: ExperienceMode,
-      options?: SetModeOptions,
-    ) => void;
+type ExperienceModeContextValue = {
+  mode: ExperienceMode;
+  userSelected: boolean;
+  setExperienceMode: (
+    mode: ExperienceMode,
+    options?: SetModeOptions,
+  ) => void;
+};
+
+type NetworkInformationLike = {
+  saveData?: boolean;
+  addEventListener?: (
+    type: "change",
+    listener: () => void,
+  ) => void;
+  removeEventListener?: (
+    type: "change",
+    listener: () => void,
+  ) => void;
+};
+
+type NavigatorWithConnection =
+  Navigator & {
+    connection?: NetworkInformationLike;
   };
 
 const STORAGE_KEY =
   "baki-portfolio-experience-mode";
 
+const COMPACT_DEVICE_QUERY =
+  "(max-width: 1023px)";
+
+const REDUCED_MOTION_QUERY =
+  "(prefers-reduced-motion: reduce)";
+
+/*
+ * SSR and hydration always start with the safe static mode.
+ * Desktop Quality is selected only after the client resolves
+ * the lightweight media-query/user-preference signals.
+ */
 const SERVER_STATE: ExperienceModeState = {
-  mode: "quality",
-  userSelected: false,
+  mode: "performance",
+  source: "default",
 };
 
-let currentState: ExperienceModeState = SERVER_STATE;
+let currentState: ExperienceModeState =
+  SERVER_STATE;
 
 let initialized = false;
 
@@ -68,6 +95,43 @@ function isExperienceMode(
   );
 }
 
+function getConnection() {
+  return (
+    navigator as NavigatorWithConnection
+  ).connection;
+}
+
+function getDeviceDefault(): ExperienceMode {
+  const compactDevice =
+    window.matchMedia(
+      COMPACT_DEVICE_QUERY,
+    ).matches;
+
+  const reducedMotion =
+    window.matchMedia(
+      REDUCED_MOTION_QUERY,
+    ).matches;
+
+  const saveData =
+    getConnection()?.saveData === true;
+
+  return compactDevice ||
+    reducedMotion ||
+    saveData
+    ? "performance"
+    : "quality";
+}
+
+function readStoredMode() {
+  try {
+    return window.localStorage.getItem(
+      STORAGE_KEY,
+    );
+  } catch {
+    return null;
+  }
+}
+
 function initializeClientState() {
   if (
     initialized ||
@@ -79,16 +143,47 @@ function initializeClientState() {
   initialized = true;
 
   const storedMode =
-    window.localStorage.getItem(
-      STORAGE_KEY,
-    );
+    readStoredMode();
 
   if (isExperienceMode(storedMode)) {
     currentState = {
       mode: storedMode,
-      userSelected: true,
+      source: "manual",
     };
+
+    return;
   }
+
+  currentState = {
+    mode: getDeviceDefault(),
+    source: "default",
+  };
+}
+
+function updateDeviceDefault() {
+  if (
+    currentState.source !==
+    "default"
+  ) {
+    return;
+  }
+
+  const nextMode =
+    getDeviceDefault();
+
+  if (
+    nextMode ===
+    currentState.mode
+  ) {
+    return;
+  }
+
+  currentState = {
+    mode: nextMode,
+    source: "default",
+  };
+
+  notifyListeners();
 }
 
 function subscribe(
@@ -97,6 +192,33 @@ function subscribe(
   initializeClientState();
 
   listeners.add(listener);
+
+  const compactQuery =
+    window.matchMedia(
+      COMPACT_DEVICE_QUERY,
+    );
+
+  const motionQuery =
+    window.matchMedia(
+      REDUCED_MOTION_QUERY,
+    );
+
+  const connection =
+    getConnection();
+
+  let resizeTimer = 0;
+
+  function scheduleDefaultUpdate() {
+    window.clearTimeout(
+      resizeTimer,
+    );
+
+    resizeTimer =
+      window.setTimeout(
+        updateDeviceDefault,
+        180,
+      );
+  }
 
   function handleStorage(
     event: StorageEvent,
@@ -108,20 +230,38 @@ function subscribe(
     }
 
     if (
-      !isExperienceMode(
+      isExperienceMode(
         event.newValue,
       )
     ) {
-      return;
+      currentState = {
+        mode: event.newValue,
+        source: "manual",
+      };
+    } else {
+      currentState = {
+        mode: getDeviceDefault(),
+        source: "default",
+      };
     }
-
-    currentState = {
-      mode: event.newValue,
-      userSelected: true,
-    };
 
     notifyListeners();
   }
+
+  compactQuery.addEventListener(
+    "change",
+    scheduleDefaultUpdate,
+  );
+
+  motionQuery.addEventListener(
+    "change",
+    scheduleDefaultUpdate,
+  );
+
+  connection?.addEventListener?.(
+    "change",
+    scheduleDefaultUpdate,
+  );
 
   window.addEventListener(
     "storage",
@@ -130,6 +270,25 @@ function subscribe(
 
   return () => {
     listeners.delete(listener);
+
+    window.clearTimeout(
+      resizeTimer,
+    );
+
+    compactQuery.removeEventListener(
+      "change",
+      scheduleDefaultUpdate,
+    );
+
+    motionQuery.removeEventListener(
+      "change",
+      scheduleDefaultUpdate,
+    );
+
+    connection?.removeEventListener?.(
+      "change",
+      scheduleDefaultUpdate,
+    );
 
     window.removeEventListener(
       "storage",
@@ -153,19 +312,31 @@ function updateExperienceMode(
   const persist =
     options?.persist ?? true;
 
+  const source =
+    options?.source ??
+    (
+      persist
+        ? "manual"
+        : "session"
+    );
+
   currentState = {
     mode,
-    userSelected: persist,
+    source,
   };
 
   if (
     persist &&
     typeof window !== "undefined"
   ) {
-    window.localStorage.setItem(
-      STORAGE_KEY,
-      mode,
-    );
+    try {
+      window.localStorage.setItem(
+        STORAGE_KEY,
+        mode,
+      );
+    } catch {
+      // Storage can be unavailable in strict privacy modes.
+    }
   }
 
   notifyListeners();
@@ -193,14 +364,14 @@ export default function ExperienceModeProvider({
       () => ({
         mode: state.mode,
         userSelected:
-          state.userSelected,
-
+          state.source ===
+          "manual",
         setExperienceMode:
           updateExperienceMode,
       }),
       [
         state.mode,
-        state.userSelected,
+        state.source,
       ],
     );
 

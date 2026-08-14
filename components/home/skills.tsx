@@ -6,6 +6,10 @@ import {
   useState,
 } from "react";
 
+import AnimatedHeading from "@/components/motion/animated-heading";
+import {
+  Reveal,
+} from "@/components/motion/reveal";
 import { useExperienceMode } from "@/components/providers/experience-mode-provider";
 import { useLanguage } from "@/components/providers/language-provider";
 
@@ -1272,7 +1276,8 @@ export default function SkillsSection() {
            ========================================== */}
 
         <header className="mx-auto max-w-[780px] text-center">
-          <div
+          <Reveal
+            direction="none"
             className={`
               skills-flow-header-pill
 
@@ -1318,9 +1323,25 @@ export default function SkillsSection() {
             >
               {copy.eyebrow}
             </span>
-          </div>
+          </Reveal>
 
-          <h2
+          <AnimatedHeading
+            language={language}
+            segments={[
+              {
+                text:
+                  `${copy.titleStart} `,
+              },
+              {
+                accent: true,
+                text:
+                  `${copy.titleAccent} `,
+              },
+              {
+                text:
+                  copy.titleEnd,
+              },
+            ]}
             className={`
               mt-6
 
@@ -1337,19 +1358,10 @@ export default function SkillsSection() {
 
               lg:text-[64px]
             `}
-          >
-            {copy.titleStart}{" "}
+          />
 
-            <span className="text-[#4e7f31]">
-              {
-                copy.titleAccent
-              }
-            </span>{" "}
-
-            {copy.titleEnd}
-          </h2>
-
-          <p
+          <Reveal
+            delay={0.12}
             className={`
               mx-auto
               mt-5
@@ -1365,10 +1377,14 @@ export default function SkillsSection() {
               sm:leading-7
             `}
           >
-            {copy.description}
-          </p>
+            <p>
+              {copy.description}
+            </p>
+          </Reveal>
 
-          <div
+          <Reveal
+            delay={0.18}
+            direction="none"
             className={`
               mx-auto
               mt-7
@@ -1407,7 +1423,7 @@ export default function SkillsSection() {
             <span>
               {copy.scroll}
             </span>
-          </div>
+          </Reveal>
         </header>
 
         {/* ==========================================

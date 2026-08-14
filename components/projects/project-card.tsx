@@ -4,6 +4,17 @@ import Image from "next/image";
 import Link from "next/link";
 
 import {
+  m,
+} from "motion/react";
+
+import {
+  CONTROLLED_SPRING,
+} from "@/components/motion/motion-config";
+import {
+  usePortfolioMotion,
+} from "@/components/motion/motion-provider";
+
+import {
   useLanguage,
 } from "@/components/providers/language-provider";
 
@@ -46,6 +57,11 @@ export default function ProjectCard({
     language,
   } = useLanguage();
 
+  const {
+    finePointer,
+    isPremium,
+  } = usePortfolioMotion();
+
   const title =
     language === "am"
       ? project.title.am
@@ -79,12 +95,30 @@ export default function ProjectCard({
         };
 
   return (
-    <Link
+    <m.div
+      className="h-full"
+      whileHover={
+        finePointer
+          ? {
+              y:
+                isPremium
+                  ? -6
+                  : -4,
+            }
+          : undefined
+      }
+      whileTap={{
+        scale: 0.99,
+      }}
+      transition={CONTROLLED_SPRING}
+    >
+      <Link
       href={`/projects/${project.slug}`}
       className={`
         group
         relative
         block
+        h-full
         overflow-hidden
 
         rounded-[24px]
@@ -100,8 +134,6 @@ export default function ProjectCard({
         duration-500
 
         ease-[cubic-bezier(0.22,1,0.36,1)]
-
-        hover:-translate-y-2
 
         hover:border-[#5f8b43]/20
 
@@ -361,6 +393,7 @@ export default function ProjectCard({
           </span>
         </div>
       </div>
-    </Link>
+      </Link>
+    </m.div>
   );
 }

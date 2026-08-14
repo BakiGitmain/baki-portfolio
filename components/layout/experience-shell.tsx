@@ -35,9 +35,14 @@ export default function ExperienceShell({
       "/admin/",
     );
 
+  const bypassesExperienceLoader =
+    isAdminRoute ||
+    pathname ===
+      "/cv";
+
   useEffect(() => {
     if (
-      isAdminRoute
+      bypassesExperienceLoader
     ) {
       document.documentElement.classList.remove(
         "is-experience-loading",
@@ -58,11 +63,11 @@ export default function ExperienceShell({
     };
   }, [
     hasRevealed,
-    isAdminRoute,
+    bypassesExperienceLoader,
   ]);
 
   if (
-    isAdminRoute
+    bypassesExperienceLoader
   ) {
     return (
       <>

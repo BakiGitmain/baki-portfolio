@@ -68,6 +68,7 @@ import siteHealthRunnerRouter from "./routes/site-health-runner.routes.js";
 import healthRouter from "./routes/health.routes.js";
 
 import projectsRouter from "./routes/projects.routes.js";
+import contactRouter from "./routes/contact.routes.js";
 
 import {
   EXPRESS_TRUST_PROXY,
@@ -246,6 +247,16 @@ app.use(
   "/api/projects",
 
   projectsRouter,
+);
+
+/* =========================================================
+   CONTACT INQUIRIES
+   ========================================================= */
+
+app.use(
+  "/api/contact",
+
+  contactRouter,
 );
 
 /* =========================================================

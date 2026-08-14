@@ -1,21 +1,7 @@
 import {
-  Resend,
-} from "resend";
-
-/* =========================================================
-   CONFIG
-   ========================================================= */
-
-const RESEND_API_KEY =
-  process.env
-    .RESEND_API_KEY
-    ?.trim();
-
-const RESEND_FROM_EMAIL =
-  process.env
-    .RESEND_FROM_EMAIL
-    ?.trim() ||
-  "Baki Digital <noreply@bakidigital.com>";
+  RESEND_FROM_EMAIL,
+  resendClient as resend,
+} from "./resend-client.js";
 
 const SITE_URL =
   "https://bakidigital.com";
@@ -31,17 +17,6 @@ const ADMIN_REPORTS_URL =
 
 const ADMIN_PROGRAMS_URL =
   `${SITE_URL}/admin/programs`;
-
-/* =========================================================
-   CLIENT
-   ========================================================= */
-
-const resend =
-  RESEND_API_KEY
-    ? new Resend(
-        RESEND_API_KEY,
-      )
-    : null;
 
 /* =========================================================
    TYPES

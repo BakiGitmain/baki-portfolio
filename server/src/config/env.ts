@@ -91,9 +91,30 @@ OPENAI_API_KEY: z
     "OPENAI_API_KEY is required.",
   ),
 
-OPENAI_MODEL: z
-  .string()
-  .min(1),
+    OPENAI_MODEL: z
+      .string()
+      .min(1),
+
+    /* =====================================================
+       EMAIL
+       ===================================================== */
+
+    RESEND_API_KEY: z
+      .string()
+      .min(1)
+      .optional(),
+
+    RESEND_FROM_EMAIL: z
+      .string()
+      .min(3)
+      .optional(),
+
+    CONTACT_RECEIVER_EMAIL: z
+      .string()
+      .trim()
+      .email()
+      .max(254)
+      .optional(),
 
     /* =====================================================
        CLOUDINARY

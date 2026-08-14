@@ -8,6 +8,13 @@ import {
 import Link from "next/link";
 
 import ProjectCard from "@/components/projects/project-card";
+import AnimatedHeading from "@/components/motion/animated-heading";
+import {
+  EyebrowAccent,
+  Reveal,
+  StaggerGroup,
+  StaggerItem,
+} from "@/components/motion/reveal";
 
 import {
   useLanguage,
@@ -172,27 +179,42 @@ export default function ProjectsSection() {
       <div className="mx-auto max-w-[1450px]">
         <div className="mb-10 flex items-end justify-between gap-8 sm:mb-12">
           <div className="max-w-[700px]">
-            <div className="mb-3 flex items-center gap-3">
-              <span className="h-[1px] w-7 bg-[#507d33]" />
+            <Reveal
+              direction="right"
+              distance={16}
+              className="mb-3 flex items-center gap-3"
+            >
+              <EyebrowAccent className="h-[1px] w-7 bg-[#507d33]" />
 
               <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#507d33]">
                 {
                   copy.eyebrow
                 }
               </span>
-            </div>
+            </Reveal>
 
-            <h2 className="text-[36px] font-bold tracking-[-0.055em] text-[#161914] sm:text-[46px] lg:text-[54px]">
-              {
-                copy.title
-              }
-            </h2>
+            <AnimatedHeading
+              language={language}
+              segments={[
+                {
+                  text:
+                    copy.title,
+                },
+              ]}
+              delay={0.035}
+              className="text-[36px] font-bold tracking-[-0.055em] text-[#161914] sm:text-[46px] lg:text-[54px]"
+            />
 
-            <p className="mt-4 max-w-[590px] text-[13px] leading-6 text-black/45 sm:text-[15px] sm:leading-7">
-              {
-                copy.description
-              }
-            </p>
+            <Reveal
+              delay={0.12}
+              className="mt-4 max-w-[590px] text-[13px] leading-6 text-black/45 sm:text-[15px] sm:leading-7"
+            >
+              <p>
+                {
+                  copy.description
+                }
+              </p>
+            </Reveal>
           </div>
 
           <Link
@@ -227,22 +249,33 @@ export default function ProjectsSection() {
             }
           </div>
         ) : (
-          <div className="grid gap-6 lg:grid-cols-2 lg:gap-7">
+          <StaggerGroup
+            className="grid gap-6 lg:grid-cols-2 lg:gap-7"
+            stagger={0.1}
+          >
             {projects.map(
               (
                 project,
+                index,
               ) => (
-                <ProjectCard
+                <StaggerItem
                   key={
                     project.slug
                   }
-                  project={
-                    project
+                  distance={
+                    38 +
+                    index * 12
                   }
-                />
+                >
+                  <ProjectCard
+                    project={
+                      project
+                    }
+                  />
+                </StaggerItem>
               ),
             )}
-          </div>
+          </StaggerGroup>
         )}
 
         <Link
